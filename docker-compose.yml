@@ -1,0 +1,65 @@
+services:
+  app:
+    build:
+      context: .
+      target: builder
+    container_name: bakery_app
+    ports:
+      - "3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npm run build && npm run start"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+
+  db:
+    image: postgres:15-alpine
+    container_name: bakery_db
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB_FILE: /run/secrets/db_name
+    ports:
+      - "5432:5432"
+    volumes:
+      - bakery_db_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+      - db_user
+      - db_name
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U root" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80" # Ruch HTTP (Caddy automatycznie przekieruje na bezpieczne HTTPS)
+      - "443:443" # Ruch HTTPS (zielona kłódka)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile # Podpinamy plik konfiguracyjny
+      - caddy_data:/data # Tutaj Caddy bezpiecznie zapisze certyfikaty SSL
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  bakery_db_data:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  db_password:
+    file: ./creds/db_password.txt
+  db_user:
+    file: ./creds/db_user.txt
+  db_name:
+    file: ./creds/db_name.txt

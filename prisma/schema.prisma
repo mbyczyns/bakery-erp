@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  BAKER
+  MANAGER
+}
+
+enum ContractorType {
+  SUPPLIER
+  CUSTOMER
+  OTHER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String?
+  login     String   @unique
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+}
+
+model Contractor {
+  id        String    @id @default(uuid())
+  type      ContractorType
+  name      String
+  nip       String
+  address   String
+  email     String
+  phone     String
+  contactPerson String?
+  products  Product[] 
+  notes     String?
+  createdAt DateTime  @default(now())
+}
+
+model ProductCategory {
+  id          String             @id @default(uuid())
+  name        String
+  products    Product[] 
+  createdAt   DateTime           @default(now())
+}
+
+model Product {
+  id          String             @id @default(uuid())
+  name        String
+  price       Decimal            @default(0.00) 
+  unit        String             
+  category    ProductCategory    @relation(fields: [categoryId], references: [id])
+  categoryId  String
+
+  supplier    Contractor         @relation(fields: [supplierId], references: [id])
+  supplierId  String
+
+  recipes     RecipeIngredient[] 
+  createdAt   DateTime           @default(now())
+}
+
+model SemiFinished {
+  id             String                   @id @default(uuid())
+  name           String
+  cost           Decimal                  @default(0.00) 
+  unit           String                   
+  
+  ingredients    SemiFinishedIngredient[] 
+  bakeryRecipes  RecipeIngredient[]       
+  
+  createdAt      DateTime                 @default(now())
+}
+
+model SemiFinishedIngredient {
+  id             String       @id @default(uuid())
+  amount         Decimal
+  unit           String
+  
+  semiFinishedId String
+  semiFinished   SemiFinished @relation(fields: [semiFinishedId], references: [id], onDelete: Cascade)
+  
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model BakeryProduct {
+  id              String             @id @default(uuid())
+  name            String
+  productionCost  Decimal            @default(0.00)
+  sellingPrice    Decimal            @default(0.00)
+  
+  ingredients     RecipeIngredient[] 
+  productions     DailyProduction[]  
+  createdAt       DateTime           @default(now())
+}
+
+model RecipeIngredient {
+  id              String        @id @default(uuid())
+  amount          Decimal       
+  ingredientUnit  String        
+  
+  bakeryProductId String
+  bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id], onDelete: Cascade)
+  
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  semiFinishedId  String?
+  semiFinished    SemiFinished?  @relation(fields: [semiFinishedId], references: [id], onDelete: Cascade)
+}
+
+model DailyProduction {
+  id              String        @id @default(uuid())
+  date            DateTime      @db.Date
+  
+  producedAmount  Int           @default(0) // Ile upieczono rano
+  soldAmount      Int           @default(0) // Ile wpisano wieczorem
+  
+  bakeryProductId String
+  bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id])
+  
+  createdAt       DateTime      @default(now())
+
+  @@unique([date, bakeryProductId])
+}
+
+model CostType {
+  id           String        @id @default(uuid())
+  name         String        
+  monthlyCosts MonthlyCost[] 
+}
+
+model MonthlyCost {
+  id         String   @id @default(uuid())
+  value      Decimal  @default(0.00) 
+  monthDate  DateTime    @db.Date
+  costTypeId String   
+  costType   CostType @relation(fields: [costTypeId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([monthDate, costTypeId])
+}
