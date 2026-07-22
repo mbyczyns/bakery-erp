@@ -2,15 +2,15 @@ services:
   app:
     build:
       context: .
-      target: builder
+      target: runner
     container_name: bakery_app
     ports:
-      - "3000"
+      - "3000:3000"
     volumes:
       - .:/app
       - /app/node_modules
       - /app/.next
-    command: sh -c "npm run build && npm run start"
+    # command: sh -c "npm run build && npm run start"
     depends_on:
       db:
         condition: service_healthy
@@ -33,28 +33,27 @@ services:
       - db_user
       - db_name
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U root" ]
+      test: [ "CMD-SHELL", "pg_isready -U $$(cat /run/secrets/db_user) -d $$(cat /run/secrets/db_name)" ]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  caddy:
-    image: caddy:2-alpine
-    restart: always
-    ports:
-      - "80:80" # Ruch HTTP (Caddy automatycznie przekieruje na bezpieczne HTTPS)
-      - "443:443" # Ruch HTTPS (zielona kłódka)
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile # Podpinamy plik konfiguracyjny
-      - caddy_data:/data # Tutaj Caddy bezpiecznie zapisze certyfikaty SSL
-      - caddy_config:/config
-    depends_on:
-      - app
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: always
+  #   ports:
+  #     - "80:80" # Ruch HTTP (Caddy automatycznie przekieruje na bezpieczne HTTPS)
+  #     - "443:443" # Ruch HTTPS (zielona kłódka)
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile # Podpinamy plik konfiguracyjny
+  #     - caddy_data:/data # Tutaj Caddy bezpiecznie zapisze certyfikaty SSL
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - app
 
 volumes:
   bakery_db_data:
-  caddy_data:
-  caddy_config:
+    # caddy_data:
+    # caddy_config:
 
 secrets:
   db_password:

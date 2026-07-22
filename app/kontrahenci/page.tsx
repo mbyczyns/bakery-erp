@@ -1,325 +1,515 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Search, Phone, Mail, MapPin, Package, FileText, X, UserIcon } from "lucide-react";
+import {
+    Plus,
+    Search,
+    X,
+    Save,
+    Building2,
+    Mail,
+    Phone,
+    User,
+    FileText,
+    MapPin,
+    ExternalLink
+} from "lucide-react";
 
-// 1. Rozbudowane mock dane - dodano pole "typ" oraz Nabywców
-const mockKontrahenci = [
+// Typy zgodne z Prisma
+type ContractorType = "SUPPLIER" | "CUSTOMER" | "OTHER";
+
+interface Contractor {
+    id: string;
+    type: ContractorType;
+    name: string;
+    nip: string;
+    address?: string;
+    email?: string;
+    phone?: string;
+    contactPerson?: string;
+    notes?: string;
+    createdAt: Date;
+}
+
+// Początkowe mock-dane kontrahentów w bazie
+const initialContractors: Contractor[] = [
     {
-        id: 1,
-        typ: "DOSTAWCA",
-        nazwa: "Młyn Nowofalowy S.A.",
-        nip: "1234567890",
-        telefon: "+48 601 234 567",
-        email: "zamowienia@mlynnowofalowy.pl",
-        adresUlica: "Ul. Młyńska 12",
-        adresKod: "00-001",
-        adresMiejscowosc: "Warszawa",
-        adresKraj: "Polska",
-        osobaKontaktowa: "Maria Nowak",
-        ostatniaDostawa: "10.07.2026",
-        warunkiPlatnosci: "Przelew 14 dni",
-        kontoBankowe: "PL 12 1140 2004 0000 3002 0123 4567"
+        id: "c1-uuid",
+        type: "SUPPLIER",
+        name: "Młyn Nowofalowy Sp. z o.o.",
+        nip: "5210001234",
+        address: "ul. Pszenna 15, 60-100 Poznań",
+        email: "kontakt@mlynnowofalowy.pl",
+        phone: "+48 601 202 303",
+        contactPerson: "Andrzej Młynarz",
+        notes: "Główny dostawca mąki typ 750 i 2000. Dostawy zawsze w środy rano.",
+        createdAt: new Date("2026-07-01")
     },
     {
-        id: 2,
-        typ: "DOSTAWCA",
-        nazwa: "Spółdzielnia Mleczarska Wiejskie Eko",
-        telefon: "+48 502 987 654",
-        nip: "8765432109",
-        email: "biuro@wiejskieeko.pl",
-        adresUlica: "Ul. Kasztanowa 54",
-        adresKod: "00-001",
-        adresMiejscowosc: "Warszawa",
-        adresKraj: "Polska",
-        osobaKontaktowa: "Karolina Kowalska",
-        ostatniaDostawa: "08.07.2026",
-        warunkiPlatnosci: "Przelew 7 dni",
-        kontoBankowe: "PL 98 1020 4027 0000 1002 0345 6789"
-    },
-    {
-        id: 3,
-        typ: "NABYWCA",
-        nazwa: "Sklep Spożywczy U Krysi",
-        telefon: "+48 555 111 222",
-        nip: "9988776655",
-        email: "sklep.krysia@gmail.com",
-        adresUlica: "Ul. Słoneczna 17",
-        adresKod: "00-001",
-        adresMiejscowosc: "Warszawa",
-        adresKraj: "Polska",
-        osobaKontaktowa: "Krystyna Bąk",
-        ostatniaDostawa: "12.07.2026",
-        warunkiPlatnosci: "Przelew 7 dni",
-        kontoBankowe: "PL 11 2222 3333 4444 5555 6666 7777"
-    },
-    {
-        id: 4,
-        typ: "DOSTAWCA",
-        nazwa: "Hurtownia Bakal-Max",
-        telefon: "+48 733 445 566",
-        nip: "5544332211",
-        email: "m.wisniewski@bakalmax.pl",
-        adresUlica: "Ul. Bakaliowa 4",
-        adresKod: "00-001",
-        adresMiejscowosc: "Warszawa",
-        adresKraj: "Polska",
-        osobaKontaktowa: "Mariusz Wiśniewski",
-        ostatniaDostawa: "28.06.2026",
-        warunkiPlatnosci: "Gotówka przy odbiorze",
-        kontoBankowe: "Brak danych"
-    },
-    {
-        id: 5,
-        typ: "NABYWCA",
-        nazwa: "Restauracja Złoty Róg",
-        telefon: "+48 666 777 888",
-        nip: "1122112211",
-        email: "faktury@zlotyrog.pl",
-        adresUlica: "Ul. Smaczna 25",
-        adresKod: "00-001",
-        adresMiejscowosc: "Warszawa",
-        adresKraj: "Polska",
-        osobaKontaktowa: "Tomasz Kowalczyk",
-        ostatniaDostawa: "13.07.2026",
-        warunkiPlatnosci: "Przelew 14 dni",
-        kontoBankowe: "PL 99 8888 7777 6666 5555 4444 3333"
-    },
-    {
-        id: 6,
-        typ: "DOSTAWCA",
-        nazwa: "EcoCukier Sp. z o.o.",
-        telefon: "+48 667 112 233",
-        email: "kontakt@ecocukier.com",
-        adresUlica: "Ul. Słodka 8",
-        adresKod: "00-001",
-        adresMiejscowosc: "Warszawa",
-        adresKraj: "Polska",
-        osobaKontaktowa: "Andrzej Kasprzak",
-        nip: "1122334455",
-        ostatniaDostawa: "02.07.2026",
-        warunkiPlatnosci: "Przelew 30 dni",
-        kontoBankowe: "PL 44 1160 2202 0000 0003 1234 5678"
-    },
+        id: "c2-uuid",
+        type: "CUSTOMER",
+        name: "Kawiarnia 'Ciepła Buła' s.c.",
+        nip: "7771234567",
+        address: "Rynek 12, 61-000 Poznań",
+        email: "zamowienia@cieplabula.pl",
+        phone: "+48 505 505 505",
+        contactPerson: "Marta Słodka",
+        notes: "Odbiór własny codziennie o 6:30. Faktura zbiorcza na koniec miesiąca.",
+        createdAt: new Date("2026-07-03")
+    }
 ];
 
-type Kontrahent = typeof mockKontrahenci[0];
-type FilterType = "WSZYSCY" | "NABYWCA" | "DOSTAWCA";
+export default function KontrahenciPage() {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [contractors, setContractors] = useState<Contractor[]>(initialContractors);
+    const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
 
-export default function DostawcyPage() {
-    const [selectedSupplier, setSelectedSupplier] = useState<Kontrahent | null>(null);
-    const [activeFilter, setActiveFilter] = useState<FilterType>("WSZYSCY");
+    // Typ pomocniczy dla obsługi zakładki "Wszyscy"
+    type TabType = ContractorType | "ALL";
 
-    // Logika zliczania
-    const countWszyscy = mockKontrahenci.length;
-    const countNabywcy = mockKontrahenci.filter(k => k.typ === "NABYWCA").length;
-    const countDostawcy = mockKontrahenci.filter(k => k.typ === "DOSTAWCA").length;
+    // Stan aktywnej zakładki ustawiony domyślnie na "ALL" (Wszyscy)
+    const [activeTab, setActiveTab] = useState<TabType>("ALL");
 
-    // Logika filtrowania listy
-    const filteredKontrahenci = mockKontrahenci.filter(k => {
-        if (activeFilter === "WSZYSCY") return true;
-        return k.typ === activeFilter;
-    });
+    // Filtrowanie kontrahentów: najpierw po typie (jeśli activeTab to "ALL", to pomijamy ten krok), potem po wyszukiwarce
+    const filteredContractors = contractors
+        .filter(c => activeTab === "ALL" ? true : c.type === activeTab)
+        .filter(c =>
+            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.nip.includes(searchTerm)
+        );
+
+    // Funkcja licząca ile elementów mamy w poszczególnych kategoriach na zakładkach
+    const getCountForType = (type: TabType) => {
+        if (type === "ALL") return contractors.length; // Zwraca sumę absolutnie wszystkich kontrahentów
+        return contractors.filter(c => c.type === type).length;
+    };
+
+    // Obsługa zapisu z modalu
+    const handleSaveContractor = (newContractorData: Omit<Contractor, "id" | "createdAt">) => {
+        const newContractor: Contractor = {
+            id: `c-${Date.now()}-uuid`,
+            createdAt: new Date(),
+            ...newContractorData
+        };
+
+        setContractors([newContractor, ...contractors]);
+
+        // Automatycznie przełączamy na zakładkę dodanego kontrahenta, żeby użytkownik go zobaczył
+        setActiveTab(newContractorData.type);
+    };
+
+    const getBadgeProps = (type: ContractorType) => {
+        switch (type) {
+            case "SUPPLIER":
+                return { label: "Dostawca", styles: "bg-blue-50 text-blue-600 border-blue-200" };
+            case "CUSTOMER":
+                return { label: "Odbiorca", styles: "bg-green-50 text-green-600 border-green-200" };
+            default:
+                return { label: "Inny", styles: "bg-gray-50 text-gray-600 border-gray-200" };
+        }
+    };
 
     return (
-        <div className="min-h-screen bg-ui-white text-ui-primary relative pb-10">
+        <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
 
-            {/* Nagłówek strony */}
+            {/* Nagłówek */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">
-                        Dostawcy i Nabywcy
-                    </h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">Kontrahenci</h1>
+                    <p className="text-ui-black text-sm mt-1">
+                        Zarządzaj bazą swoich dostawców i odbiorców wypieków.
+                    </p>
                 </div>
 
-                <button className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-4 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto">
+                <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto"
+                >
                     <Plus size={18} />
-                    Dodaj kontrahenta
+                    <span>Dodaj kontrahenta</span>
                 </button>
             </div>
 
-            {/* Przełącznik (Segmented Control) wg screenshota */}
-            <div className="mb-6 overflow-x-auto pb-2 sm:pb-0">
-                <div className="inline-flex items-center p-1 bg-ui-accent/15 rounded-xl">
-                    <button
-                        onClick={() => setActiveFilter("WSZYSCY")}
-                        className={`flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeFilter === "WSZYSCY"
-                            ? "bg-ui-white text-ui-primary shadow-sm"
-                            : "text-ui-primary/60 hover:text-ui-primary/80"
-                            }`}
-                    >
-                        Wszyscy <span className="font-normal opacity-60">({countWszyscy})</span>
-                    </button>
+            {/* POPRAWIONY PASEK WYBORU ZAKŁADEK (Wszyscy, Dostawcy, Odbiorcy, Inni) */}
+            <div className="flex gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto scrollbar-none">
+                {([
+                    { type: "ALL", label: "Wszyscy" },
+                    { type: "SUPPLIER", label: "Dostawcy" },
+                    { type: "CUSTOMER", label: "Odbiorcy" },
+                    { type: "OTHER", label: "Inni" }
+                ] as { type: TabType; label: string }[]).map((tab) => {
+                    const isActive = activeTab === tab.type;
+                    const count = getCountForType(tab.type);
 
-                    <button
-                        onClick={() => setActiveFilter("NABYWCA")}
-                        className={`flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeFilter === "NABYWCA"
-                            ? "bg-ui-white text-ui-primary shadow-sm"
-                            : "text-ui-primary/60 hover:text-ui-primary/80"
-                            }`}
-                    >
-                        Nabywcy <span className="font-normal opacity-60">({countNabywcy})</span>
-                    </button>
-
-                    <button
-                        onClick={() => setActiveFilter("DOSTAWCA")}
-                        className={`flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeFilter === "DOSTAWCA"
-                            ? "bg-ui-white text-ui-primary shadow-sm"
-                            : "text-ui-primary/60 hover:text-ui-primary/80"
-                            }`}
-                    >
-                        Dostawcy <span className="font-normal opacity-60">({countDostawcy})</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Pasek wyszukiwania */}
-            <div className="bg-ui-white rounded-2xl p-4 shadow-sm border border-ui-accent flex flex-col md:flex-row gap-4 mb-6">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-3.5 text-ui-black/50" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Szukaj po nazwie lub NIP-ie..."
-                        className="w-full bg-ui-white pl-10 pr-4 py-3 rounded-xl border border-ui-accent text-sm focus:outline-none focus:border-ui-secondary placeholder-ui-primary/50"
-                    />
-                </div>
-            </div>
-
-            {/* Siatka z kartami dostawców */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredKontrahenci.map((kontrahent) => (
-                    <div
-                        key={kontrahent.id}
-                        onClick={() => setSelectedSupplier(kontrahent)}
-                        className="bg-ui-white rounded-2xl p-6 shadow-sm border border-ui-accent hover:border-ui-secondary hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer"
-                    >
-                        {/* Tag wskazujący typ (Nabywca/Dostawca) */}
-                        <div className="mb-3">
-                            <span className={`inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-md ${kontrahent.typ === 'DOSTAWCA' ? 'bg-ui-secondary/10 text-ui-secondary' : 'bg-ui-primary/10 text-ui-primary'
+                    return (
+                        <button
+                            key={tab.type}
+                            onClick={() => setActiveTab(tab.type)}
+                            className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 whitespace-nowrap
+                                ${isActive
+                                    ? "border-ui-secondary text-ui-secondary"
+                                    : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                                }`}
+                        >
+                            {tab.label}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold
+                                ${isActive
+                                    ? "bg-ui-secondary text-ui-white"
+                                    : "bg-ui-accent/25 text-ui-primary/70"
                                 }`}>
-                                {kontrahent.typ}
+                                {count}
                             </span>
-                        </div>
+                        </button>
+                    );
+                })}
+            </div>
 
-                        <h3 className="text-xl font-bold text-ui-primary leading-snug mb-4">
-                            {kontrahent.nazwa}
-                        </h3>
+            {/* Wyszukiwarka z dynamicznym placeholderem */}
+            <div className="relative mb-8">
+                <Search className="absolute left-4 top-3.5 text-ui-secondary" size={20} />
+                <input
+                    type="text"
+                    placeholder={
+                        activeTab === "ALL"
+                            ? "Szukaj wśród wszystkich kontrahentów..."
+                            : `Szukaj w zakładce ${activeTab === "SUPPLIER" ? "dostawcy" : activeTab === "CUSTOMER" ? "odbiorcy" : "inni"}...`
+                    }
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-ui-white pl-12 pr-4 py-3.5 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                />
+            </div>
 
-                        <div className="space-y-2.5 mb-2 text-sm border-t border-ui-accent/30 pt-4">
-                            <div className="flex items-center gap-3 text-ui-black">
-                                <Phone size={16} className="text-ui-secondary" />
-                                <span>{kontrahent.telefon}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-ui-black/80 text-xs mt-3">
-                                <Mail size={16} className="text-ui-secondary" />
-                                <span className="truncate">{kontrahent.email}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-ui-black/80 text-xs mt-3">
-                                <FileText size={16} className="text-ui-secondary" />
-                                <span>NIP: {kontrahent.nip}</span>
-                            </div>
-                        </div>
+            {/* Siatka kontrahentów */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredContractors.length === 0 ? (
+                    <div className="col-span-full text-center py-10 text-ui-secondary italic">
+                        Brak pasujących pozycji w wybranej zakładce.
                     </div>
-                ))}
+                ) : (
+                    filteredContractors.map((c) => {
+                        const badge = getBadgeProps(c.type);
+                        return (
+                            <div
+                                key={c.id}
+                                onClick={() => setSelectedContractor(c)}
+                                className="bg-ui-white border border-ui-accent hover:border-ui-secondary rounded-2xl p-5 shadow-sm transition-all duration-200 cursor-pointer flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="flex items-start justify-between gap-2 mb-3">
+                                        <h3 className="font-bold text-ui-black text-lg line-clamp-1">{c.name}</h3>
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${badge.styles} shrink-0`}>
+                                            {badge.label}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-ui-primary/60">NIP: <strong className="text-ui-black">{c.nip}</strong></p>
+                                    {c.address && (
+                                        <p className="text-xs text-ui-primary/50 mt-1.5 flex items-center gap-1.5 line-clamp-1">
+                                            <MapPin size={12} />
+                                            {c.address}
+                                        </p>
+                                    )}
+                                </div>
 
-                {/* Komunikat gdy lista jest pusta */}
-                {filteredKontrahenci.length === 0 && (
-                    <div className="col-span-full py-10 text-center text-ui-primary/60">
-                        Brak kontrahentów w tej kategorii.
-                    </div>
+                                <div className="border-t border-ui-accent/40 mt-4 pt-3 flex items-center justify-between text-xs text-ui-secondary font-medium">
+                                    <span>Szczegóły firmy</span>
+                                    <ExternalLink size={12} />
+                                </div>
+                            </div>
+                        );
+                    })
                 )}
             </div>
 
-            {/* DUŻE WYSKAKUJĄCE OKNO (MODAL) */}
-            {selectedSupplier && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in">
-
-                    {/* Przyciemnione tło */}
+            {/* MODAL 1: Podgląd szczegółów */}
+            {selectedContractor && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setSelectedContractor(null)}
+                >
                     <div
-                        className="absolute inset-0 bg-ui-black/40 backdrop-blur-sm transition-opacity"
-                        onClick={() => setSelectedSupplier(null)}
-                    />
-
-                    {/* Kontener Modala */}
-                    <div className="relative bg-ui-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-
-                        {/* Nagłówek Modala */}
-                        <div className="px-6 py-5 border-b border-ui-accent flex items-start justify-between bg-ui-white">
+                        className="bg-ui-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border border-ui-accent"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="border-b border-ui-accent p-5 flex items-start justify-between">
                             <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md ${selectedSupplier.typ === 'NABYWCA' ? 'bg-ui-secondary/10 text-ui-secondary' : 'bg-ui-primary/10 text-ui-primary'
-                                        }`}>
-                                        {selectedSupplier.typ}
-                                    </span>
-                                </div>
-                                <h2 className="text-2xl font-bold text-ui-black pr-4">
-                                    {selectedSupplier.nazwa}
-                                </h2>
-                                <div className="flex items-center gap-2 text-sm text-ui-black/60 mt-1">
-                                    <FileText size={14} />
-                                    <span>NIP: {selectedSupplier.nip}</span>
-                                </div>
+                                <h2 className="text-xl font-bold text-ui-primary">{selectedContractor.name}</h2>
+                                <p className="text-xs text-ui-secondary mt-1">NIP: {selectedContractor.nip}</p>
                             </div>
                             <button
-                                onClick={() => setSelectedSupplier(null)}
-                                className="p-2 hover:bg-ui-accent rounded-full text-ui-black/50 hover:text-ui-black transition-colors"
+                                onClick={() => setSelectedContractor(null)}
+                                className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors"
                             >
-                                <X size={24} />
+                                <X size={20} />
                             </button>
                         </div>
 
-                        {/* Ciało Modala */}
-                        <div className="p-6 overflow-y-auto">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div className="flex items-start gap-3 text-ui-black text-sm">
-                                    <Phone size={18} className="text-ui-secondary shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-semibold">Telefon</p>
-                                        <p className="text-ui-black/80">{selectedSupplier.telefon}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3 text-ui-black text-sm">
-                                    <Mail size={18} className="text-ui-secondary shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-semibold">E-mail</p>
-                                        <p className="text-ui-black/80 truncate">{selectedSupplier.email}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3 text-ui-black text-sm">
-                                    <UserIcon size={18} className="text-ui-secondary shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-semibold">Osoba kontaktowa</p>
-                                        <p className="text-ui-black/80">{selectedSupplier.osobaKontaktowa}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3 text-ui-black text-sm">
-
-                                    <MapPin size={18} className="text-ui-secondary shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-semibold">Adres</p>
-                                        <p className="text-ui-black/80">{selectedSupplier.adresUlica}, {selectedSupplier.adresKod} {selectedSupplier.adresMiejscowosc}</p>
-                                    </div>
-                                </div>
+                        <div className="p-6 space-y-4 text-sm">
+                            <div className="flex justify-between border-b border-ui-accent/30 pb-2">
+                                <span className="text-ui-secondary font-semibold">Typ relacji:</span>
+                                <span className="font-bold text-ui-black">{getBadgeProps(selectedContractor.type).label}</span>
                             </div>
-
-
+                            {selectedContractor.address && (
+                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
+                                    <span className="text-ui-secondary font-semibold shrink-0">Adres:</span>
+                                    <span className="text-right text-ui-black font-medium">{selectedContractor.address}</span>
+                                </div>
+                            )}
+                            {selectedContractor.email && (
+                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
+                                    <span className="text-ui-secondary font-semibold">E-mail:</span>
+                                    <a href={`mailto:${selectedContractor.email}`} className="text-ui-primary hover:underline font-medium">{selectedContractor.email}</a>
+                                </div>
+                            )}
+                            {selectedContractor.phone && (
+                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
+                                    <span className="text-ui-secondary font-semibold">Telefon:</span>
+                                    <span className="text-ui-black font-medium">{selectedContractor.phone}</span>
+                                </div>
+                            )}
+                            {selectedContractor.contactPerson && (
+                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
+                                    <span className="text-ui-secondary font-semibold">Osoba kontaktowa:</span>
+                                    <span className="text-ui-black font-medium">{selectedContractor.contactPerson}</span>
+                                </div>
+                            )}
+                            {selectedContractor.notes && (
+                                <div className="bg-ui-accent/10 border border-ui-accent/40 rounded-xl p-3 text-xs mt-4">
+                                    <p className="font-bold text-ui-secondary mb-1">Uwagi wewnętrzne:</p>
+                                    <p className="text-ui-black/80 whitespace-pre-wrap">{selectedContractor.notes}</p>
+                                </div>
+                            )}
                         </div>
+                    </div>
+                </div>
+            )}
 
-                        {/* Stopka Modala z przyciskami */}
-                        <div className="px-6 py-4 bg-ui-accent/10 border-t border-ui-accent flex flex-col sm:flex-row justify-end gap-3">
-                            <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-white border border-ui-secondary text-ui-primary px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-ui-accent transition-colors shadow-sm">
-                                <Package size={16} />
-                                Zobacz ofertę
-                            </button>
-                            <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary text-ui-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-ui-primary/90 transition-opacity shadow-sm">
-                                <FileText size={16} />
-                                Przeglądaj faktury
-                            </button>
+            {/* MODAL 2: Kreator */}
+            <AddContractorModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSave={handleSaveContractor}
+            />
+
+        </div>
+    );
+}
+
+// =========================================================================
+// PODKOMPONENT: AddContractorModal (Formularz Prisma Contractor)
+// =========================================================================
+interface AddContractorModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (data: Omit<Contractor, "id" | "createdAt">) => void;
+}
+
+function AddContractorModal({ isOpen, onClose, onSave }: AddContractorModalProps) {
+    const [type, setType] = useState<ContractorType>("SUPPLIER");
+    const [name, setName] = useState("");
+    const [nip, setNip] = useState("");
+    const [address, setAddress] = useState("");
+    const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
+    const [contactPerson, setContactPerson] = useState("");
+    const [notes, setNotes] = useState("");
+
+    if (!isOpen) return null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        onSave({
+            type,
+            name,
+            nip,
+            address: address.trim() || undefined,
+            email: email.trim() || undefined,
+            phone: phone.trim() || undefined,
+            contactPerson: contactPerson.trim() || undefined,
+            notes: notes.trim() || undefined
+        });
+
+        setName("");
+        setNip("");
+        setAddress("");
+        setEmail("");
+        setPhone("");
+        setContactPerson("");
+        setNotes("");
+        setType("SUPPLIER");
+
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+            <div className="absolute inset-0 bg-ui-black/40 backdrop-blur-sm" onClick={onClose} />
+
+            <div className="relative bg-ui-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] border border-ui-accent animate-scale-up">
+
+                <div className="px-6 py-5 border-b border-ui-accent flex items-center justify-between bg-ui-white">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-ui-accent/20 p-2 rounded-lg text-ui-primary">
+                            <Building2 size={20} className="text-ui-secondary" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-ui-black">Nowy kontrahent</h2>
+                            <p className="text-xs text-ui-black/50">Uzupełnij dane identyfikacyjne firmy i dane teleadresowe.</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-ui-accent rounded-full text-ui-black/50 hover:text-ui-black transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+
+                    {/* WYBÓR TYPU */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Typ relacji biznesowej</label>
+                        <div className="grid grid-cols-3 gap-2 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40">
+                            {(["SUPPLIER", "CUSTOMER", "OTHER"] as ContractorType[]).map((t) => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setType(t)}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all duration-200
+                                        ${type === t
+                                            ? "bg-ui-primary text-ui-white shadow-sm"
+                                            : "text-ui-primary/60 hover:text-ui-primary hover:bg-ui-white/50"
+                                        }`}
+                                >
+                                    {t === "SUPPLIER" ? "Dostawca" : t === "CUSTOMER" ? "Odbiorca" : "Inny"}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                </div>
-            )}
+                    {/* DANE PODSTAWOWE */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Nazwa firmy / Kontrahenta</label>
+                            <input
+                                type="text"
+                                required
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="np. Zakłady Młynarskie Poznań"
+                                className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">NIP</label>
+                            <input
+                                type="text"
+                                required
+                                pattern="\d{10}"
+                                title="NIP musi składać się z dokładnie 10 cyfr"
+                                value={nip}
+                                onChange={(e) => setNip(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                placeholder="10 cyfr bez kresek"
+                                className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* ADRES */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-1">
+                            <MapPin size={12} /> Adres siedziby <span className="text-ui-secondary/40 font-normal lowercase">(opcjonalnie)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            placeholder="ul. Chlebowa 10, 60-100 Poznań"
+                            className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                        />
+                    </div>
+
+                    {/* DANE TELEADRESOWE */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-1">
+                                <Mail size={12} /> Adres e-mail <span className="text-ui-secondary/40 font-normal lowercase">(opcjonalnie)</span>
+                            </label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="biuro@kontrahent.pl"
+                                className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-1">
+                                <Phone size={12} /> Numer telefonu <span className="text-ui-secondary/40 font-normal lowercase">(opcjonalnie)</span>
+                            </label>
+                            <input
+                                type="tel"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                placeholder="+48 123 456 789"
+                                className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* OSOBA KONTAKTOWA */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-1">
+                            <User size={12} /> Osoba kontaktowa <span className="text-ui-secondary/40 font-normal lowercase">(opcjonalnie)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={contactPerson}
+                            onChange={(e) => setContactPerson(e.target.value)}
+                            placeholder="Imię i nazwisko przedstawiciela..."
+                            className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                        />
+                    </div>
+
+                    {/* UWAGI */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-1">
+                            <FileText size={12} /> Uwagi wewnętrzne <span className="text-ui-secondary/40 font-normal lowercase">(opcjonalnie)</span>
+                        </label>
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            placeholder="Zapisz istotne informacje o współpracy, dostawach, upustach cenowych..."
+                            rows={3}
+                            className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all resize-none"
+                        />
+                    </div>
+
+                    {/* Stopka Modala */}
+                    <div className="pt-4 border-t border-ui-accent flex flex-col sm:flex-row justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-ui-secondary text-ui-primary font-semibold hover:bg-ui-accent/20 transition-colors text-sm"
+                        >
+                            Anuluj
+                        </button>
+                        <button
+                            type="submit"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-6 py-2.5 rounded-xl font-semibold shadow-sm transition-colors text-sm"
+                        >
+                            <Save size={16} />
+                            Zapisz w bazie
+                        </button>
+                    </div>
+
+                </form>
+            </div>
         </div>
     );
-} 
+}
