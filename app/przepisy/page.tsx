@@ -264,6 +264,16 @@ export default function RecepturyPage() {
                         className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto"
                     >
                         <FileText size={18} />
+                        <span>Składniki</span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            console.log("kliknięto")
+                            setIsAddModalOpen(true)
+                        }}
+                        className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto"
+                    >
+                        <FileText size={18} />
                         <span>Nowy przepis</span>
                     </button>
                 </div>

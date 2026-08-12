@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, Home, ShoppingCart, Cookie, TrendingUp, TrendingDown, DollarSign, ReceiptEuroIcon, FileText, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home, ShoppingCart, Cookie, TrendingUp, TrendingDown, DollarSign, ReceiptEuroIcon, FileText, Settings, Oven } from "lucide-react";
 
 export default function Sidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -14,8 +14,9 @@ export default function Sidebar() {
         { name: "Strona główna", href: "/", icon: Home },
         { name: "Faktury i paragony", href: "/faktury", icon: ReceiptEuroIcon },
         { name: "Dostawcy i kontrahenci", href: "/kontrahenci", icon: ShoppingCart },
+        { name: "Produkcja", href: "/produkcja", icon: Oven },
+        { name: "Składniki", href: "/skladniki", icon: Cookie },
         { name: "Przepisy i foodcosty", href: "/przepisy", icon: FileText },
-        { name: "Produkcja i sprzedaż", href: "/produkcja", icon: Cookie },
         { name: "Przychody", href: "/przychody", icon: TrendingUp },
         { name: "Koszty", href: "/koszty", icon: TrendingDown },
         { name: "Finanse", href: "/finanse", icon: DollarSign },

@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-} 
+}
 
 enum UserRole {
   ADMIN
@@ -19,12 +19,21 @@ enum ContractorType {
   OTHER
 }
 
-enum ProductType {
-  INGREDIENT
+enum InvoiceType {
+  VAT
+  RECEIPT
+  CORRECTION
+  MANUAL
+}
+
+enum InvoiceStatus {
+  IMPORTED
+  WAITING
+  REJECTED
+}
+
+enum IngredientType {
   FLOUR
-  EQUIPMENT
-  CLEANING
-  SERVICE
   OTHER
 }
 
@@ -39,68 +48,97 @@ model User {
 
 model Contractor {
   id            String         @id @default(uuid())
-  type          ContractorType
+  type          ContractorType @default(SUPPLIER)
   name          String
-  nip           String
+  nip           String         @unique
   address       String
   email         String
   phone         String
   contactPerson String?
-  products      Product[]
-  invoices      Invoice[]      // <-- DODANO: odwrotna relacja do faktur
   notes         String?
   createdAt     DateTime       @default(now())
+
+  products Product[]
+  invoices Invoice[]
 }
 
 model Invoice {
-  id            String            @id @default(uuid())
-  contractor    Contractor        @relation(fields: [contractorId], references: [id])
+  id            String        @id @default(uuid())
   contractorId  String
-  products      Product[]
-  ksefNumber    String            @unique
+  contractor    Contractor    @relation(fields: [contractorId], references: [id])
+  type          InvoiceType   @default(VAT)
+  ksefNumber    String        @unique
   invoiceNumber String
-  issuedDate    DateTime          @db.Date
-  dueDate       DateTime          @db.Date
-  status        String
-  grossAmount   Decimal           @default(0.00)
-  netAmount     Decimal           @default(0.00)
-  vatAmount     Decimal           @default(0.00)
-  currency      String            @default("PLN")
-  importDate    DateTime          @default(now())
-  positions     InvoicePosition[]
+  issuedDate    DateTime      @db.Date
+  dueDate       DateTime      @db.Date
+  status        InvoiceStatus @default(WAITING)
+  grossAmount   Decimal       @default(0.00)
+  netAmount     Decimal       @default(0.00)
+  vatAmount     Decimal       @default(0.00)
+  currency      String        @default("PLN")
+  importDate    DateTime      @default(now())
+
+  positions InvoicePosition[]
 }
 
 model InvoicePosition {
-  id        String   @id @default(uuid())
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  id        String  @id @default(uuid())
   invoiceId String
-  product   Product  @relation(fields: [productId], references: [id])
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  name     String
+  quantity Decimal @default(1.00)
+  unit     String  @default("szt")
+
+  netPrice    Decimal @default(0.00)
+  netAmount   Decimal @default(0.00)
+  vatRate     Decimal @default(23.00)
+  grossAmount Decimal @default(0.00)
+
   createdAt DateTime @default(now())
 }
 
 model ProductCategory {
   id        String    @id @default(uuid())
-  name      String
+  name      String    @unique
   products  Product[]
   createdAt DateTime  @default(now())
 }
 
 model Product {
-  id           String            @id @default(uuid())
-  name         String
-  price        Decimal           @default(0.00)
-  unit         String
-  category     ProductCategory   @relation(fields: [categoryId], references: [id])
-  categoryId   String
-  supplier     Contractor        @relation(fields: [supplierId], references: [id])
-  supplierId   String
-  recipes      RecipeIngredient[]
+  id    String  @id @default(uuid())
+  name  String
+  price Decimal @default(0.00)
+  unit  String
 
-  // --- DODANE POWIĄZANIA ODWROTNE ---
-  invoices                Invoice[]                // relacja do Invoice
-  invoicePositions        InvoicePosition[]        // relacja do InvoicePosition
-  semiFinishedIngredients SemiFinishedIngredient[] // relacja do SemiFinishedIngredient
+  supplier   Contractor @relation(fields: [supplierId], references: [id])
+  supplierId String
+
+  category   ProductCategory @relation(fields: [categoryId], references: [id])
+  categoryId String
+
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id])
+  ingredientId String?
+
+  invoicePositions InvoicePosition[]
+  createdAt        DateTime          @default(now())
+
+  @@unique([supplierId, name])
+}
+
+model Ingredient {
+  id              String  @id @default(uuid())
+  name            String  @unique
+  unit            String
+  calculatedPrice Decimal @default(0.00)
+
+  type IngredientType @default(OTHER)
+
+  products                Product[]
+  recipeIngredients       RecipeIngredient[]
+  semiFinishedIngredients SemiFinishedIngredient[]
 
   createdAt DateTime @default(now())
 }
@@ -116,35 +154,40 @@ model SemiFinished {
 }
 
 model SemiFinishedIngredient {
-  id             String       @id @default(uuid())
-  amount         Decimal
-  unit           String
+  id     String  @id @default(uuid())
+  amount Decimal
+  unit   String
+
   semiFinishedId String
   semiFinished   SemiFinished @relation(fields: [semiFinishedId], references: [id], onDelete: Cascade)
-  productId      String
-  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 }
 
 model BakeryProduct {
-  id              String             @id @default(uuid())
-  name            String
-  productionCost  Decimal            @default(0.00)
-  sellingPrice    Decimal            @default(0.00)
-  ingredients     RecipeIngredient[]
-  productions     DailyProduction[]
-  createdAt       DateTime           @default(now())
+  id             String             @id @default(uuid())
+  name           String
+  productionCost Decimal            @default(0.00)
+  sellingPrice   Decimal            @default(0.00)
+  ingredients    RecipeIngredient[]
+  productions    DailyProduction[]
+  createdAt      DateTime           @default(now())
 }
 
 model RecipeIngredient {
-  id              String         @id @default(uuid())
-  amount          Decimal
-  ingredientUnit  String
+  id             String  @id @default(uuid())
+  amount         Decimal
+  ingredientUnit String
+
   bakeryProductId String
-  bakeryProduct   BakeryProduct  @relation(fields: [bakeryProductId], references: [id], onDelete: Cascade)
-  productId       String?
-  product         Product?       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  semiFinishedId  String?
-  semiFinished    SemiFinished?  @relation(fields: [semiFinishedId], references: [id], onDelete: Cascade)
+  bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id], onDelete: Cascade)
+
+  ingredientId String?
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  semiFinishedId String?
+  semiFinished   SemiFinished? @relation(fields: [semiFinishedId], references: [id], onDelete: Cascade)
 }
 
 model DailyProduction {
