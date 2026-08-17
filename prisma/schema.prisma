@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BakeryProductType {
+  BREAD
+  ROLL
+  SWEET
+  SAVORY
+}
+
 enum UserRole {
   ADMIN
   BAKER
@@ -119,6 +126,9 @@ model Product {
   category   ProductCategory @relation(fields: [categoryId], references: [id])
   categoryId String
 
+  sellingPrice Decimal? @default(0.00)
+  isResale     Boolean  @default(false)
+
   ingredient   Ingredient? @relation(fields: [ingredientId], references: [id])
   ingredientId String?
 
@@ -168,6 +178,7 @@ model SemiFinishedIngredient {
 model BakeryProduct {
   id             String             @id @default(uuid())
   name           String
+  type           BakeryProductType  @default(BREAD)
   productionCost Decimal            @default(0.00)
   sellingPrice   Decimal            @default(0.00)
   ingredients    RecipeIngredient[]
@@ -198,8 +209,16 @@ model DailyProduction {
   bakeryProductId String
   bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id])
   createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@unique([date, bakeryProductId])
+}
+
+model DailyIncome {
+  id           String   @id @default(uuid())
+  date         DateTime @db.Date
+  incomeAmount Decimal  @default(0.00)
+  createdAt    DateTime @default(now())
 }
 
 model CostType {

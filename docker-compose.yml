@@ -2,10 +2,14 @@ services:
   app:
     build:
       context: .
-      target: runner
+      dockerfile: Dockerfile.dev
+      # DOCKERFILE DEWELOPERSKI - ZMIENIC NA DOCKERFILE 
+      # target: runner
     container_name: bakery_app
     ports:
       - "3000:3000"
+    environment:
+      - WATCHPACK_POLLING=true
     volumes:
       - .:/app
       - /app/node_modules

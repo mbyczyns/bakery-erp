@@ -466,7 +466,7 @@ export default function FakturyPage() {
 }
 
 // =========================================================================
-// PODKOMPONENT: VerificationModal (Mapowanie Pozycji)
+// PODKOMPONENT: VerificationModal (Mapowanie Pozycji z Czystym Wyborem)
 // =========================================================================
 interface VerificationModalProps {
     doc: Document;
@@ -480,15 +480,21 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRejecting, setIsRejecting] = useState(false);
 
+    // Znajdujemy identyfikatory najważniejszych kategorii w bazie
+    const foodCategory = categories.find((c) => c.name.toLowerCase() === "produkty spożywcze");
+    const flourCategory = categories.find((c) => c.name.toLowerCase() === "mąka");
+
+    const defaultCategoryId = foodCategory?.id || categories[0]?.id || "";
+
     const [mappingState, setMappingState] = useState<
         Record<string, { categoryId: string; ingredientId?: string }>
     >(() => {
         const initialState: Record<string, { categoryId: string; ingredientId?: string }> = {};
-        const defaultCategory = categories[0]?.id || "";
 
         (doc.positions || []).forEach((pos) => {
             initialState[pos.productId] = {
-                categoryId: pos.categoryId || defaultCategory,
+                // Domyślnie ustawiamy "Produkty spożywcze"
+                categoryId: pos.categoryId || defaultCategoryId,
                 ingredientId: pos.ingredientId || undefined,
             };
         });
@@ -501,7 +507,10 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
             [productId]: {
                 ...prev[productId],
                 categoryId,
-                ingredientId: isFoodCategory(categoryId) ? prev[productId]?.ingredientId : undefined,
+                // Wyszyszczamy wybór surowca przy zmianie kategorii, jeśli nowa kategoria nie jest spożywcza ani mąką
+                ingredientId: (categoryId === foodCategory?.id || categoryId === flourCategory?.id)
+                    ? prev[productId]?.ingredientId
+                    : undefined,
             },
         }));
     };
@@ -514,13 +523,6 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
                 ingredientId: ingredientId || undefined,
             },
         }));
-    };
-
-    const isFoodCategory = (categoryId: string) => {
-        const cat = categories.find((c) => c.id === categoryId);
-        if (!cat) return false;
-        const nameLower = cat.name.toLowerCase();
-        return nameLower.includes("spożywcze") || nameLower.includes("mąki") || nameLower.includes("surowce") || nameLower.includes("materiały");
     };
 
     const handleApprove = async () => {
@@ -575,9 +577,10 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-ui-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[90vh] flex flex-col">
+                {/* Nagłówek Modala */}
                 <div className="px-6 py-5 border-b border-ui-accent flex items-center justify-between bg-amber-50/50">
                     <div className="flex items-center gap-3">
-                        <div className="bg-amber-100 p-2 rounded-xl text-amber-800">
+                        <div className="bg-amber-100 p-2.5 rounded-xl text-amber-800">
                             <AlertCircle size={22} />
                         </div>
                         <div>
@@ -587,106 +590,153 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary">
+                    <button onClick={onClose} className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer">
                         <X size={20} />
                     </button>
                 </div>
 
+                {/* Tabela Pozycji z Wyrazistym Wyborem */}
                 <div className="p-6 overflow-y-auto space-y-4 flex-1">
                     <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
                         <Layers size={16} className="text-blue-600 mt-0.5 shrink-0" />
                         <div>
-                            <b>Pozycje z faktury ({doc.positions?.length || 0}):</b>
-                            <br />Dla każdej pozycji z faktury dobierz kategorię oraz surowiec bazowy piekarni (`Ingredient`) potrzebny do Food Costu.
+                            <b>Weryfikacja pozycji:</b>
+                            <br />Wybierz typ pozycji (domyślnie: <b>Produkty spożywcze</b> / <b>Mąka</b>) i przypisz surowiec piekarni do wyliczania Food Costu.
                         </div>
                     </div>
 
                     <div className="border border-ui-accent rounded-xl overflow-hidden shadow-sm">
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-ui-accent/20 text-ui-secondary font-bold uppercase border-b border-ui-accent">
                                     <th className="p-3.5 w-1/3">Pozycja z KSeF</th>
-                                    <th className="p-3.5 text-center">Ilość & Cena</th>
-                                    <th className="p-3.5 w-1/4">1. Kategoria Pozycji</th>
-                                    <th className="p-3.5 w-1/3">2. Surowiec Piekarni (Food Cost)</th>
+                                    <th className="p-3.5 text-center w-28">Ilość & Cena</th>
+                                    <th className="p-3.5 w-2/5">1. Kategoria Wydatku</th>
+                                    <th className="p-3.5 w-1/3">2. Przypisany Surowiec Piekarni</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-ui-accent/40">
                                 {(doc.positions || []).map((pos) => {
-                                    const currentMapping = mappingState[pos.productId] || { categoryId: categories[0]?.id || "" };
+                                    const currentMapping = mappingState[pos.productId] || { categoryId: defaultCategoryId };
+                                    const isFoodSelected = currentMapping.categoryId === foodCategory?.id;
+                                    const isFlourSelected = currentMapping.categoryId === flourCategory?.id;
+                                    const isOtherSelected = !isFoodSelected && !isFlourSelected;
 
                                     return (
-                                        <tr key={pos.id} className="hover:bg-ui-accent/5">
+                                        <tr key={pos.id} className="hover:bg-ui-accent/5 transition-colors">
+                                            {/* Nazwa z KSeF */}
                                             <td className="p-3.5">
-                                                <div className="font-bold text-ui-black">{pos.name}</div>
-                                                <div className="text-[10px] text-ui-secondary mt-0.5">ID: {pos.productId.substring(0, 8)}...</div>
+                                                <div className="font-bold text-ui-black text-sm">{pos.name}</div>
+                                                <div className="text-[10px] text-ui-secondary mt-0.5 font-mono">ID: {pos.productId.substring(0, 8)}...</div>
                                             </td>
+
+                                            {/* Ilość i Cena */}
                                             <td className="p-3.5 text-center">
-                                                <div className="font-semibold text-ui-primary">{pos.quantity} {pos.unit}</div>
-                                                <div className="text-[11px] text-ui-secondary">{Number(pos.netPrice || 0).toFixed(2)} zł / szt netto</div>
+                                                <div className="font-bold text-ui-primary text-sm">{pos.quantity} {pos.unit}</div>
+                                                <div className="text-[11px] text-ui-secondary font-medium">{Number(pos.netPrice || 0).toFixed(2)} zł / szt</div>
                                             </td>
+
+                                            {/* KAZDORAZOWY WYRÓŻNIONY WYBÓR KATEGORII */}
                                             <td className="p-3.5">
-                                                <select
-                                                    value={currentMapping.categoryId}
-                                                    onChange={(e) => handleCategoryChange(pos.productId, e.target.value)}
-                                                    className="w-full bg-ui-white border border-ui-accent rounded-lg px-2.5 py-2 text-xs font-semibold text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer"
-                                                >
-                                                    {categories.map((cat) => (
-                                                        <option key={cat.id} value={cat.id}>
-                                                            {cat.name}
+                                                <div className="flex flex-col gap-2">
+                                                    {/* Przełączniki Kafelkowe dla Głównych Kategorii */}
+                                                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-ui-accent/15 rounded-xl border border-ui-accent/40">
+                                                        {/* Przycisk: Produkty Spożywcze (Domyślny) */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => foodCategory && handleCategoryChange(pos.productId, foodCategory.id)}
+                                                            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isFoodSelected
+                                                                ? "bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600/30"
+                                                                : "text-ui-primary hover:bg-emerald-50 hover:text-emerald-800"
+                                                                }`}
+                                                        >
+                                                            🥛 Spożywcze
+                                                        </button>
+
+                                                        {/* Przycisk: Mąka */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => flourCategory && handleCategoryChange(pos.productId, flourCategory.id)}
+                                                            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isFlourSelected
+                                                                ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-600/30"
+                                                                : "text-ui-primary hover:bg-amber-50 hover:text-amber-800"
+                                                                }`}
+                                                        >
+                                                            🌾 Mąka
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Rozwijalna lista dla pozostałych kategorii ogólnych */}
+                                                    <select
+                                                        value={isOtherSelected ? currentMapping.categoryId : ""}
+                                                        onChange={(e) => e.target.value && handleCategoryChange(pos.productId, e.target.value)}
+                                                        className={`w-full text-[11px] font-semibold rounded-lg px-2.5 py-1.5 border transition-all cursor-pointer ${isOtherSelected
+                                                            ? "bg-blue-50 border-blue-400 text-blue-900 font-bold"
+                                                            : "bg-ui-white/60 border-ui-accent text-ui-secondary hover:text-ui-primary"
+                                                            }`}
+                                                    >
+                                                        <option value="" disabled={!isOtherSelected}>
+                                                            {isOtherSelected ? "Inna kategoria:" : "--- Inne Wydatki Ogólne ---"}
                                                         </option>
-                                                    ))}
-                                                </select>
+                                                        {categories
+                                                            .filter((c) => c.id !== foodCategory?.id && c.id !== flourCategory?.id)
+                                                            .map((cat) => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    📦 {cat.name}
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
                                             </td>
+
+                                            {/* DRUGA KOLUMNA: DYNAMICZNY WYBÓR SUROWCA */}
                                             <td className="p-3.5">
                                                 {(() => {
-                                                    const selectedCategory = categories.find(c => c.id === currentMapping.categoryId);
-
-                                                    const FLOUR_CATEGORY_ID = categories.find(c => c.name === "Mąka")?.id;
-                                                    const FOOD_CATEGORY_ID = categories.find(c => c.name === "Produkty spożywcze")?.id;
-
-                                                    if (selectedCategory?.id === FLOUR_CATEGORY_ID) {
-                                                        const flourIngredients = ingredients.filter(ing => ing.type === "FLOUR");
+                                                    // Jeśli wybrano MĄKĘ
+                                                    if (isFlourSelected) {
+                                                        const flourIngredients = ingredients.filter((ing) => ing.type === "FLOUR");
 
                                                         return (
                                                             <select
                                                                 value={currentMapping.ingredientId || ""}
                                                                 onChange={(e) => handleIngredientChange(pos.productId, e.target.value)}
-                                                                className="w-full bg-amber-50/80 border border-amber-300 rounded-lg px-2.5 py-2 text-xs font-bold text-amber-900 focus:outline-none cursor-pointer"
+                                                                className="w-full bg-amber-50 border-2 border-amber-400 text-amber-950 font-extrabold rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 shadow-sm cursor-pointer"
                                                             >
-                                                                <option value="">-- Wybierz Mąkę --</option>
+                                                                <option value="">-- Wybierz Typ Mąki --</option>
                                                                 {flourIngredients.map((ing) => (
                                                                     <option key={ing.id} value={ing.id}>
-                                                                        {ing.name} ({ing.unit})
+                                                                        🌾 {ing.name} ({ing.unit})
                                                                     </option>
                                                                 ))}
                                                             </select>
                                                         );
                                                     }
 
-                                                    if (selectedCategory?.id === FOOD_CATEGORY_ID) {
-                                                        const foodIngredients = ingredients.filter(ing => ing.type === "OTHER");
+                                                    // Jeśli wybrano PRODUKTY SPOŻYWCZE
+                                                    if (isFoodSelected) {
+                                                        const foodIngredients = ingredients.filter((ing) => ing.type === "OTHER");
 
                                                         return (
                                                             <select
                                                                 value={currentMapping.ingredientId || ""}
                                                                 onChange={(e) => handleIngredientChange(pos.productId, e.target.value)}
-                                                                className="w-full bg-emerald-50/80 border border-emerald-300 rounded-lg px-2.5 py-2 text-xs font-bold text-emerald-900 focus:outline-none cursor-pointer"
+                                                                className="w-full bg-emerald-50 border-2 border-emerald-400 text-emerald-950 font-extrabold rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm cursor-pointer"
                                                             >
                                                                 <option value="">-- Wybierz Surowiec Spożywczy --</option>
                                                                 {foodIngredients.map((ing) => (
                                                                     <option key={ing.id} value={ing.id}>
-                                                                        {ing.name} ({ing.unit})
+                                                                        🥛 {ing.name} ({ing.unit})
                                                                     </option>
                                                                 ))}
                                                             </select>
                                                         );
                                                     }
 
+                                                    // Jeśli wybrano inną kategorię ogólną (np. prąd, opakowania)
                                                     return (
-                                                        <span className="text-[11px] text-ui-secondary italic px-2 py-1 bg-ui-accent/10 rounded-md block text-center">
+                                                        <div className="text-[11px] text-ui-secondary italic px-3 py-2 bg-ui-accent/10 border border-ui-accent/40 rounded-xl block text-center font-medium">
                                                             Wydatek ogólny / brak surowca
-                                                        </span>
+                                                        </div>
                                                     );
                                                 })()}
                                             </td>
@@ -698,6 +748,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
                     </div>
                 </div>
 
+                {/* Stopka Modala */}
                 <div className="px-6 py-4 border-t border-ui-accent flex flex-col sm:flex-row justify-between items-center gap-3 bg-ui-white">
                     <button
                         type="button"
@@ -713,7 +764,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
                         <button
                             type="button"
                             onClick={onClose}
-                            className="w-full sm:w-auto px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold hover:bg-ui-accent/20 transition-colors text-xs"
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold hover:bg-ui-accent/20 transition-colors text-xs cursor-pointer"
                         >
                             Anuluj
                         </button>
@@ -721,7 +772,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess }:
                             type="button"
                             onClick={handleApprove}
                             disabled={isSubmitting || isRejecting}
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-semibold text-xs shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
                         >
                             {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                             Zatwierdź i Zmapuj Pozycje

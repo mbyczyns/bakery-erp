@@ -1,0 +1,29 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Instalujemy OpenSSL i certyfikaty (niezbędne dla Prismy)
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Kopiujemy pliki definicji pakietów oraz schemat Prismy
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+
+# Instalujemy zależności
+RUN npm install
+
+# Generujemy klienta Prismy
+RUN npx prisma generate
+
+# Kopiujemy resztę kodu
+COPY . .
+
+# Kopiujemy i nadajemy uprawnienia dla entrypoint.sh
+COPY entrypoint.sh ./
+RUN chmod +x ./entrypoint.sh
+
+EXPOSE 3000
+
+# Wykorzystujemy Twój entrypoint, ale uruchamiamy serwer w trybie dev!
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["npm", "run", "dev"]
