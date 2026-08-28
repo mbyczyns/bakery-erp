@@ -1,61 +1,95 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient, InvoiceStatus } from '@prisma/client';
+import { NextRequest, NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 export async function POST(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> }
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> } // <-- ZMIANA: params jest teraz obietnicą (Promise)
 ) {
     try {
-        const { id: invoiceId } = await params;
-        const { itemsMapping } = await req.json();
+        // ZMIANA: Musimy "poczekać" na rozwiązanie parametrów z adresu URL
+        const { id } = await params;
 
-        if (itemsMapping && Array.isArray(itemsMapping)) {
-            for (const item of itemsMapping) {
-                // A. Aktualizacja Karty Artykułu (Kategoria + Surowiec)
-                await prisma.product.update({
-                    where: { id: item.productId },
+        const body = await request.json();
+        const { itemsMapping } = body; // Oczekujemy tablicy: [{ productId, categoryId, ingredientId, multiplier }]
+
+        if (!itemsMapping || !Array.isArray(itemsMapping)) {
+            return NextResponse.json({ error: "Brak danych mapowania" }, { status: 400 });
+        }
+
+        // 1. Pobieramy fakturę wraz z pozycjami, aby mieć dostęp do aktualnych cen z KSeF
+        const invoice = await prisma.invoice.findUnique({
+            where: { id },
+            include: { positions: true },
+        });
+
+        if (!invoice) {
+            return NextResponse.json({ error: "Nie znaleziono faktury" }, { status: 404 });
+        }
+
+        // Przygotowujemy tablicę operacji do wykonania w ramach jednej transakcji
+        const operations = [];
+
+        // 2. Analizujemy każdą przysłaną pozycję z modala
+        for (const mapping of itemsMapping) {
+            const { productId, categoryId, ingredientId, multiplier } = mapping;
+
+            // Zabezpieczenie wartości mnożnika (zawsze minimum 0.001)
+            const safeMultiplier = Math.max(0.001, parseFloat(multiplier) || 1);
+
+            // A. Aktualizacja "Pamięci Dostawców" (Tabela Product)
+            operations.push(
+                prisma.product.update({
+                    where: { id: productId },
                     data: {
-                        categoryId: item.categoryId,
-                        ingredientId: item.ingredientId || null,
+                        categoryId: categoryId,
+                        ingredientId: ingredientId || null,
+                        multiplier: safeMultiplier,
                     },
-                });
+                })
+            );
 
-                // B. Jeśli przypisano do Surowca Bazowego -> Aktualizujemy jego cenę dla receptur
-                if (item.ingredientId) {
-                    const latestPosition = await prisma.invoicePosition.findFirst({
-                        where: { invoiceId, productId: item.productId },
-                        orderBy: { createdAt: 'desc' },
-                    });
+            // B. Aktualizacja ceny bazowej surowca (Tabela Ingredient)
+            if (ingredientId) {
+                // Szukamy, jaką cenę miał ten produkt na weryfikowanej właśnie fakturze
+                const position = invoice.positions.find(p => p.productId === productId);
 
-                    if (latestPosition) {
-                        await prisma.ingredient.update({
-                            where: { id: item.ingredientId },
+                if (position && position.netPrice) {
+                    // Magia przelicznika: Cena Netto za opakowanie / współczynnik = Cena za 1 jednostkę bazową
+                    const baseUnitPrice = Number(position.netPrice) / safeMultiplier;
+
+                    operations.push(
+                        prisma.ingredient.update({
+                            where: { id: ingredientId },
                             data: {
-                                calculatedPrice: latestPosition.netPrice,
+                                // Zapisujemy nową uśrednioną cenę za jednostkę bazową
+                                calculatedPrice: baseUnitPrice,
                             },
-                        });
-                    }
+                        })
+                    );
                 }
             }
         }
 
-        // C. Oznaczenie faktury jako Zaakceptowana
-        const approvedInvoice = await prisma.invoice.update({
-            where: { id: invoiceId },
-            data: { status: InvoiceStatus.IMPORTED },
-        });
+        // 3. Na koniec zmieniamy status dokumentu na Zaakceptowany (IMPORTED)
+        operations.push(
+            prisma.invoice.update({
+                where: { id },
+                data: {
+                    status: "IMPORTED",
+                },
+            })
+        );
 
-        return NextResponse.json({
-            success: true,
-            message: 'Faktura została pomyślnie zweryfikowana i aktywowana.',
-            invoice: approvedInvoice,
-        });
+        // 4. Wykonujemy wszystkie operacje na raz
+        await prisma.$transaction(operations);
+
+        return NextResponse.json({ success: true, message: "Faktura zmapowana pomyślnie" });
     } catch (error: any) {
-        console.error('Błąd akceptacji faktury:', error);
+        console.error("Błąd zatwierdzania faktury:", error);
         return NextResponse.json(
-            { error: 'Błąd podczas akceptacji faktury', details: error.message },
+            { error: "Wystąpił błąd podczas zapisywania w bazie danych", details: error.message },
             { status: 500 }
         );
     }

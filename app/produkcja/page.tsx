@@ -148,17 +148,15 @@ export default function ProdukcjaPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-ui-black">
-                        Dzienna Produkcja i Sprzedaż
+                        Dzienna produkcja i sprzedaż
                     </h1>
-                    <p className="text-ui-black/60 text-sm mt-1">
-                        Wprowadź ilość wyprodukowanego i sprzedanego towaru dla wybranego dnia.
-                    </p>
+
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2 bg-amber-50/80 px-3.5 py-2 rounded-xl border border-amber-300 text-amber-950 shadow-sm">
                         <Calendar size={18} className="text-amber-800 shrink-0" />
-                        <span className="text-xs font-bold uppercase">Data:</span>
+
                         <input
                             type="date"
                             value={selectedDate}
@@ -234,7 +232,7 @@ export default function ProdukcjaPage() {
             ) : products.length === 0 ? (
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-12 text-center text-ui-secondary text-sm">
                     <Package size={36} className="mx-auto mb-3 text-ui-secondary/50" />
-                    Brak wyrobów w bazie danych. Dodaj przepisy na stronie <b>/przepisy</b>!
+                    Brak przepisów.
                 </div>
             ) : (
                 <div className="space-y-10">

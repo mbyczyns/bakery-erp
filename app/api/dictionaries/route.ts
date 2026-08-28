@@ -13,6 +13,11 @@ export async function GET() {
             orderBy: { name: 'asc' },
         });
 
+        const contractors = await prisma.contractor.findMany({
+            select: { id: true, name: true, nip: true },
+            orderBy: { name: 'asc' }
+        });
+
         return NextResponse.json({
             categories,
             ingredients: ingredients.map((ing) => ({
@@ -21,6 +26,7 @@ export async function GET() {
                 unit: ing.unit,
                 type: ing.type, // <-- ZWRACAMY TYP ENUM (FLOUR / OTHER)
             })),
+            contractors,
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

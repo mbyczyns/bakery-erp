@@ -106,16 +106,56 @@ export async function GET(
         const faRoot = parsedXml.Faktura || parsedXml;
         const faSection = faRoot?.Fa;
 
+        // --- NOWE: POBIERANIE I AKTUALIZACJA ADRESU KONTRAHENTA ---
+        const podmiot1 = faRoot?.Podmiot1;
+        const adres = podmiot1?.Adres;
+
+        if (adres && invoice.contractorId) {
+            let fullAddress = '';
+
+            // Opcja 1: Adres ustrukturyzowany (np. AdresPol)
+            if (adres.AdresPol) {
+                const ulica = adres.AdresPol.Ulica ? `ul. ${adres.AdresPol.Ulica}` : '';
+                const nrDomu = adres.AdresPol.NrDomu || '';
+                const nrLokalu = adres.AdresPol.NrLokalu ? `/${adres.AdresPol.NrLokalu}` : '';
+                const kodPocztowy = adres.AdresPol.KodPocztowy || '';
+                const miejscowosc = adres.AdresPol.Miejscowosc || '';
+
+                const streetPart = `${ulica} ${nrDomu}${nrLokalu}`.trim();
+                const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
+                fullAddress = [streetPart, cityPart].filter(Boolean).join(', ');
+            }
+            // Opcja 2: Adres liniowy (AdresL1, AdresL2)
+            else if (adres.AdresL1 || adres.AdresL2) {
+                const l1 = adres.AdresL1 || '';
+                const l2 = adres.AdresL2 || '';
+                fullAddress = [l1, l2].filter(Boolean).join(', ');
+            }
+
+            // Aktualizuj w bazie, jeśli wyciągnęliśmy adres i wciąż mamy placeholder
+            if (
+                fullAddress &&
+                (!invoice.contractor.address || invoice.contractor.address === 'Pobrano z KSeF')
+            ) {
+                await prisma.contractor.update({
+                    where: { id: invoice.contractorId },
+                    data: { address: fullAddress },
+                });
+                console.log(`[ON-DEMAND] Zaktualizowano adres dla ${invoice.contractor.name}: ${fullAddress}`);
+            }
+        }
+        // ---------------------------------------------------------
+
         let rows = faSection?.FaWiersz || [];
         if (!Array.isArray(rows)) {
             rows = rows ? [rows] : [];
         }
 
-        let defaultCategory = await prisma.productCategory.findFirst({ where: { name: 'Materiały i Surowce' } })
+        let defaultCategory = await prisma.productCategory.findFirst({ where: { name: 'Produkty spożywcze' } })
             || await prisma.productCategory.findFirst();
 
         if (!defaultCategory) {
-            defaultCategory = await prisma.productCategory.create({ data: { name: 'Materiały i Surowce' } });
+            defaultCategory = await prisma.productCategory.create({ data: { name: 'Produkty spożywcze' } });
         }
 
         // Zapis pozycji w bazie danych
@@ -128,7 +168,17 @@ export async function GET(
             const netPrice = parseFloat(String(row.P_9A || '0'));
             const netAmount = parseFloat(String(row.P_11 || row.P_11A || '0'));
             const grossAmount = parseFloat(String(row.P_11A || '0')) || (netAmount * 1.23);
-            const vatRate = String(row.P_12 || '23');
+
+            // --- BEZPIECZNE PARSOWANIE STAWKI VAT ---
+            const rawVat = row.P_12 !== undefined ? String(row.P_12).toLowerCase().trim() : '23';
+            let safeVatRate = 0;
+
+            if (rawVat === 'zw' || rawVat === 'np' || rawVat === 'oo') {
+                safeVatRate = 0;
+            } else {
+                safeVatRate = parseFloat(rawVat.replace('%', '').replace(',', '.')) || 0;
+            }
+            // ----------------------------------------
 
             let product = await prisma.product.findFirst({
                 where: { name: productName, supplierId: invoice.contractorId },
@@ -140,7 +190,7 @@ export async function GET(
                         name: productName,
                         price: netPrice,
                         unit: unit,
-                        categoryId: defaultCategory.id,
+                        categoryId: null,
                         supplierId: invoice.contractorId,
                         ingredientId: null,
                     },
@@ -156,7 +206,7 @@ export async function GET(
                     unit: unit,
                     netPrice: netPrice,
                     netAmount: netAmount,
-                    vatRate: vatRate,
+                    vatRate: safeVatRate,
                     grossAmount: grossAmount,
                 },
             });

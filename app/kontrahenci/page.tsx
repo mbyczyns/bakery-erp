@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Plus,
     Search,
@@ -12,7 +12,9 @@ import {
     User,
     FileText,
     MapPin,
-    ExternalLink
+    Eye,
+    Calendar,
+    Loader2
 } from "lucide-react";
 
 // Typy zgodne z Prisma
@@ -29,40 +31,18 @@ interface Contractor {
     contactPerson?: string;
     notes?: string;
     createdAt: Date;
+    lastPurchaseDate?: string | null;
 }
-
-// Początkowe mock-dane kontrahentów w bazie
-const initialContractors: Contractor[] = [
-    {
-        id: "c1-uuid",
-        type: "SUPPLIER",
-        name: "Młyn Nowofalowy Sp. z o.o.",
-        nip: "5210001234",
-        address: "ul. Pszenna 15, 60-100 Poznań",
-        email: "kontakt@mlynnowofalowy.pl",
-        phone: "+48 601 202 303",
-        contactPerson: "Andrzej Młynarz",
-        notes: "Główny dostawca mąki typ 750 i 2000. Dostawy zawsze w środy rano.",
-        createdAt: new Date("2026-07-01")
-    },
-    {
-        id: "c2-uuid",
-        type: "CUSTOMER",
-        name: "Kawiarnia 'Ciepła Buła' s.c.",
-        nip: "7771234567",
-        address: "Rynek 12, 61-000 Poznań",
-        email: "zamowienia@cieplabula.pl",
-        phone: "+48 505 505 505",
-        contactPerson: "Marta Słodka",
-        notes: "Odbiór własny codziennie o 6:30. Faktura zbiorcza na koniec miesiąca.",
-        createdAt: new Date("2026-07-03")
-    }
-];
 
 export default function KontrahenciPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [contractors, setContractors] = useState<Contractor[]>(initialContractors);
+
+    // Stany dla danych z bazy
+    const [contractors, setContractors] = useState<Contractor[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
     const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
 
     // Typ pomocniczy dla obsługi zakładki "Wszyscy"
@@ -71,32 +51,68 @@ export default function KontrahenciPage() {
     // Stan aktywnej zakładki ustawiony domyślnie na "ALL" (Wszyscy)
     const [activeTab, setActiveTab] = useState<TabType>("ALL");
 
-    // Filtrowanie kontrahentów: najpierw po typie (jeśli activeTab to "ALL", to pomijamy ten krok), potem po wyszukiwarce
+    // Pobieranie danych z API
+    const fetchContractors = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/kontrahenci");
+            if (res.ok) {
+                const data = await res.json();
+                setContractors(data);
+            } else {
+                console.error("Błąd podczas pobierania kontrahentów");
+            }
+        } catch (error) {
+            console.error("Błąd połączenia z serwerem", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchContractors();
+    }, []);
+
+    // Filtrowanie kontrahentów: najpierw po typie, potem po wyszukiwarce
     const filteredContractors = contractors
         .filter(c => activeTab === "ALL" ? true : c.type === activeTab)
         .filter(c =>
             c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.nip.includes(searchTerm)
+            c.nip.includes(searchTerm) ||
+            (c.address && c.address.toLowerCase().includes(searchTerm.toLowerCase()))
         );
 
-    // Funkcja licząca ile elementów mamy w poszczególnych kategoriach na zakładkach
+    // Licznik dla zakładek
     const getCountForType = (type: TabType) => {
-        if (type === "ALL") return contractors.length; // Zwraca sumę absolutnie wszystkich kontrahentów
+        if (type === "ALL") return contractors.length;
         return contractors.filter(c => c.type === type).length;
     };
 
-    // Obsługa zapisu z modalu
-    const handleSaveContractor = (newContractorData: Omit<Contractor, "id" | "createdAt">) => {
-        const newContractor: Contractor = {
-            id: `c-${Date.now()}-uuid`,
-            createdAt: new Date(),
-            ...newContractorData
-        };
+    // Obsługa zapisu z modalu do bazy danych
+    const handleSaveContractor = async (newContractorData: Omit<Contractor, "id" | "createdAt">) => {
+        setIsSaving(true);
+        try {
+            const res = await fetch("/api/kontrahenci", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newContractorData),
+            });
 
-        setContractors([newContractor, ...contractors]);
-
-        // Automatycznie przełączamy na zakładkę dodanego kontrahenta, żeby użytkownik go zobaczył
-        setActiveTab(newContractorData.type);
+            if (res.ok) {
+                const savedContractor = await res.json();
+                setContractors([savedContractor, ...contractors]);
+                setActiveTab(savedContractor.type);
+                setIsAddModalOpen(false);
+            } else {
+                const err = await res.json();
+                alert(`Błąd: ${err.error}`);
+            }
+        } catch (error) {
+            console.error("Błąd podczas zapisu", error);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const getBadgeProps = (type: ContractorType) => {
@@ -117,21 +133,19 @@ export default function KontrahenciPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-ui-black">Kontrahenci</h1>
-                    <p className="text-ui-black text-sm mt-1">
-                        Zarządzaj bazą swoich dostawców i odbiorców wypieków.
-                    </p>
+
                 </div>
 
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto"
+                    className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto cursor-pointer"
                 >
                     <Plus size={18} />
                     <span>Dodaj kontrahenta</span>
                 </button>
             </div>
 
-            {/* POPRAWIONY PASEK WYBORU ZAKŁADEK (Wszyscy, Dostawcy, Odbiorcy, Inni) */}
+            {/* Zakładki */}
             <div className="flex gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto scrollbar-none">
                 {([
                     { type: "ALL", label: "Wszyscy" },
@@ -146,7 +160,7 @@ export default function KontrahenciPage() {
                         <button
                             key={tab.type}
                             onClick={() => setActiveTab(tab.type)}
-                            className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 whitespace-nowrap
+                            className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 whitespace-nowrap cursor-pointer
                                 ${isActive
                                     ? "border-ui-secondary text-ui-secondary"
                                     : "border-transparent text-ui-primary/60 hover:text-ui-primary"
@@ -165,61 +179,111 @@ export default function KontrahenciPage() {
                 })}
             </div>
 
-            {/* Wyszukiwarka z dynamicznym placeholderem */}
-            <div className="relative mb-8">
+            {/* Wyszukiwarka */}
+            <div className="relative mb-6">
                 <Search className="absolute left-4 top-3.5 text-ui-secondary" size={20} />
                 <input
                     type="text"
                     placeholder={
                         activeTab === "ALL"
-                            ? "Szukaj wśród wszystkich kontrahentów..."
+                            ? "Szukaj wśród wszystkich kontrahentów (nazwa, NIP, adres)..."
                             : `Szukaj w zakładce ${activeTab === "SUPPLIER" ? "dostawcy" : activeTab === "CUSTOMER" ? "odbiorcy" : "inni"}...`
                     }
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-ui-white pl-12 pr-4 py-3.5 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                    className="w-full bg-ui-white pl-12 pr-4 py-3.5 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all text-sm"
                 />
             </div>
 
-            {/* Siatka kontrahentów */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredContractors.length === 0 ? (
-                    <div className="col-span-full text-center py-10 text-ui-secondary italic">
-                        Brak pasujących pozycji w wybranej zakładce.
-                    </div>
-                ) : (
-                    filteredContractors.map((c) => {
-                        const badge = getBadgeProps(c.type);
-                        return (
-                            <div
-                                key={c.id}
-                                onClick={() => setSelectedContractor(c)}
-                                className="bg-ui-white border border-ui-accent hover:border-ui-secondary rounded-2xl p-5 shadow-sm transition-all duration-200 cursor-pointer flex flex-col justify-between"
-                            >
-                                <div>
-                                    <div className="flex items-start justify-between gap-2 mb-3">
-                                        <h3 className="font-bold text-ui-black text-lg line-clamp-1">{c.name}</h3>
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${badge.styles} shrink-0`}>
-                                            {badge.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-ui-primary/60">NIP: <strong className="text-ui-black">{c.nip}</strong></p>
-                                    {c.address && (
-                                        <p className="text-xs text-ui-primary/50 mt-1.5 flex items-center gap-1.5 line-clamp-1">
-                                            <MapPin size={12} />
-                                            {c.address}
-                                        </p>
-                                    )}
-                                </div>
+            {/* WIDOK LISTY / TABELA */}
+            <div className="bg-ui-white border border-ui-accent rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[800px] text-left border-collapse table-fixed">
+                        <colgroup>
+                            <col style={{ width: '45%' }} />
+                            <col style={{ width: '20%' }} />
+                            <col style={{ width: '15%' }} />
+                            <col style={{ width: '20%' }} />
+                        </colgroup>
 
-                                <div className="border-t border-ui-accent/40 mt-4 pt-3 flex items-center justify-between text-xs text-ui-secondary font-medium">
-                                    <span>Szczegóły firmy</span>
-                                    <ExternalLink size={12} />
-                                </div>
-                            </div>
-                        );
-                    })
-                )}
+                        <thead>
+                            <tr className="bg-ui-accent/10 text-ui-secondary text-xs font-bold uppercase tracking-wider border-b border-ui-accent">
+                                <th className="p-4 text-left">Nazwa Kontrahenta</th>
+                                <th className="p-4 text-left">NIP</th>
+                                <th className="p-4 text-left">Typ</th>
+                                <th className="p-4 text-left">Ostatnie zakupy</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ui-accent/40 text-sm">
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan={4} className="p-12 text-center text-ui-secondary">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <Loader2 size={18} className="animate-spin text-ui-primary" />
+                                            Ładowanie bazy kontrahentów...
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredContractors.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="p-8 text-center text-ui-secondary italic">
+                                        Brak kontrahentów w wybranej zakładce.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredContractors.map((c) => {
+                                    const badge = getBadgeProps(c.type);
+
+                                    return (
+                                        <tr
+                                            key={c.id}
+                                            onClick={() => setSelectedContractor(c)}
+                                            className="hover:bg-ui-accent/5 transition-colors cursor-pointer group"
+                                        >
+                                            {/* Nazwa */}
+                                            <td className="p-4 font-bold text-ui-black group-hover:text-ui-primary transition-colors">
+                                                <div className="truncate pr-4" title={c.name}>{c.name}</div>
+                                                {c.contactPerson && (
+                                                    <div className="text-xs font-normal text-ui-secondary flex items-center gap-1 mt-0.5 truncate">
+                                                        <User size={12} className="shrink-0" /> {c.contactPerson}
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* NIP */}
+                                            <td className="p-4 font-mono text-sm text-ui-black">
+                                                {c.nip}
+                                            </td>
+
+                                            {/* Typ relacji */}
+                                            <td className="p-4">
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-4 py-1 rounded-md border ${badge.styles} inline-block whitespace-nowrap`}>
+                                                    {badge.label}
+                                                </span>
+                                            </td>
+
+                                            {/* Ostatnie zakupy */}
+                                            <td className="p-4 text-xs text-ui-secondary">
+                                                <div className="flex items-center gap-1.5 font-medium">
+                                                    <Calendar size={14} className="text-ui-secondary/70 shrink-0" />
+                                                    <span>
+                                                        {c.lastPurchaseDate
+                                                            ? new Date(c.lastPurchaseDate).toLocaleDateString('pl-PL', {
+                                                                year: 'numeric',
+                                                                month: '2-digit',
+                                                                day: '2-digit'
+                                                            })
+                                                            : "Brak historii"}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* MODAL 1: Podgląd szczegółów */}
@@ -239,7 +303,7 @@ export default function KontrahenciPage() {
                             </div>
                             <button
                                 onClick={() => setSelectedContractor(null)}
-                                className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors"
+                                className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors cursor-pointer"
                             >
                                 <X size={20} />
                             </button>
@@ -288,6 +352,7 @@ export default function KontrahenciPage() {
             {/* MODAL 2: Kreator */}
             <AddContractorModal
                 isOpen={isAddModalOpen}
+                isSaving={isSaving}
                 onClose={() => setIsAddModalOpen(false)}
                 onSave={handleSaveContractor}
             />
@@ -297,15 +362,16 @@ export default function KontrahenciPage() {
 }
 
 // =========================================================================
-// PODKOMPONENT: AddContractorModal (Formularz Prisma Contractor)
+// PODKOMPONENT: AddContractorModal
 // =========================================================================
 interface AddContractorModalProps {
     isOpen: boolean;
+    isSaving: boolean;
     onClose: () => void;
     onSave: (data: Omit<Contractor, "id" | "createdAt">) => void;
 }
 
-function AddContractorModal({ isOpen, onClose, onSave }: AddContractorModalProps) {
+function AddContractorModal({ isOpen, isSaving, onClose, onSave }: AddContractorModalProps) {
     const [type, setType] = useState<ContractorType>("SUPPLIER");
     const [name, setName] = useState("");
     const [nip, setNip] = useState("");
@@ -339,8 +405,6 @@ function AddContractorModal({ isOpen, onClose, onSave }: AddContractorModalProps
         setContactPerson("");
         setNotes("");
         setType("SUPPLIER");
-
-        onClose();
     };
 
     return (
@@ -361,7 +425,8 @@ function AddContractorModal({ isOpen, onClose, onSave }: AddContractorModalProps
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-ui-accent rounded-full text-ui-black/50 hover:text-ui-black transition-colors"
+                        disabled={isSaving}
+                        className="p-2 hover:bg-ui-accent rounded-full text-ui-black/50 hover:text-ui-black transition-colors cursor-pointer disabled:opacity-50"
                     >
                         <X size={24} />
                     </button>
@@ -378,7 +443,7 @@ function AddContractorModal({ isOpen, onClose, onSave }: AddContractorModalProps
                                     key={t}
                                     type="button"
                                     onClick={() => setType(t)}
-                                    className={`py-2 rounded-lg text-xs font-bold transition-all duration-200
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer
                                         ${type === t
                                             ? "bg-ui-primary text-ui-white shadow-sm"
                                             : "text-ui-primary/60 hover:text-ui-primary hover:bg-ui-white/50"
@@ -495,15 +560,17 @@ function AddContractorModal({ isOpen, onClose, onSave }: AddContractorModalProps
                         <button
                             type="button"
                             onClick={onClose}
-                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-ui-secondary text-ui-primary font-semibold hover:bg-ui-accent/20 transition-colors text-sm"
+                            disabled={isSaving}
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-ui-secondary text-ui-primary font-semibold hover:bg-ui-accent/20 transition-colors text-sm cursor-pointer disabled:opacity-50"
                         >
                             Anuluj
                         </button>
                         <button
                             type="submit"
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-6 py-2.5 rounded-xl font-semibold shadow-sm transition-colors text-sm"
+                            disabled={isSaving}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-6 py-2.5 rounded-xl font-semibold shadow-sm transition-colors text-sm cursor-pointer disabled:opacity-50"
                         >
-                            <Save size={16} />
+                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                             Zapisz w bazie
                         </button>
                     </div>
