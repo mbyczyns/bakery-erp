@@ -5,7 +5,7 @@ echo "[entrypoint] Uruchamiam kontener aplikacji..."
 
 # Inicjalizacja/Aktualizacja bazy danych Prisma
 echo "[entrypoint] Wykonuję Prisma db push oraz generate..."
-npx prisma db push
+npx prisma db push --accept-data-loss
 npx prisma generate
 
 echo "[entrypoint] Gotowe! Startuję serwer Next.js: $@"

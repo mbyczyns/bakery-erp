@@ -14,8 +14,11 @@ import {
     MapPin,
     Eye,
     Calendar,
-    Loader2
+    Loader2,
+    ChevronRight,
+    ExternalLink
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Typy zgodne z Prisma
 type ContractorType = "SUPPLIER" | "CUSTOMER" | "OTHER";
@@ -24,6 +27,8 @@ interface Contractor {
     id: string;
     type: ContractorType;
     name: string;
+    customName?: string | null;
+    displayName?: string;
     nip: string;
     address?: string;
     email?: string;
@@ -35,6 +40,7 @@ interface Contractor {
 }
 
 export default function KontrahenciPage() {
+    const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -42,8 +48,6 @@ export default function KontrahenciPage() {
     const [contractors, setContractors] = useState<Contractor[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-
-    const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
 
     // Typ pomocniczy dla obsługi zakładki "Wszyscy"
     type TabType = ContractorType | "ALL";
@@ -73,18 +77,26 @@ export default function KontrahenciPage() {
         fetchContractors();
     }, []);
 
-    // Filtrowanie kontrahentów: najpierw po typie, potem po wyszukiwarce
+    // Filtrowanie kontrahentów: najpierw po typie (kontrahent typu OTHER widoczny u dostawców i odbiorców), potem po wyszukiwarce
     const filteredContractors = contractors
-        .filter(c => activeTab === "ALL" ? true : c.type === activeTab)
+        .filter(c => {
+            if (activeTab === "ALL") return true;
+            if (activeTab === "SUPPLIER") return c.type === "SUPPLIER" || c.type === "OTHER";
+            if (activeTab === "CUSTOMER") return c.type === "CUSTOMER" || c.type === "OTHER";
+            return c.type === activeTab;
+        })
         .filter(c =>
             c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.customName && c.customName.toLowerCase().includes(searchTerm.toLowerCase())) ||
             c.nip.includes(searchTerm) ||
-            (c.address && c.address.toLowerCase().includes(searchTerm.toLowerCase()))
+            (c.address && c.address !== 'Pobrano z KSeF' && c.address.toLowerCase().includes(searchTerm.toLowerCase()))
         );
 
     // Licznik dla zakładek
     const getCountForType = (type: TabType) => {
         if (type === "ALL") return contractors.length;
+        if (type === "SUPPLIER") return contractors.filter(c => c.type === "SUPPLIER" || c.type === "OTHER").length;
+        if (type === "CUSTOMER") return contractors.filter(c => c.type === "CUSTOMER" || c.type === "OTHER").length;
         return contractors.filter(c => c.type === type).length;
     };
 
@@ -120,7 +132,9 @@ export default function KontrahenciPage() {
             case "SUPPLIER":
                 return { label: "Dostawca", styles: "bg-blue-50 text-blue-600 border-blue-200" };
             case "CUSTOMER":
-                return { label: "Odbiorca", styles: "bg-green-50 text-green-600 border-green-200" };
+                return { label: "Odbiorca", styles: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+            case "OTHER":
+                return { label: "Dostawca / Odbiorca", styles: "bg-purple-50 text-purple-700 border-purple-200" };
             default:
                 return { label: "Inny", styles: "bg-gray-50 text-gray-600 border-gray-200" };
         }
@@ -237,12 +251,19 @@ export default function KontrahenciPage() {
                                     return (
                                         <tr
                                             key={c.id}
-                                            onClick={() => setSelectedContractor(c)}
+                                            onClick={() => router.push(`/kontrahenci/${c.id}`)}
                                             className="hover:bg-ui-accent/5 transition-colors cursor-pointer group"
                                         >
                                             {/* Nazwa */}
                                             <td className="p-4 font-bold text-ui-black group-hover:text-ui-primary transition-colors">
-                                                <div className="truncate pr-4" title={c.name}>{c.name}</div>
+                                                <div className="truncate pr-4 text-sm" title={c.displayName || c.customName || c.name}>
+                                                    {c.displayName || c.customName || c.name}
+                                                </div>
+                                                {c.customName && c.customName !== c.name && (
+                                                    <div className="text-[11px] font-normal text-ui-secondary truncate" title={c.name}>
+                                                        Faktura: {c.name}
+                                                    </div>
+                                                )}
                                                 {c.contactPerson && (
                                                     <div className="text-xs font-normal text-ui-secondary flex items-center gap-1 mt-0.5 truncate">
                                                         <User size={12} className="shrink-0" /> {c.contactPerson}
@@ -286,70 +307,7 @@ export default function KontrahenciPage() {
                 </div>
             </div>
 
-            {/* MODAL 1: Podgląd szczegółów */}
-            {selectedContractor && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
-                    onClick={() => setSelectedContractor(null)}
-                >
-                    <div
-                        className="bg-ui-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border border-ui-accent"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="border-b border-ui-accent p-5 flex items-start justify-between">
-                            <div>
-                                <h2 className="text-xl font-bold text-ui-primary">{selectedContractor.name}</h2>
-                                <p className="text-xs text-ui-secondary mt-1">NIP: {selectedContractor.nip}</p>
-                            </div>
-                            <button
-                                onClick={() => setSelectedContractor(null)}
-                                className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors cursor-pointer"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-4 text-sm">
-                            <div className="flex justify-between border-b border-ui-accent/30 pb-2">
-                                <span className="text-ui-secondary font-semibold">Typ relacji:</span>
-                                <span className="font-bold text-ui-black">{getBadgeProps(selectedContractor.type).label}</span>
-                            </div>
-                            {selectedContractor.address && (
-                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
-                                    <span className="text-ui-secondary font-semibold shrink-0">Adres:</span>
-                                    <span className="text-right text-ui-black font-medium">{selectedContractor.address}</span>
-                                </div>
-                            )}
-                            {selectedContractor.email && (
-                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
-                                    <span className="text-ui-secondary font-semibold">E-mail:</span>
-                                    <a href={`mailto:${selectedContractor.email}`} className="text-ui-primary hover:underline font-medium">{selectedContractor.email}</a>
-                                </div>
-                            )}
-                            {selectedContractor.phone && (
-                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
-                                    <span className="text-ui-secondary font-semibold">Telefon:</span>
-                                    <span className="text-ui-black font-medium">{selectedContractor.phone}</span>
-                                </div>
-                            )}
-                            {selectedContractor.contactPerson && (
-                                <div className="flex justify-between border-b border-ui-accent/30 pb-2">
-                                    <span className="text-ui-secondary font-semibold">Osoba kontaktowa:</span>
-                                    <span className="text-ui-black font-medium">{selectedContractor.contactPerson}</span>
-                                </div>
-                            )}
-                            {selectedContractor.notes && (
-                                <div className="bg-ui-accent/10 border border-ui-accent/40 rounded-xl p-3 text-xs mt-4">
-                                    <p className="font-bold text-ui-secondary mb-1">Uwagi wewnętrzne:</p>
-                                    <p className="text-ui-black/80 whitespace-pre-wrap">{selectedContractor.notes}</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL 2: Kreator */}
+            {/* MODAL: Kreator */}
             <AddContractorModal
                 isOpen={isAddModalOpen}
                 isSaving={isSaving}

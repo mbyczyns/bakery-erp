@@ -106,14 +106,17 @@ export async function GET(
         const faRoot = parsedXml.Faktura || parsedXml;
         const faSection = faRoot?.Fa;
 
-        // --- NOWE: POBIERANIE I AKTUALIZACJA ADRESU KONTRAHENTA ---
-        const podmiot1 = faRoot?.Podmiot1;
-        const adres = podmiot1?.Adres;
+        // --- POBIERANIE I AKTUALIZACJA ADRESU KONTRAHENTA ---
+        // Dla faktur sprzedażowych (wystawionych przez nas) kontrahentem jest Nabywca (Podmiot2)
+        // Dla faktur zakupowych (kosztowych) kontrahentem jest Sprzedawca (Podmiot1)
+        const isSalesInvoice = (invoice as any).isSales || invoice.type === 'SALES';
+        const remoteSubject = isSalesInvoice ? (faRoot?.Podmiot2 || faRoot?.Podmiot1) : (faRoot?.Podmiot1 || faRoot?.Podmiot2);
+        const adres = remoteSubject?.Adres;
 
         if (adres && invoice.contractorId) {
             let fullAddress = '';
 
-            // Opcja 1: Adres ustrukturyzowany (np. AdresPol)
+            // Opcja 1: Adres ustrukturyzowany polski (AdresPol)
             if (adres.AdresPol) {
                 const ulica = adres.AdresPol.Ulica ? `ul. ${adres.AdresPol.Ulica}` : '';
                 const nrDomu = adres.AdresPol.NrDomu || '';
@@ -125,24 +128,41 @@ export async function GET(
                 const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
                 fullAddress = [streetPart, cityPart].filter(Boolean).join(', ');
             }
-            // Opcja 2: Adres liniowy (AdresL1, AdresL2)
+            // Opcja 2: Adres zagraniczny (AdresZagr)
+            else if (adres.AdresZagr) {
+                const ulica = adres.AdresZagr.Ulica || '';
+                const nrDomu = adres.AdresZagr.NrDomu || '';
+                const kodPocztowy = adres.AdresZagr.KodPocztowy || '';
+                const miejscowosc = adres.AdresZagr.Miejscowosc || '';
+                const kraj = adres.AdresZagr.NazwaKraju || adres.AdresZagr.KodKraju || '';
+
+                const streetPart = `${ulica} ${nrDomu}`.trim();
+                const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
+                fullAddress = [streetPart, cityPart, kraj].filter(Boolean).join(', ');
+            }
+            // Opcja 3: Adres liniowy (AdresL1, AdresL2)
             else if (adres.AdresL1 || adres.AdresL2) {
                 const l1 = adres.AdresL1 || '';
                 const l2 = adres.AdresL2 || '';
                 fullAddress = [l1, l2].filter(Boolean).join(', ');
             }
 
-            // Aktualizuj w bazie, jeśli wyciągnęliśmy adres i wciąż mamy placeholder
-            if (
-                fullAddress &&
-                (!invoice.contractor.address || invoice.contractor.address === 'Pobrano z KSeF')
-            ) {
+            // Aktualizuj w bazie tylko jeśli udało się odczytać faktyczny adres
+            if (fullAddress && fullAddress.trim()) {
                 await prisma.contractor.update({
                     where: { id: invoice.contractorId },
-                    data: { address: fullAddress },
+                    data: { address: fullAddress.trim() },
                 });
                 console.log(`[ON-DEMAND] Zaktualizowano adres dla ${invoice.contractor.name}: ${fullAddress}`);
             }
+        }
+
+        // Czyszczenie starego placeholdera jeśli wciąż istnieje
+        if (invoice.contractor && invoice.contractor.address === 'Pobrano z KSeF') {
+            await prisma.contractor.update({
+                where: { id: invoice.contractorId },
+                data: { address: '' },
+            }).catch(() => {});
         }
         // ---------------------------------------------------------
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
     Plus,
     Search,
@@ -57,6 +58,7 @@ interface Recipe {
 }
 
 export default function PrzepisyPage() {
+    const router = useRouter();
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [semiFinishedList, setSemiFinishedList] = useState<SemiFinishedItem[]>([]);
     const [dbIngredients, setDbIngredients] = useState<DictionaryIngredient[]>([]);
@@ -81,7 +83,7 @@ export default function PrzepisyPage() {
     const [newProductType, setNewProductType] = useState<ProductType>("BREAD");
     const [newSellingPrice, setNewSellingPrice] = useState<string>("0");
     const [newSemiUnit, setNewSemiUnit] = useState<string>("kg");
-    const [batchSize, setBatchSize] = useState<number>(10);
+    const [batchSize, setBatchSize] = useState<string>("10");
 
     // Pozycje w formularzu (mogą być surowcem lub półproduktem)
     const [formItems, setFormItems] = useState<
@@ -163,19 +165,40 @@ export default function PrzepisyPage() {
             return;
         }
         if (formItems.length === 0) {
-            alert("Dodaj przynajmniej jeden składnik!");
+            alert("Dodaj przynajmniej jeden składnik lub półprodukt do receptury!");
             return;
+        }
+
+        const cleanBatchStr = batchSize.toString().replace(",", ".").trim();
+        const batchNum = parseFloat(cleanBatchStr);
+        if (isNaN(batchNum) || batchNum <= 0) {
+            alert("Wprowadź prawidłową wielkość partii (liczbę większą od 0)!");
+            return;
+        }
+
+        // Walidacja ilości składników
+        for (const item of formItems) {
+            const cleanAmtStr = item.batchAmount.toString().replace(",", ".").trim();
+            const amtNum = parseFloat(cleanAmtStr);
+            if (isNaN(amtNum) || amtNum <= 0) {
+                alert(`Wprowadź poprawną ilość dla pozycji "${item.name}" (większą od 0)!`);
+                return;
+            }
         }
 
         setIsSubmitting(true);
         try {
             if (creationKind === "PRODUCT") {
-                const singleUnitIngredients = formItems.map((item) => ({
-                    amount: Number(item.batchAmount) / batchSize,
-                    unit: item.unit,
-                    ingredientId: item.kind === "INGREDIENT" ? item.id : null,
-                    semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
-                }));
+                const singleUnitIngredients = formItems.map((item) => {
+                    const cleanAmtStr = item.batchAmount.toString().replace(",", ".").trim();
+                    const amtNum = parseFloat(cleanAmtStr) || 0;
+                    return {
+                        amount: amtNum / batchNum,
+                        unit: item.unit,
+                        ingredientId: item.kind === "INGREDIENT" ? item.id : null,
+                        semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
+                    };
+                });
 
                 const res = await fetch("/api/przepisy", {
                     method: "POST",
@@ -183,23 +206,30 @@ export default function PrzepisyPage() {
                     body: JSON.stringify({
                         name: newName.trim(),
                         type: newProductType,
-                        sellingPrice: Number(newSellingPrice || 0),
+                        sellingPrice: 0,
                         ingredients: singleUnitIngredients,
                     }),
                 });
 
-                if (!res.ok) throw new Error((await res.json()).error);
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || "Nie udało się zapisać przepisu");
+                }
             } else {
                 // Zapis Półproduktu (SemiFinished)
                 const payload = {
                     name: newName.trim(),
                     unit: newSemiUnit,
-                    amount: batchSize, // Ilość bazowa wyprodukowana w recepturze
-                    ingredients: formItems.map((item) => ({
-                        ingredientId: item.id,
-                        amount: Number(item.batchAmount) / batchSize, // Ilość na 1 jednostkę półproduktu
-                        unit: item.unit,
-                    })),
+                    amount: batchNum, // Ilość bazowa wyprodukowana w recepturze
+                    ingredients: formItems.map((item) => {
+                        const cleanAmtStr = item.batchAmount.toString().replace(",", ".").trim();
+                        const amtNum = parseFloat(cleanAmtStr) || 0;
+                        return {
+                            ingredientId: item.id,
+                            amount: amtNum / batchNum, // Ilość na 1 jednostkę półproduktu
+                            unit: item.unit,
+                        };
+                    }),
                 };
 
                 const res = await fetch("/api/polprodukty", {
@@ -208,12 +238,16 @@ export default function PrzepisyPage() {
                     body: JSON.stringify(payload),
                 });
 
-                if (!res.ok) throw new Error((await res.json()).error);
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || "Nie udało się zapisać półproduktu");
+                }
             }
 
             // Reset formularza
             setNewName("");
             setNewSellingPrice("0");
+            setBatchSize(creationKind === "PRODUCT" ? "10" : "1");
             setFormItems([]);
             setIsAddModalOpen(false);
             await fetchData();
@@ -256,7 +290,7 @@ export default function PrzepisyPage() {
                     <button
                         onClick={() => {
                             setCreationKind("SEMI_FINISHED");
-                            setBatchSize(1);
+                            setBatchSize("1");
                             setIsAddModalOpen(true);
                         }}
                         className="flex items-center justify-center gap-2 border border-ui-accent hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
@@ -268,7 +302,7 @@ export default function PrzepisyPage() {
                         onClick={() => {
                             setCreationKind("PRODUCT");
                             setNewProductType(activeTab === "SEMI_FINISHED" ? "BREAD" : activeTab);
-                            setBatchSize(10);
+                            setBatchSize("10");
                             setIsAddModalOpen(true);
                         }}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
@@ -410,8 +444,14 @@ export default function PrzepisyPage() {
                                         {Number(recipe.sellingPrice || 0).toFixed(2)} zł
                                     </td>
                                     <td className="p-4 text-center">
-                                        <button className="flex items-center gap-1 mx-auto text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors">
-                                            Zobacz Przepis
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/przepisy/${recipe.id}`);
+                                            }}
+                                            className="flex items-center gap-1 mx-auto text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                        >
+                                            Foodcost & Marża
                                             <ChevronRight size={14} />
                                         </button>
                                     </td>
@@ -505,6 +545,23 @@ export default function PrzepisyPage() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+
+                        {/* Stopka z linkiem do pełnej karty receptury i kalkulatora */}
+                        <div className="p-4 border-t border-ui-accent bg-amber-50/30 flex items-center justify-between">
+                            <button
+                                onClick={() => setSelectedRecipe(null)}
+                                className="px-4 py-2 rounded-xl border border-ui-accent text-ui-secondary hover:text-ui-primary font-semibold text-xs transition-colors cursor-pointer"
+                            >
+                                Zamknij
+                            </button>
+                            <button
+                                onClick={() => router.push(`/przepisy/${selectedRecipe.id}`)}
+                                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+                            >
+                                Pełny foodcost, marża i historia
+                                <ChevronRight size={15} />
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -606,60 +663,70 @@ export default function PrzepisyPage() {
                     onClick={() => setIsAddModalOpen(false)}
                 >
                     <div
-                        className="bg-ui-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[90vh] flex flex-col"
+                        className="bg-ui-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[92vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-5 border-b border-ui-accent flex items-center justify-between bg-amber-50/50">
-                            <div>
-                                <h2 className="text-lg font-bold text-ui-black">
-                                    {creationKind === "PRODUCT" ? "Nowy Przepis" : "Nowy Półprodukt"}
-                                </h2>
+                        {/* Nagłówek Modalu */}
+                        <div className="px-6 py-4 border-b border-ui-accent flex items-center justify-between bg-amber-50/70">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-amber-100 rounded-xl text-amber-800 shadow-sm">
+                                    {creationKind === "PRODUCT" ? <ChefHat size={22} /> : <Layers size={22} />}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-ui-black leading-tight">
+                                        {creationKind === "PRODUCT" ? "Nowy Przepis" : "Nowy Półprodukt"}
+                                    </h2>
 
+                                </div>
                             </div>
                             <button
                                 onClick={() => setIsAddModalOpen(false)}
-                                className="p-1.5 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer"
+                                className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer"
+                                title="Zamknij"
                             >
-                                <X size={18} />
+                                <X size={20} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmitForm} className="p-6 space-y-5 overflow-y-auto flex-1 text-xs">
+                        <form onSubmit={handleSubmitForm} className="p-6 md:p-7 space-y-6 overflow-y-auto flex-1 text-sm">
                             {/* Wybór typu formularza */}
                             <div className="grid grid-cols-2 gap-2 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setCreationKind("PRODUCT");
-                                        setBatchSize(10);
+                                        setBatchSize("10");
                                     }}
-                                    className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${creationKind === "PRODUCT"
+                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-sm transition-all cursor-pointer ${creationKind === "PRODUCT"
                                         ? "bg-ui-primary text-ui-white shadow-sm"
-                                        : "text-ui-secondary hover:text-ui-primary"
+                                        : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/10"
                                         }`}
                                 >
+                                    <ChefHat size={17} />
                                     Wypiek gotowy
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setCreationKind("SEMI_FINISHED");
-                                        setBatchSize(1);
+                                        setBatchSize("1");
                                     }}
-                                    className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${creationKind === "SEMI_FINISHED"
+                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-sm transition-all cursor-pointer ${creationKind === "SEMI_FINISHED"
                                         ? "bg-ui-primary text-ui-white shadow-sm"
-                                        : "text-ui-secondary hover:text-ui-primary"
+                                        : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/10"
                                         }`}
                                 >
+                                    <Layers size={17} />
                                     Półprodukt
                                 </button>
                             </div>
 
                             {/* Dane podstawowe */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div className="sm:col-span-2">
-                                    <label className="block font-bold text-ui-secondary uppercase mb-1">
-                                        Nazwa
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                {/* Nazwa wyrobu / półproduktu */}
+                                <div className="md:col-span-6">
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
+                                        Nazwa {creationKind === "PRODUCT" ? "wyrobu" : "półproduktu"}
                                     </label>
                                     <input
                                         type="text"
@@ -667,117 +734,108 @@ export default function PrzepisyPage() {
                                         placeholder={
                                             creationKind === "PRODUCT"
                                                 ? "np. Chleb Żytni 500g"
-                                                : "np. Kruszonka Maślana"
+                                                : "np. Zaczyn żytni / Kruszonka"
                                         }
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
-                                        className="w-full h-[38px] bg-ui-white border border-ui-accent rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-ui-secondary transition-all"
+                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black placeholder:text-ui-secondary/50 focus:outline-none focus:border-amber-600 transition-all shadow-sm"
                                     />
                                 </div>
 
+                                {/* Kategoria dla wyrobu LUB Jednostka dla półproduktu */}
                                 {creationKind === "PRODUCT" ? (
-                                    <div>
-                                        <label className="block font-bold text-ui-secondary uppercase mb-1">
+                                    <div className="md:col-span-3">
+                                        <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
                                             Kategoria
                                         </label>
                                         <div className="relative">
                                             <select
                                                 value={newProductType}
                                                 onChange={(e) => setNewProductType(e.target.value as ProductType)}
-                                                // DODANO: appearance-none, pl-3, pr-8
-                                                className="w-full h-[38px] bg-ui-white border border-ui-accent rounded-xl pl-3 pr-8 py-2 text-xs font-semibold text-ui-black focus:outline-none focus:border-ui-secondary cursor-pointer transition-all appearance-none"
+                                                className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm  text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm"
                                             >
                                                 <option value="BREAD">Chleb</option>
                                                 <option value="ROLL">Bułka</option>
                                                 <option value="SWEET">Słodkie</option>
                                                 <option value="SAVORY">Słone</option>
                                             </select>
-                                            <div className="absolute inset-y-0 right-0 flex items-center px-2.5 pointer-events-none text-ui-secondary">
-                                                <ChevronDown size={14} />
+                                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                                <ChevronDown size={16} />
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div>
-                                        <label className="block font-bold text-ui-secondary uppercase mb-1">
-                                            Jednostka
+                                    <div className="md:col-span-3">
+                                        <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
+                                            Jednostka miary
                                         </label>
                                         <div className="relative">
                                             <select
                                                 value={newSemiUnit}
                                                 onChange={(e) => setNewSemiUnit(e.target.value)}
-                                                // DODANO: appearance-none, pl-3, pr-8
-                                                className="w-full h-[38px] bg-ui-white border border-ui-accent rounded-xl pl-3 pr-8 py-2 text-xs font-semibold text-ui-black focus:outline-none focus:border-ui-secondary cursor-pointer transition-all appearance-none"
+                                                className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm  text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm"
                                             >
-                                                <option value="kg">kg</option>
+                                                <option value="kg">kg (kilogram)</option>
                                                 <option value="l">l (litr)</option>
-                                                <option value="szt">szt</option>
+                                                <option value="szt">szt (sztuka)</option>
                                             </select>
-                                            <div className="absolute inset-y-0 right-0 flex items-center px-2.5 pointer-events-none text-ui-secondary">
-                                                <ChevronDown size={14} />
+                                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                                <ChevronDown size={16} />
                                             </div>
                                         </div>
                                     </div>
                                 )}
-                            </div>
 
-                            {/* Parametry partii */}
-                            <div className="grid grid-cols-2 gap-3 bg-ui-accent/10 p-3 rounded-xl">
-                                <div>
-                                    <label className="block font-bold text-ui-secondary uppercase mb-1">
-                                        {creationKind === "PRODUCT"
-                                            ? "Deklaracja partii (sztuki)"
-                                            : `Waga/Ilość partii (${newSemiUnit})`}
+                                {/* Deklaracja partii */}
+                                <div className="md:col-span-3">
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5 truncate">
+                                        {creationKind === "PRODUCT" ? "Deklaracja partii" : "Ilość partii bazowej"}
                                     </label>
-                                    <input
-                                        type="number"
-                                        min="0.1"
-                                        step="0.5"
-                                        required
-                                        value={batchSize}
-                                        onChange={(e) => setBatchSize(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                                        className="w-full bg-ui-white border border-ui-accent rounded-xl px-3 py-2 text-xs font-bold text-center focus:outline-none"
-                                    />
-                                </div>
-
-                                {creationKind === "PRODUCT" && (
-                                    <div>
-                                        <label className="block font-bold text-ui-secondary uppercase mb-1">
-                                            Cena Sprzedaży (zł brutto)
-                                        </label>
+                                    <div className="relative">
                                         <input
-                                            type="number"
-                                            step="0.10"
-                                            value={newSellingPrice}
-                                            onChange={(e) => setNewSellingPrice(e.target.value)}
-                                            className="w-full bg-ui-white border border-ui-accent rounded-xl px-3 py-2 text-xs font-bold focus:outline-none"
+                                            type="text"
+                                            inputMode="decimal"
+                                            required
+                                            value={batchSize}
+                                            onChange={(e) => setBatchSize(e.target.value)}
+                                            placeholder={creationKind === "PRODUCT" ? "10" : "1"}
+                                            className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-14 py-2 text-sm  text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
                                         />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs  text-ui-secondary bg-ui-accent/15 px-2 py-0.5 rounded pointer-events-none">
+                                            {creationKind === "PRODUCT" ? "szt." : newSemiUnit}
+                                        </span>
                                     </div>
-                                )}
+                                </div>
                             </div>
+
 
                             {/* Składniki i Półprodukty w przepisie */}
                             <div className="space-y-3">
-                                <label className="block font-bold text-ui-black uppercase tracking-wider">
-                                    Składniki dla partii ({batchSize} {creationKind === "PRODUCT" ? "szt." : newSemiUnit})
-                                </label>
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-bold text-ui-black uppercase tracking-wider">
+                                        Składniki dla partii ({batchSize || "1"} {creationKind === "PRODUCT" ? "szt." : newSemiUnit})
+                                    </label>
+                                    <span className="text-xs text-ui-secondary font-medium">
+                                        Dodano pozycji: <b>{formItems.length}</b>
+                                    </span>
+                                </div>
 
                                 {/* Wyszukiwarka surowców i półproduktów */}
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-2.5 text-ui-secondary" size={14} />
+                                    <Search className="absolute left-3.5 top-3 text-ui-secondary" size={17} />
                                     <input
                                         type="text"
-                                        placeholder="Wpisz nazwę surowca lub półproduktu..."
+                                        placeholder="Wyszukaj i wybierz składnik lub półprodukt..."
                                         value={searchInput}
                                         onChange={(e) => setSearchInput(e.target.value)}
-                                        className="w-full border border-ui-accent rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-ui-primary focus:outline-none focus:border-ui-secondary"
+                                        className="w-full h-11 border border-ui-accent rounded-xl pl-10 pr-3 py-2 text-sm font-medium text-ui-primary focus:outline-none focus:border-amber-600 shadow-sm"
                                     />
 
                                     {searchInput.trim().length > 0 && (
-                                        <div className="absolute left-0 right-0 top-full mt-1 bg-ui-white border border-ui-accent rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-ui-accent/40">
+                                        <div className="absolute left-0 right-0 top-full mt-1.5 bg-ui-white border border-ui-accent rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-ui-accent/40">
                                             {availableIngredients.length === 0 && availableSemiFinished.length === 0 ? (
-                                                <div className="p-3 text-center text-ui-secondary italic">
-                                                    Brak wyników
+                                                <div className="p-4 text-center text-ui-secondary text-xs italic">
+                                                    Nie znaleziono pozycji pasujących do &quot;{searchInput}&quot;
                                                 </div>
                                             ) : (
                                                 <>
@@ -788,13 +846,16 @@ export default function PrzepisyPage() {
                                                             onClick={() =>
                                                                 handleSelectItem(semi.id, "SEMI_FINISHED", semi.name, semi.unit)
                                                             }
-                                                            className="w-full text-left p-2.5 hover:bg-amber-50 transition-colors flex items-center justify-between font-bold text-amber-950 cursor-pointer bg-amber-50/30"
+                                                            className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors flex items-center justify-between font-bold text-amber-950 cursor-pointer bg-amber-50/40"
                                                         >
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Layers size={13} className="text-amber-700" />
-                                                                <span>[Półprodukt] {semi.name}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <Layers size={15} className="text-amber-700" />
+                                                                <span>{semi.name}</span>
+                                                                <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">
+                                                                    PÓŁPRODUKT
+                                                                </span>
                                                             </div>
-                                                            <span className="text-[10px] text-ui-secondary">[{semi.unit}]</span>
+                                                            <span className="text-xs font-semibold text-ui-secondary">[{semi.unit}]</span>
                                                         </button>
                                                     ))}
 
@@ -805,10 +866,15 @@ export default function PrzepisyPage() {
                                                             onClick={() =>
                                                                 handleSelectItem(ing.id, "INGREDIENT", ing.name, ing.unit)
                                                             }
-                                                            className="w-full text-left p-2.5 hover:bg-amber-50 transition-colors flex items-center justify-between font-semibold text-ui-black cursor-pointer"
+                                                            className="w-full text-left px-4 py-3 hover:bg-amber-50/60 transition-colors flex items-center justify-between font-semibold text-ui-black cursor-pointer"
                                                         >
-                                                            <span>{ing.name}</span>
-                                                            <span className="text-[10px] text-ui-secondary">[{ing.unit}]</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span>{ing.name}</span>
+                                                                <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.5 rounded border border-slate-200">
+                                                                    SUROWIEC
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-ui-secondary">[{ing.unit}]</span>
                                                         </button>
                                                     ))}
                                                 </>
@@ -818,63 +884,80 @@ export default function PrzepisyPage() {
                                 </div>
 
                                 {/* Lista zadeklarowanych składników */}
-                                <div className="border border-ui-accent rounded-xl divide-y divide-ui-accent/40 bg-ui-white">
+                                <div className="border border-ui-accent rounded-xl overflow-hidden divide-y divide-ui-accent/40 bg-ui-white shadow-sm">
                                     {formItems.length === 0 ? (
-                                        <div className="p-6 text-center text-ui-secondary italic">
-                                            Wyszukaj i dodaj składniki w polu powyżej.
+                                        <div className="p-8 text-center text-ui-secondary text-xs italic">
+                                            Wyszukaj i wybierz składniki powyżej, aby dodać je do receptury.
                                         </div>
                                     ) : (
-                                        formItems.map((item) => (
-                                            <div
-                                                key={`${item.kind}-${item.id}`}
-                                                className="p-3 flex items-center justify-between gap-3 hover:bg-ui-accent/5"
-                                            >
-                                                <div className="flex-1 truncate">
-                                                    <span className="font-bold text-ui-black">
-                                                        {item.kind === "SEMI_FINISHED" ? `[Półprodukt] ${item.name}` : item.name}
-                                                    </span>
-                                                </div>
+                                        formItems.map((item) => {
+                                            const currentBatchNum = parseFloat(batchSize.replace(",", ".")) || 1;
+                                            const currentItemAmt = parseFloat(item.batchAmount.replace(",", ".")) || 0;
+                                            const perUnitAmt = currentItemAmt / currentBatchNum;
 
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[10px] text-ui-secondary">Ilość:</span>
-                                                    <input
-                                                        type="number"
-                                                        step="0.001"
-                                                        value={item.batchAmount}
-                                                        onChange={(e) => handleAmountChange(item.id, item.kind, e.target.value)}
-                                                        className="w-20 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1 text-center font-extrabold text-amber-950 focus:outline-none"
-                                                    />
-                                                    <span className="font-bold text-ui-secondary w-6">{item.unit}</span>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveItem(item.id, item.kind)}
-                                                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                            return (
+                                                <div
+                                                    key={`${item.kind}-${item.id}`}
+                                                    className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-ui-accent/5 transition-colors"
                                                 >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        ))
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+
+                                                        <span className="font-bold text-ui-black text-sm truncate">
+                                                            {item.name}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs text-ui-secondary font-medium">Ilość:</span>
+                                                            <input
+                                                                type="text"
+                                                                inputMode="decimal"
+                                                                value={item.batchAmount}
+                                                                onChange={(e) => handleAmountChange(item.id, item.kind, e.target.value)}
+                                                                placeholder="1.0"
+                                                                className="w-24 h-9 bg-amber-50/70 border border-amber-300 rounded-lg px-2.5 text-center font-extrabold text-sm text-amber-950 focus:outline-none focus:border-amber-600 focus:bg-white transition-all shadow-sm"
+                                                            />
+                                                            <span className="font-bold text-ui-secondary text-xs w-7">{item.unit}</span>
+                                                        </div>
+
+                                                        <div className="hidden md:block text-[11px] text-ui-secondary bg-ui-accent/10 px-2 py-1 rounded font-medium">
+                                                            ≈ {perUnitAmt < 1 && item.unit === "kg"
+                                                                ? `${(perUnitAmt * 1000).toFixed(1)} g`
+                                                                : `${perUnitAmt.toFixed(3)} ${item.unit}`} / {creationKind === "PRODUCT" ? "szt." : newSemiUnit}
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveItem(item.id, item.kind)}
+                                                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                            title="Usuń z receptury"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
                                     )}
                                 </div>
                             </div>
 
                             {/* Stopka */}
-                            <div className="pt-4 border-t border-ui-accent flex justify-end gap-2">
+                            <div className="pt-4 border-t border-ui-accent flex justify-end gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setIsAddModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold text-xs hover:bg-ui-accent/20 transition-colors cursor-pointer"
+                                    className="px-5 py-2.5 rounded-xl border border-ui-accent text-ui-primary font-semibold text-sm hover:bg-ui-accent/20 transition-colors cursor-pointer"
                                 >
                                     Anuluj
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                                 >
-                                    {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                                    {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                                     {creationKind === "PRODUCT" ? "Zapisz Przepis" : "Zapisz Półprodukt"}
                                 </button>
                             </div>

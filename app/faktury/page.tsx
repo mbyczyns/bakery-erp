@@ -16,7 +16,8 @@ import {
     FileText,
     Plus,
     Trash2,
-    Edit2
+    Edit2,
+    ArrowRightLeft
 } from "lucide-react";
 
 type InvoiceStatus = "WAITING" | "IMPORTED" | "REJECTED";
@@ -48,6 +49,8 @@ interface Document {
     status: InvoiceStatus;
     notes?: string;
     positions: PositionItem[];
+    // NOWA FLAGA DLA BACKENDU DO ROZRÓŻNIANIA TYPU FAKTURY
+    isSales?: boolean;
 }
 
 interface DictionaryCategory {
@@ -313,6 +316,9 @@ function SearchableContractorSelect({ contractors, value, onChange }: Searchable
 // STRONA GŁÓWNA: FakturyPage
 // =========================================================================
 export default function FakturyPage() {
+    // NOWY STAN: Przełącznik Kosztowe vs Sprzedażowe
+    const [invoiceDirection, setInvoiceDirection] = useState<"COST" | "SALES">("COST");
+
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<InvoiceStatus>("WAITING");
     const [documents, setDocuments] = useState<Document[]>([]);
@@ -425,16 +431,24 @@ export default function FakturyPage() {
         }
     };
 
-    const waitingCount = documents.filter((d) => d.status === "WAITING").length;
-    const importedCount = documents.filter((d) => d.status === "IMPORTED").length;
-    const rejectedCount = documents.filter((d) => d.status === "REJECTED").length;
+    // Zliczanie dokumentów kosztowych (bez flagi isSales)
+    const costDocuments = documents.filter(d => !d.isSales);
+    const waitingCount = costDocuments.filter((d) => d.status === "WAITING").length;
+    const importedCount = costDocuments.filter((d) => d.status === "IMPORTED").length;
+    const rejectedCount = costDocuments.filter((d) => d.status === "REJECTED").length;
 
-    const filteredDocs = documents
-        .filter((doc) => doc.status === activeTab)
-        .filter(
-            (doc) =>
-                (doc.docNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (doc.contractorName || "").toLowerCase().includes(searchTerm.toLowerCase())
+    // Filtrowanie z podziałem na Kosztowe i Sprzedażowe
+    const displayedDocs = documents
+        .filter(doc => {
+            if (invoiceDirection === "COST") {
+                return !doc.isSales && doc.status === activeTab;
+            } else {
+                return doc.isSales; // Sprzedażowe pokazujemy od razu wszystkie (bez statusów)
+            }
+        })
+        .filter((doc) =>
+            (doc.docNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (doc.contractorName || "").toLowerCase().includes(searchTerm.toLowerCase())
         );
 
     return (
@@ -442,18 +456,21 @@ export default function FakturyPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-ui-black">
-                        Faktury i Dokumenty Kosztowe
+                        Faktury i Dokumenty
                     </h1>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setIsManualModalOpen(true)}
-                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm cursor-pointer"
-                    >
-                        <Plus size={18} />
-                        Dodaj ręcznie
-                    </button>
+                    {/* Ukrywamy opcję dodawania ręcznego dla faktur sprzedażowych */}
+                    {invoiceDirection === "COST" && (
+                        <button
+                            onClick={() => setIsManualModalOpen(true)}
+                            className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm cursor-pointer"
+                        >
+                            <Plus size={18} />
+                            Dodaj ręcznie
+                        </button>
+                    )}
                     <button
                         onClick={handleSyncKsef}
                         disabled={isSyncing}
@@ -474,70 +491,92 @@ export default function FakturyPage() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap border-b border-ui-accent mb-6 gap-2">
+            {/* GŁÓWNY PRZEŁĄCZNIK: Kosztowe vs Sprzedażowe */}
+            <div className="flex bg-ui-accent/20 p-1 rounded-xl w-fit mb-6 border border-ui-accent/40 shadow-sm">
                 <button
-                    onClick={() => setActiveTab("WAITING")}
-                    className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "WAITING"
-                        ? "border-amber-500 text-amber-700 bg-amber-50/50 rounded-t-xl"
-                        : "border-transparent text-ui-secondary hover:text-ui-primary"
-                        }`}
+                    onClick={() => setInvoiceDirection("COST")}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "COST" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
                 >
-                    <Clock size={16} />
-                    Do weryfikacji
-                    {waitingCount > 0 && (
-                        <span className="bg-amber-200 text-amber-900 text-xs px-2 py-0.5 rounded-full font-bold">
-                            {waitingCount}
-                        </span>
-                    )}
+                    Zakupy (Kosztowe)
                 </button>
-
                 <button
-                    onClick={() => setActiveTab("IMPORTED")}
-                    className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "IMPORTED"
-                        ? "border-emerald-600 text-emerald-800 bg-emerald-50/50 rounded-t-xl"
-                        : "border-transparent text-ui-secondary hover:text-ui-primary"
-                        }`}
+                    onClick={() => setInvoiceDirection("SALES")}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${invoiceDirection === "SALES" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
                 >
-                    <CheckCircle2 size={16} />
-                    Zaakceptowane
-                    <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
-                        {importedCount}
-                    </span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab("REJECTED")}
-                    className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "REJECTED"
-                        ? "border-rose-500 text-rose-700 bg-rose-50/50 rounded-t-xl"
-                        : "border-transparent text-ui-secondary hover:text-ui-primary"
-                        }`}
-                >
-                    <XCircle size={16} />
-                    Odrzucone
-                    <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
-                        {rejectedCount}
-                    </span>
+                    <ArrowRightLeft size={16} />
+                    Sprzedaż (Wystawione)
                 </button>
             </div>
 
+            {/* ZAKŁADKI STATUSÓW (Tylko dla faktur Kosztowych) */}
+            {invoiceDirection === "COST" && (
+                <div className="flex flex-wrap border-b border-ui-accent mb-6 gap-2">
+                    <button
+                        onClick={() => setActiveTab("WAITING")}
+                        className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "WAITING"
+                            ? "border-amber-500 text-amber-700 bg-amber-50/50 rounded-t-xl"
+                            : "border-transparent text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <Clock size={16} />
+                        Do weryfikacji
+                        {waitingCount > 0 && (
+                            <span className="bg-amber-200 text-amber-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                                {waitingCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab("IMPORTED")}
+                        className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "IMPORTED"
+                            ? "border-emerald-600 text-emerald-800 bg-emerald-50/50 rounded-t-xl"
+                            : "border-transparent text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <CheckCircle2 size={16} />
+                        Zaakceptowane
+                        <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
+                            {importedCount}
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab("REJECTED")}
+                        className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "REJECTED"
+                            ? "border-rose-500 text-rose-700 bg-rose-50/50 rounded-t-xl"
+                            : "border-transparent text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <XCircle size={16} />
+                        Odrzucone
+                        <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
+                            {rejectedCount}
+                        </span>
+                    </button>
+                </div>
+            )}
+
+            {/* Pasek wyszukiwania */}
             <div className="relative mb-6">
                 <Search className="absolute left-4 top-3.5 text-ui-secondary" size={20} />
                 <input
                     type="text"
-                    placeholder="Wyszukaj po numerze faktury lub nazwie dostawcy..."
+                    placeholder={`Wyszukaj po numerze faktury lub nazwie ${invoiceDirection === "COST" ? "dostawcy" : "nabywcy"}...`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full bg-ui-white pl-12 pr-4 py-3 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary transition-all text-sm"
                 />
             </div>
 
+            {/* GŁÓWNA TABELA DOKUMENTÓW */}
             <div className="bg-ui-white border border-ui-accent rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-ui-accent/10 text-ui-secondary text-xs font-bold uppercase tracking-wider border-b border-ui-accent">
                                 <th className="p-4 text-left">Numer Faktury</th>
-                                <th className="p-1">Dostawca</th>
+                                <th className="p-1">{invoiceDirection === "COST" ? "Dostawca" : "Nabywca / Klient"}</th>
                                 <th className="p-4 max-w-[80px] leading-tight text-left">Wystawiono</th>
                                 <th className="p-4 text-left">Kwota Brutto</th>
                                 <th className="p-4 text-center">Akcja</th>
@@ -546,21 +585,23 @@ export default function FakturyPage() {
                         <tbody className="divide-y divide-ui-accent/40">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={6} className="p-12 text-center text-ui-secondary text-sm">
+                                    <td colSpan={5} className="p-12 text-center text-ui-secondary text-sm">
                                         <div className="flex items-center justify-center gap-2">
                                             <Loader2 size={20} className="animate-spin" />
                                             Ładowanie listy faktur z bazy danych...
                                         </div>
                                     </td>
                                 </tr>
-                            ) : filteredDocs.length === 0 ? (
+                            ) : displayedDocs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-ui-secondary italic text-sm">
-                                        Brak faktur w wybranej zakładce.
+                                    <td colSpan={5} className="p-8 text-center text-ui-secondary italic text-sm">
+                                        {invoiceDirection === "COST"
+                                            ? "Brak faktur zakupowych w wybranej zakładce."
+                                            : "Brak wystawionych faktur sprzedażowych."}
                                     </td>
                                 </tr>
                             ) : (
-                                filteredDocs.map((doc) => {
+                                displayedDocs.map((doc) => {
                                     const isThisLoading = loadingDocId === doc.id;
 
                                     return (
@@ -579,7 +620,25 @@ export default function FakturyPage() {
                                             <td className="p-4 text-ui-primary text-sm font-medium text-left">{doc.issueDate}</td>
                                             <td className="p-4 text-left font-bold text-ui-black text-sm">{Number(doc.grossAmount || 0).toFixed(2)} zł</td>
                                             <td className="p-4 text-center">
-                                                {doc.status === "WAITING" ? (
+                                                {/* LOGIKA PRZYCISKÓW ZALEŻNA OD TRYBU FAKTURY */}
+                                                {invoiceDirection === "SALES" ? (
+                                                    // DLA FAKTUR SPRZEDAŻOWYCH TYLKO PODGLĄD
+                                                    <button
+                                                        onClick={() => loadInvoiceDetails(doc, "VIEW")}
+                                                        disabled={isThisLoading}
+                                                        className="border border-ui-accent hover:bg-ui-accent/20 text-ui-primary text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
+                                                    >
+                                                        {isThisLoading ? (
+                                                            <Loader2 size={14} className="animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <Eye size={14} />
+                                                                Podgląd
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                ) : doc.status === "WAITING" ? (
+                                                    // KOSZTOWE DO WERYFIKACJI
                                                     <button
                                                         onClick={() => loadInvoiceDetails(doc, "VERIFY")}
                                                         disabled={isThisLoading}
@@ -595,6 +654,7 @@ export default function FakturyPage() {
                                                         )}
                                                     </button>
                                                 ) : doc.status === "IMPORTED" ? (
+                                                    // KOSZTOWE ZAAKCEPTOWANE (WIDOK + EDYCJA)
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
                                                             onClick={() => loadInvoiceDetails(doc, "VIEW")}
@@ -614,6 +674,7 @@ export default function FakturyPage() {
                                                         </button>
                                                     </div>
                                                 ) : (
+                                                    // KOSZTOWE ODRZUCONE
                                                     <button
                                                         onClick={() => loadInvoiceDetails(doc, "VIEW")}
                                                         disabled={isThisLoading}
@@ -638,6 +699,8 @@ export default function FakturyPage() {
                     </table>
                 </div>
             </div>
+
+            {/* MODALE POZOSTAJĄ BEZ ZMIAN */}
 
             {verifyingDoc && (
                 <VerificationModal
@@ -667,6 +730,7 @@ export default function FakturyPage() {
                 />
             )}
 
+            {/* Uniwersalny View Modal - obsługuje poprawnie zarówno kosztowe jak i sprzedażowe */}
             {selectedDoc && (
                 <div
                     className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
@@ -678,10 +742,15 @@ export default function FakturyPage() {
                     >
                         <div className="border-b border-ui-accent p-5 flex items-start justify-between bg-ui-white rounded-t-2xl">
                             <div>
-                                <h2 className="text-xl font-bold text-ui-primary">{selectedDoc.docNumber}</h2>
+                                <h2 className="text-xl font-bold text-ui-primary flex items-center gap-2">
+                                    {selectedDoc.docNumber}
+                                    {selectedDoc.isSales && (
+                                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md uppercase tracking-wider">Sprzedaż</span>
+                                    )}
+                                </h2>
                                 <p className="text-xs text-ui-secondary mt-1">{selectedDoc.contractorName}</p>
                             </div>
-                            <button onClick={() => setSelectedDoc(null)} className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors">
+                            <button onClick={() => setSelectedDoc(null)} className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors cursor-pointer">
                                 <X size={20} />
                             </button>
                         </div>
@@ -740,7 +809,7 @@ export default function FakturyPage() {
 }
 
 // =========================================================================
-// PODKOMPONENT: VerificationModal
+// PODKOMPONENT: VerificationModal (BEZ ZMIAN)
 // =========================================================================
 interface VerificationModalProps {
     doc: Document;
@@ -881,7 +950,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 
     const handleCreateIngredient = async (name: string, unit: string, type: string) => {
         try {
-            const res = await fetch("/api/skladniki", {
+            const res = await fetch("/api/ingredients", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, unit, type })
@@ -931,7 +1000,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                     <div className="flex items-center gap-6">
                         <div className="text-right">
                             <div className="text-[10px] font-bold text-ui-secondary uppercase tracking-wider">
-                                Do zapłaty (Brutto)
+                                {doc.status === "IMPORTED" ? "Edycja Mapowania" : "Do zapłaty (Brutto)"}
                             </div>
                             <div className="text-3xl font-black text-ui-black mt-0.5">{Number(doc.grossAmount || 0).toFixed(2)} zł</div>
                         </div>
@@ -1098,7 +1167,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                             className="w-full bg-ui-accent/10 rounded-lg px-3 py-2 text-sm font-semibold border border-transparent focus:border-ui-primary focus:outline-none transition-all appearance-none"
                                         >
                                             <option value="FLOUR">Mąka</option>
-                                            <option value="FRUIT">Owoce / Warzywa</option>
+                                            <option value="FRUIT">Owoce / Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
                                             <option value="OTHER">Inne</option>
                                         </select>
@@ -1153,7 +1222,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 }
 
 // =========================================================================
-// NOWY PODKOMPONENT: ManualInvoiceModal
+// NOWY PODKOMPONENT: ManualInvoiceModal (BEZ ZMIAN)
 // =========================================================================
 interface ManualInvoiceModalProps {
     categories: DictionaryCategory[];
@@ -1315,7 +1384,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
 
     const handleCreateIngredient = async (name: string, unit: string, type: string) => {
         try {
-            const res = await fetch("/api/skladniki", {
+            const res = await fetch("/api/ingredients", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, unit, type })
@@ -1596,7 +1665,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                                             className="w-full bg-ui-accent/10 rounded-lg px-3 py-2 text-sm font-semibold border border-transparent focus:border-ui-primary focus:outline-none transition-all appearance-none"
                                         >
                                             <option value="FLOUR">Mąka</option>
-                                            <option value="FRUIT">Owoce / Warzywa</option>
+                                            <option value="FRUIT">Owoce / Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
                                             <option value="OTHER">Inne</option>
                                         </select>

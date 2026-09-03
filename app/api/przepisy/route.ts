@@ -13,6 +13,7 @@ export async function GET() {
                 ingredients: {
                     include: {
                         ingredient: true,
+                        semiFinished: true,
                     },
                 },
             },
@@ -47,13 +48,17 @@ export async function POST(request: NextRequest) {
                     create: ingredients.map((ing: any) => ({
                         amount: Number(ing.amount),
                         ingredientUnit: ing.unit || "kg",
-                        ingredientId: ing.ingredientId,
+                        ingredientId: ing.ingredientId || null,
+                        semiFinishedId: ing.semiFinishedId || null,
                     })),
                 },
             },
             include: {
                 ingredients: {
-                    include: { ingredient: true },
+                    include: {
+                        ingredient: true,
+                        semiFinished: true,
+                    },
                 },
             },
         });

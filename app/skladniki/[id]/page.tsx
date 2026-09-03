@@ -19,66 +19,38 @@ export default function SkladnikDetailPage({
     const { id } = React.use(params);
 
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<any>(null);
 
     useEffect(() => {
-        // Tymczasowa symulacja pobierania danych z backendu
         const fetchIngredientDetails = async () => {
             setIsLoading(true);
+            setError(null);
             try {
-                // Symulacja API
-                setTimeout(() => {
-                    setData({
-                        id,
-                        name: "Mąka Pszenna Typ 750",
-                        type: "Mąka",
-                        unit: "kg",
-                        stats: {
-                            currentPrice: 2.15,
-                            priceTrend: "up",
-                            avgMonthlyConsumption: 850,
-                            bestSupplierName: "Młyny Szczecińskie",
-                            bestSupplierPrice: 2.10
-                        },
-                        // NOWE: Uproszczony trend średniej ceny
-                        priceHistory: [
-                            { month: "Mar", avgPrice: 2.12 },
-                            { month: "Kwi", avgPrice: 2.15 },
-                            { month: "Maj", avgPrice: 2.21 },
-                            { month: "Cze", avgPrice: 2.23 },
-                            { month: "Lip", avgPrice: 2.25 },
-                            { month: "Sie", avgPrice: 2.23 },
-                        ],
-                        // NOWE: Dane do wykresu kolumnowego Zużycie vs Zakupy
-                        volumeHistory: [
-                            { month: "Mar", consumed: 800, purchased: 900 },
-                            { month: "Kwi", consumed: 820, purchased: 800 },
-                            { month: "Maj", consumed: 850, purchased: 900 },
-                            { month: "Cze", consumed: 900, purchased: 850 },
-                            { month: "Lip", consumed: 880, purchased: 1000 },
-                            { month: "Sie", consumed: 850, purchased: 650 },
-                        ],
-                        suppliersRanking: [
-                            { id: "s1", name: "Młyny Szczecińskie", lastPrice: 2.10, isBest: true, lastBuy: "2026-08-10" },
-                            { id: "s2", name: "Hurtownia MAKRO", lastPrice: 2.25, isBest: false, lastBuy: "2026-07-22" },
-                            { id: "s3", name: "P.H.U. Jan Kowalski", lastPrice: 2.30, isBest: false, lastBuy: "2026-05-14" },
-                        ],
-                        deliveriesHistory: [
-                            { id: "d1", date: "2026-08-10", supplier: "Młyny Szczecińskie", doc: "FS 123/08/2026", quantity: 500, price: 2.10 },
-                            { id: "d2", date: "2026-07-22", supplier: "Hurtownia MAKRO", doc: "FV/456/26", quantity: 150, price: 2.25 },
-                            { id: "d3", date: "2026-07-05", supplier: "Młyny Szczecińskie", doc: "FS 098/07/2026", quantity: 600, price: 2.05 },
-                            { id: "d4", date: "2026-06-15", supplier: "Hurtownia MAKRO", doc: "FV/321/26", quantity: 100, price: 2.20 },
-                        ]
-                    });
-                    setIsLoading(false);
-                }, 800);
-            } catch (error) {
-                console.error("Błąd ładowania szczegółów:", error);
+                const res = await fetch(`/api/skladniki/${id}`);
+                if (!res.ok) {
+                    if (res.status === 404) {
+                        setError("Nie znaleziono wybranego składnika.");
+                    } else {
+                        const errJson = await res.json().catch(() => ({}));
+                        setError(errJson.error || "Wystąpił błąd podczas ładowania danych.");
+                    }
+                    setData(null);
+                    return;
+                }
+                const responseData = await res.json();
+                setData(responseData);
+            } catch (err) {
+                console.error("Błąd ładowania szczegółów:", err);
+                setError("Nie udało się połączyć z serwerem.");
+            } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchIngredientDetails();
+        if (id) {
+            fetchIngredientDetails();
+        }
     }, [id]);
 
     if (isLoading) {
@@ -92,7 +64,20 @@ export default function SkladnikDetailPage({
         );
     }
 
-    if (!data) return null;
+    if (error || !data) {
+        return (
+            <div className="min-h-screen bg-ui-white text-ui-primary pb-20 pt-10 flex flex-col items-center justify-center">
+                <p className="text-ui-secondary font-medium mb-4">{error || "Nie znaleziono składnika"}</p>
+                <button
+                    onClick={() => router.push("/skladniki")}
+                    className="flex items-center gap-2 text-ui-primary hover:text-emerald-700 font-semibold text-sm transition-colors cursor-pointer"
+                >
+                    <ArrowLeft size={16} />
+                    Powrót do bazy składników
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20">
@@ -131,21 +116,27 @@ export default function SkladnikDetailPage({
                         </h3>
                     </div>
                     <div className="p-3 flex-1">
-                        {data.suppliersRanking.map((sup: any, index: number) => (
-                            <div key={sup.id} className={`flex items-center justify-between p-3 rounded-xl mb-1.5 ${sup.isBest ? "bg-emerald-50 border border-emerald-100" : "hover:bg-ui-accent/5"}`}>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        {sup.isBest && <span className="flex items-center justify-center w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] font-black">1</span>}
-                                        {!sup.isBest && <span className="flex items-center justify-center w-5 h-5 bg-ui-accent text-ui-secondary rounded-full text-[10px] font-black">{index + 1}</span>}
-                                        <span className={`text-sm ${sup.isBest ? "text-emerald-900" : "text-ui-black"}`}>{sup.name}</span>
+                        {data.suppliersRanking && data.suppliersRanking.length > 0 ? (
+                            data.suppliersRanking.map((sup: any, index: number) => (
+                                <div key={sup.id} className={`flex items-center justify-between p-3 rounded-xl mb-1.5 ${sup.isBest ? "bg-emerald-50 border border-emerald-100" : "hover:bg-ui-accent/5"}`}>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            {sup.isBest && <span className="flex items-center justify-center w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] font-black">1</span>}
+                                            {!sup.isBest && <span className="flex items-center justify-center w-5 h-5 bg-ui-accent text-ui-secondary rounded-full text-[10px] font-black">{index + 1}</span>}
+                                            <span className={`text-sm ${sup.isBest ? "text-emerald-900" : "text-ui-black"}`}>{sup.name}</span>
+                                        </div>
+                                        <div className="text-[10px] text-ui-secondary font-semibold ml-7 mt-0.5">Ost. zakup: {sup.lastBuy}</div>
                                     </div>
-                                    <div className="text-[10px] text-ui-secondary font-semibold ml-7 mt-0.5">Ost. zakup: {sup.lastBuy}</div>
+                                    <div className={`font-bold ${sup.isBest ? "text-emerald-600 text-lg" : "text-ui-primary text-base"}`}>
+                                        {sup.lastPrice.toFixed(2)} <span className="text-xs font-semibold opacity-70">zł</span>
+                                    </div>
                                 </div>
-                                <div className={`font-bold ${sup.isBest ? "text-emerald-600 text-lg" : "text-ui-primary text-base"}`}>
-                                    {sup.lastPrice.toFixed(2)} <span className="text-xs font-semibold opacity-70">zł</span>
-                                </div>
+                            ))
+                        ) : (
+                            <div className="p-6 text-center text-xs text-ui-secondary italic">
+                                Brak przypisanych dostawców
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
 
@@ -166,19 +157,27 @@ export default function SkladnikDetailPage({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-ui-accent/40">
-                                {data.deliveriesHistory.map((del: any) => (
-                                    <tr key={del.id} className="hover:bg-ui-accent/5 transition-colors">
-                                        <td className="p-4 font-semibold text-ui-black">{del.date}</td>
-                                        <td className="p-4 text-ui-primary">
-                                            <div className="truncate max-w-[250px]" title={del.supplier}>
-                                                {del.supplier}
-                                            </div>
-                                            <div className="text-[10px] text-ui-secondary font-mono mt-0.5">{del.doc}</div>
+                                {data.deliveriesHistory && data.deliveriesHistory.length > 0 ? (
+                                    data.deliveriesHistory.map((del: any) => (
+                                        <tr key={del.id} className="hover:bg-ui-accent/5 transition-colors">
+                                            <td className="p-4 font-semibold text-ui-black">{del.date}</td>
+                                            <td className="p-4 text-ui-primary">
+                                                <div className="truncate max-w-[250px]" title={del.supplier}>
+                                                    {del.supplier}
+                                                </div>
+                                                <div className="text-[10px] text-ui-secondary font-mono mt-0.5">{del.doc}</div>
+                                            </td>
+                                            <td className="p-4 text-center  text-ui-black whitespace-nowrap">{del.quantity} {data.unit}</td>
+                                            <td className="p-4 text-right font-bold text-ui-black whitespace-nowrap">{del.price.toFixed(2)} zł</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={4} className="p-8 text-center text-xs text-ui-secondary italic">
+                                            Brak historii zakupów dla tego składnika
                                         </td>
-                                        <td className="p-4 text-center  text-ui-black whitespace-nowrap">{del.quantity} {data.unit}</td>
-                                        <td className="p-4 text-right font-bold text-ui-black whitespace-nowrap">{del.price.toFixed(2)} zł</td>
                                     </tr>
-                                ))}
+                                )}
                             </tbody>
                         </table>
                     </div>

@@ -59,6 +59,7 @@ model Contractor {
   id            String         @id @default(uuid())
   type          ContractorType @default(SUPPLIER)
   name          String
+  customName    String?
   nip           String         @unique
   address       String
   email         String
@@ -86,6 +87,7 @@ model Invoice {
   vatAmount     Decimal       @default(0.00)
   currency      String        @default("PLN")
   importDate    DateTime      @default(now())
+  isSales       Boolean       @default(false)
 
   positions InvoicePosition[]
 }
@@ -209,6 +211,7 @@ model DailyProduction {
   date            DateTime      @db.Date
   producedAmount  Int           @default(0)
   soldAmount      Int           @default(0)
+  soldOutTime     String?
   bakeryProductId String
   bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id])
   salesIncome     Int           @default(0)
@@ -220,7 +223,7 @@ model DailyProduction {
 
 model DailyIncome {
   id           String   @id @default(uuid())
-  date         DateTime @db.Date
+  date         DateTime @unique @db.Date
   incomeAmount Decimal  @default(0.00)
   createdAt    DateTime @default(now())
 }

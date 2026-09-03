@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { getCustomNamesMap } from '@/lib/contractor-names';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,6 +10,7 @@ const prisma = new PrismaClient();
 export async function GET() {
     try {
         console.log('=== [DEBUG API FAKTURY START] ===');
+        const customNamesMap = getCustomNamesMap();
 
         // 1. Liczymy rekordy bezpośrednio w tabelach
         const invoiceCount = await prisma.invoice.count();
@@ -51,8 +53,10 @@ export async function GET() {
                 netAmount: Number(inv.netAmount || 0),
                 grossAmount: Number(inv.grossAmount || 0),
                 contractorId: inv.contractorId,
-                contractorName: inv.contractor?.name || 'Nieznany kontrahent',
+                contractorName: customNamesMap[inv.contractorId] || (inv.contractor as any)?.customName || inv.contractor?.name || 'Nieznany kontrahent',
                 status: inv.status,
+                // NOWE POLE PRZESYŁANE NA FRONTEND
+                isSales: inv.isSales || false,
                 notes: inv.ksefNumber ? `KSeF: ${inv.ksefNumber}` : undefined,
                 positions: positions.map((pos) => {
                     const prod = productMap.get(pos.productId);
