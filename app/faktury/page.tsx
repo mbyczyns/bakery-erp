@@ -456,7 +456,7 @@ export default function FakturyPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-ui-black">
-                        Faktury i Dokumenty
+                        Faktury
                     </h1>
                 </div>
 
@@ -497,14 +497,13 @@ export default function FakturyPage() {
                     onClick={() => setInvoiceDirection("COST")}
                     className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "COST" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
                 >
-                    Zakupy (Kosztowe)
+                    Kosztowe
                 </button>
                 <button
                     onClick={() => setInvoiceDirection("SALES")}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${invoiceDirection === "SALES" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "SALES" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
                 >
-                    <ArrowRightLeft size={16} />
-                    Sprzedaż (Wystawione)
+                    Sprzedażowe
                 </button>
             </div>
 
