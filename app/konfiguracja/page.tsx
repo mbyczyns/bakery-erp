@@ -2,9 +2,10 @@
 
 import React, { useState } from "react";
 import { User, Tags, Sliders, Save, ShieldCheck, Plus, X, Tag } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
-export default function Home() {
-    // Stan dla domyślnych/obecnych kategorii w bazie
+export default function KonfiguracjaPage() {
+    const { user } = useAuth();
 
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
@@ -22,7 +23,7 @@ export default function Home() {
             {/* Kontener na sekcje ustawień */}
             <div className="space-y-6 w-full">
 
-                {/* SEKCJA 1: Konto użytkownika + Zmiana Hasła */}
+                {/* SEKCJA 1: Konto użytkownika */}
                 <div className="bg-ui-white rounded-2xl p-6 shadow-sm border border-ui-accent hover:border-ui-secondary transition-all duration-300">
 
                     {/* Nagłówek sekcji */}
@@ -40,18 +41,18 @@ export default function Home() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-ui-accent/10 border border-ui-accent/40 rounded-xl p-4 mb-8">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-ui-primary text-ui-white font-bold text-lg rounded-full flex items-center justify-center shadow-sm">
-                                JK
+                                {(user?.name || user?.login || "U").slice(0, 2).toUpperCase()}
                             </div>
                             <div>
-                                <h3 className="font-bold text-ui-black text-base">Jan Kowalski</h3>
-                                <p className="text-xs text-ui-primary/60">Login: <span className="font-semibold text-ui-primary">j.kowalski</span></p>
+                                <h3 className="font-bold text-ui-black text-base">{user?.name || user?.login || "Użytkownik"}</h3>
+                                <p className="text-xs text-ui-primary/60">Login: <span className="font-semibold text-ui-primary">{user?.login}</span></p>
                             </div>
                         </div>
 
                         {/* Status roli użytkownika */}
                         <div className="flex items-center gap-1.5 bg-ui-white border border-ui-secondary/35 text-ui-secondary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm w-fit">
                             <ShieldCheck size={14} />
-                            Właściciel
+                            Rola: {user?.role || "USER"}
                         </div>
                     </div>
 

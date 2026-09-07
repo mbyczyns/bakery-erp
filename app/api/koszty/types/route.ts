@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -144,8 +145,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Kategoria o takiej nazwie już istnieje" }, { status: 409 });
         }
 
+        const user = await getUserFromRequest(request);
+
         const newType = await prisma.costType.create({
-            data: { name: trimmed },
+            data: {
+                name: trimmed,
+                ...(user?.id ? { createdById: user.id } : {}),
+            },
         });
 
         return NextResponse.json({ costType: newType }, { status: 201 });

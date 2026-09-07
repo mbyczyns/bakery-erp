@@ -53,6 +53,18 @@ model User {
   password  String
   role      UserRole
   createdAt DateTime @default(now())
+
+  contractors       Contractor[]
+  invoices          Invoice[]
+  products          Product[]
+  productCategories ProductCategory[]
+  ingredients       Ingredient[]
+  semiFinisheds     SemiFinished[]
+  bakeryProducts    BakeryProduct[]
+  dailyProductions  DailyProduction[]
+  dailyIncomes      DailyIncome[]
+  costTypes         CostType[]
+  monthlyCosts      MonthlyCost[]
 }
 
 model Contractor {
@@ -67,6 +79,9 @@ model Contractor {
   contactPerson String?
   notes         String?
   createdAt     DateTime       @default(now())
+
+  createdById   String?
+  createdBy     User?          @relation(fields: [createdById], references: [id])
 
   products Product[]
   invoices Invoice[]
@@ -88,6 +103,9 @@ model Invoice {
   currency      String        @default("PLN")
   importDate    DateTime      @default(now())
   isSales       Boolean       @default(false)
+
+  createdById   String?
+  createdBy     User?         @relation(fields: [createdById], references: [id])
 
   positions InvoicePosition[]
 }
@@ -116,6 +134,9 @@ model ProductCategory {
   name      String    @unique
   products  Product[]
   createdAt DateTime  @default(now())
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
 }
 
 model Product {
@@ -138,6 +159,9 @@ model Product {
   ingredient   Ingredient? @relation(fields: [ingredientId], references: [id])
   ingredientId String?
 
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
   invoicePositions InvoicePosition[]
   createdAt        DateTime          @default(now())
 
@@ -150,6 +174,9 @@ model Ingredient {
   unit            String
   calculatedPrice Decimal        @default(0.00)
   type            IngredientType @default(OTHER)
+
+  createdById     String?
+  createdBy       User?          @relation(fields: [createdById], references: [id])
 
   products                Product[]
   recipeIngredients       RecipeIngredient[]
@@ -165,6 +192,10 @@ model SemiFinished {
   unit          String
   ingredients   SemiFinishedIngredient[]
   bakeryRecipes RecipeIngredient[]
+
+  createdById   String?
+  createdBy     User?                    @relation(fields: [createdById], references: [id])
+
   createdAt     DateTime                 @default(now())
 }
 
@@ -188,6 +219,10 @@ model BakeryProduct {
   sellingPrice   Decimal            @default(0.00)
   ingredients    RecipeIngredient[]
   productions    DailyProduction[]
+
+  createdById    String?
+  createdBy      User?              @relation(fields: [createdById], references: [id])
+
   createdAt      DateTime           @default(now())
 }
 
@@ -215,6 +250,10 @@ model DailyProduction {
   bakeryProductId String
   bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id])
   salesIncome     Int           @default(0)
+
+  createdById     String?
+  createdBy       User?         @relation(fields: [createdById], references: [id])
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -225,6 +264,10 @@ model DailyIncome {
   id           String   @id @default(uuid())
   date         DateTime @unique @db.Date
   incomeAmount Decimal  @default(0.00)
+
+  createdById  String?
+  createdBy    User?    @relation(fields: [createdById], references: [id])
+
   createdAt    DateTime @default(now())
 }
 
@@ -232,6 +275,9 @@ model CostType {
   id           String        @id @default(uuid())
   name         String
   monthlyCosts MonthlyCost[]
+
+  createdById  String?
+  createdBy    User?         @relation(fields: [createdById], references: [id])
 }
 
 model MonthlyCost {
@@ -240,6 +286,10 @@ model MonthlyCost {
   monthDate  DateTime @db.Date
   costTypeId String
   costType   CostType @relation(fields: [costTypeId], references: [id])
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+
   createdAt  DateTime @default(now())
 
   @@unique([monthDate, costTypeId])

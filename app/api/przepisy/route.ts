@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -29,6 +30,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
+        const user = await getUserFromRequest(request);
         const body = await request.json();
         const { name, type, sellingPrice, ingredients } = body;
 
@@ -44,6 +46,7 @@ export async function POST(request: NextRequest) {
                 name,
                 type: (type as ProductType) || "BREAD",
                 sellingPrice: Number(sellingPrice || 0),
+                ...(user?.id ? { createdById: user.id } : {}),
                 ingredients: {
                     create: ingredients.map((ing: any) => ({
                         amount: Number(ing.amount),

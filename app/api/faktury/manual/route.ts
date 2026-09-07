@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
             return { ...pos, netAmount, grossAmount, vatRate };
         });
 
+        const user = await getUserFromRequest(request);
+
         const result = await prisma.$transaction(async (tx) => {
 
             const invoice = await tx.invoice.create({
@@ -46,6 +49,7 @@ export async function POST(request: NextRequest) {
                     netAmount: totalNet,
                     vatAmount: totalGross - totalNet,
                     currency: "PLN",
+                    ...(user?.id ? { createdById: user.id } : {}),
                 },
             });
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 import { ensureCleanCostTypes } from "./types/route";
 
 const prisma = new PrismaClient();
@@ -349,6 +350,8 @@ export async function POST(request: NextRequest) {
 
         const monthDate = new Date(Date.UTC(year, monthNum - 1, 1));
 
+        const user = await getUserFromRequest(request);
+
         for (const item of costs) {
             const { costTypeId, value } = item;
             const numericValue = Math.max(0, parseFloat(value) || 0);
@@ -362,11 +365,13 @@ export async function POST(request: NextRequest) {
                 },
                 update: {
                     value: numericValue,
+                    ...(user?.id ? { createdById: user.id } : {}),
                 },
                 create: {
                     monthDate,
                     costTypeId,
                     value: numericValue,
+                    ...(user?.id ? { createdById: user.id } : {}),
                 },
             });
         }

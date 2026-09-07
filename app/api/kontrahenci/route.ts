@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 import { getCustomNamesMap } from "@/lib/contractor-names";
 
 const prisma = new PrismaClient();
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        const user = await getUserFromRequest(request);
+
         const newContractor = await prisma.contractor.create({
             data: {
                 type: body.type,
@@ -77,6 +80,7 @@ export async function POST(request: NextRequest) {
                 phone: body.phone || '',
                 contactPerson: body.contactPerson || null,
                 notes: body.notes || null,
+                ...(user?.id ? { createdById: user.id } : {}),
             },
         });
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 import fs from "fs";
 import path from "path";
 
@@ -344,6 +345,8 @@ export async function POST(request: NextRequest) {
         };
         saveExtras(extras);
 
+        const user = await getUserFromRequest(request);
+
         // 2. Próba zapisu do tabeli DailyIncome w Postgresie (jeśli dostępna)
         try {
             if ((prisma as any).dailyIncome) {
@@ -353,11 +356,18 @@ export async function POST(request: NextRequest) {
                 if (existing) {
                     await (prisma as any).dailyIncome.update({
                         where: { id: existing.id },
-                        data: { incomeAmount: numFiscalIncome },
+                        data: {
+                            incomeAmount: numFiscalIncome,
+                            ...(user?.id ? { createdById: user.id } : {}),
+                        },
                     });
                 } else {
                     await (prisma as any).dailyIncome.create({
-                        data: { date: targetDate, incomeAmount: numFiscalIncome },
+                        data: {
+                            date: targetDate,
+                            incomeAmount: numFiscalIncome,
+                            ...(user?.id ? { createdById: user.id } : {}),
+                        },
                     });
                 }
             }
@@ -380,12 +390,14 @@ export async function POST(request: NextRequest) {
                 update: {
                     producedAmount: producedAmt,
                     soldAmount: soldAmt,
+                    ...(user?.id ? { createdById: user.id } : {}),
                 },
                 create: {
                     date: targetDate,
                     bakeryProductId: item.bakeryProductId,
                     producedAmount: producedAmt,
                     soldAmount: soldAmt,
+                    ...(user?.id ? { createdById: user.id } : {}),
                 },
             });
         });

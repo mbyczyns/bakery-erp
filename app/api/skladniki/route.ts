@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient, IngredientType } from "@prisma/client";
+import { getUserFromRequest } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -81,11 +82,14 @@ export async function POST(request: NextRequest) {
         const validTypes: IngredientType[] = ["FLOUR", "FRUIT", "DAIRY", "OTHER"];
         const assignedType: IngredientType = validTypes.includes(type) ? type : "OTHER";
 
+        const user = await getUserFromRequest(request);
+
         const ingredient = await prisma.ingredient.create({
             data: {
                 name: name.trim(),
                 unit: unit || "kg",
                 type: assignedType,
+                ...(user?.id ? { createdById: user.id } : {}),
             },
         });
 
