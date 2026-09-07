@@ -20,6 +20,23 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+// Helper do formatowania daty: YYYY-MM-DD -> DD-MM-YYYY
+function formatDate(dateStr?: string | Date | null): string {
+    if (!dateStr) return "-";
+    const str = typeof dateStr === "string" ? dateStr : dateStr.toISOString();
+    const cleanDate = str.split("T")[0];
+    const parts = cleanDate.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return str;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
 // Typy zgodne z Prisma
 type ContractorType = "SUPPLIER" | "CUSTOMER" | "OTHER";
 
@@ -146,13 +163,13 @@ export default function KontrahenciPage() {
             {/* Nagłówek */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">Kontrahenci</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">Dostawcy i kontrahenci</h1>
 
                 </div>
 
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-colors duration-200 text-sm w-full sm:w-auto cursor-pointer"
+                    className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
                 >
                     <Plus size={18} />
                     <span>Dodaj kontrahenta</span>
@@ -284,16 +301,11 @@ export default function KontrahenciPage() {
                                             </td>
 
                                             {/* Ostatnie zakupy */}
-                                            <td className="p-4 text-xs text-ui-secondary">
+                                            <td className="p-4 text-m text-ui-primary">
                                                 <div className="flex items-center gap-1.5 font-medium">
-                                                    <Calendar size={14} className="text-ui-secondary/70 shrink-0" />
                                                     <span>
                                                         {c.lastPurchaseDate
-                                                            ? new Date(c.lastPurchaseDate).toLocaleDateString('pl-PL', {
-                                                                year: 'numeric',
-                                                                month: '2-digit',
-                                                                day: '2-digit'
-                                                            })
+                                                            ? formatDate(c.lastPurchaseDate)
                                                             : "Brak historii"}
                                                     </span>
                                                 </div>

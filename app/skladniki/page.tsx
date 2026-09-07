@@ -8,7 +8,8 @@ import {
     Loader2,
     X,
     Filter,
-    ChevronDown
+    ChevronDown,
+    CheckCircle2
 } from "lucide-react";
 
 type IngredientType = "FLOUR" | "FRUIT" | "DAIRY" | "OTHER";
@@ -118,7 +119,7 @@ export default function SkladnikiPage() {
 
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
                 >
                     <Plus size={18} />
                     Nowy składnik
@@ -173,7 +174,7 @@ export default function SkladnikiPage() {
                                 <th className="p-4">Nazwa Składnika</th>
                                 <th className="p-4">Typ</th>
                                 <th className="p-4">Ostatni Dostawca</th>
-                                <th className="p-4 text-right">Cena (Jednostkowa)</th>
+                                <th className="p-4 text-right">Cena</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-ui-accent/40 text-sm">
@@ -223,28 +224,18 @@ export default function SkladnikiPage() {
                                                         <div className="font-semibold text-ui-primary truncate">
                                                             {item.lastSupplierName}
                                                         </div>
-                                                        {item.lastPurchaseDate && (
-                                                            <div className="text-[10px] text-ui-secondary font-medium mt-0.5">
-                                                                Ost. zakup: {new Date(item.lastPurchaseDate).toLocaleDateString('pl-PL')}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-ui-secondary italic text-sm">Brak historii</span>
+                                                    <span className="text-ui-secondary  text-sm">Brak historii</span>
                                                 )}
                                             </td>
 
                                             <td className="p-4 text-right">
-                                                {item.calculatedPrice ? (
+                                                {item.lastPurchasePrice ? (
                                                     <div>
                                                         <div className="font-bold text-ui-black whitespace-nowrap">
-                                                            {Number(item.calculatedPrice).toFixed(2)} zł / {item.unit}
+                                                            {Number(item.lastPurchasePrice).toFixed(2)} zł / {item.unit}
                                                         </div>
-                                                        {item.lastPurchasePrice && (
-                                                            <div className="text-[10px] text-ui-secondary font-medium mt-0.5">
-                                                                Ost. faktura: {Number(item.lastPurchasePrice).toFixed(2)} zł
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 ) : (
                                                     <span className="text-ui-secondary">—</span>
@@ -345,6 +336,7 @@ export default function SkladnikiPage() {
                                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                                 >
                                     {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                                    <CheckCircle2 size={16} />
                                     Zapisz
                                 </button>
                             </div>

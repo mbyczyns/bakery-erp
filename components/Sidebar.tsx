@@ -11,14 +11,11 @@ export default function Sidebar() {
 
     // Menu aplikacji - linki i ikony
     const menuItems = [
-        { name: "Strona główna", href: "/", icon: Home },
-        { name: "Faktury i paragony", href: "/faktury", icon: ReceiptEuroIcon },
+        { name: "Faktury", href: "/faktury", icon: ReceiptEuroIcon },
         { name: "Dostawcy i kontrahenci", href: "/kontrahenci", icon: ShoppingCart },
-        { name: "Produkcja", href: "/produkcja", icon: Microwave },
+        { name: "Produkcja i sprzedaż", href: "/produkcja", icon: Microwave },
         { name: "Składniki", href: "/skladniki", icon: Milk },
         { name: "Przepisy i foodcosty", href: "/przepisy", icon: FileText },
-        { name: "Przychody", href: "/przychody", icon: TrendingUp },
-        { name: "Koszty", href: "/koszty", icon: TrendingDown },
         { name: "Finanse", href: "/finanse", icon: DollarSign },
         { name: "Konfiguracja", href: "/konfiguracja", icon: Settings },
     ];
@@ -38,7 +35,7 @@ export default function Sidebar() {
             <nav className="flex-1 space-y-2">
                 {menuItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = pathname === item.href;
+                    const isActive = pathname === item.href || (item.href === "/finanse" && (pathname.startsWith("/przychody") || pathname.startsWith("/koszty")));
 
                     return (
                         <Link

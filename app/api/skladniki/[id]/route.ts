@@ -187,7 +187,7 @@ export async function GET(
             lastBuy: sup.lastBuy,
         }));
 
-        // 3. Okres ostatnich 6 miesięcy do wykresów
+        // 3. Okres ostatnich 6 miesięcy do istniejących wykresów (kompatybilność wsteczna)
         const now = new Date();
         const monthsRange: Array<{
             year: number;
@@ -206,20 +206,15 @@ export async function GET(
             });
         }
 
-        // 4. Historia cen (Price History) oraz Wolumen Zużycie vs Zakupy (Volume History)
+        // 4. Historia cen (Price History)
         const initialPrice = deliveriesHistory.length > 0
             ? deliveriesHistory[deliveriesHistory.length - 1].price
             : Number(ingredient.calculatedPrice || 0);
 
         let runningPrice = initialPrice;
-
         const priceHistory: Array<{ month: string; avgPrice: number }> = [];
-        const volumeHistory: Array<{ month: string; consumed: number; purchased: number }> = [];
-
-        let totalConsumedAcrossMonths = 0;
 
         for (const m of monthsRange) {
-            // Zakupy w danym miesiącu
             const monthPositions = allPositions.filter((p) => {
                 return (
                     p.rawDate.getFullYear() === m.year &&
@@ -243,60 +238,438 @@ export async function GET(
                 month: m.label,
                 avgPrice: runningPrice,
             });
-
-            // Zużycie w danym miesiącu z produkcji
-            let monthConsumed = 0;
-
-            // A. Zużycie bezpośrednie z receptur
-            for (const rec of ingredient.recipeIngredients) {
-                const amountPerUnit = Number(rec.amount || 0);
-                if (rec.bakeryProduct?.productions) {
-                    for (const prod of rec.bakeryProduct.productions) {
-                        const prodDate = new Date(prod.date);
-                        if (
-                            prodDate.getFullYear() === m.year &&
-                            prodDate.getMonth() === m.monthIndex
-                        ) {
-                            monthConsumed += prod.producedAmount * amountPerUnit;
-                        }
-                    }
-                }
-            }
-
-            // B. Zużycie pośrednie z półproduktów
-            for (const semiIng of ingredient.semiFinishedIngredients) {
-                const amountPerSemi = Number(semiIng.amount || 0);
-                if (semiIng.semiFinished?.bakeryRecipes) {
-                    for (const rec of semiIng.semiFinished.bakeryRecipes) {
-                        const amountSemiPerProduct = Number(rec.amount || 0);
-                        if (rec.bakeryProduct?.productions) {
-                            for (const prod of rec.bakeryProduct.productions) {
-                                const prodDate = new Date(prod.date);
-                                if (
-                                    prodDate.getFullYear() === m.year &&
-                                    prodDate.getMonth() === m.monthIndex
-                                ) {
-                                    monthConsumed += prod.producedAmount * amountSemiPerProduct * amountPerSemi;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            const roundedConsumed = Math.round(monthConsumed * 100) / 100;
-            const roundedPurchased = Math.round(monthPurchasedQty * 100) / 100;
-
-            totalConsumedAcrossMonths += roundedConsumed;
-
-            volumeHistory.push({
-                month: m.label,
-                consumed: roundedConsumed,
-                purchased: roundedPurchased,
-            });
         }
 
-        // 5. Statystyki podsumowujące (Stats)
+        // 5. SZCZEGÓŁOWA ANALIZA ZUŻYCIA (DZIENNA, TYGODNIOWA, MIESIĘCZNA, WG PRODUKTÓW)
+        const POLISH_WEEKDAYS = ["Niedziela", "Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota"];
+        const POLISH_SHORT_WEEKDAYS = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "Sb"];
+        const POLISH_MONTHS_FULL = [
+            "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+            "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+        ];
+
+        // Mapa zużycia dziennego: dateStr -> DailyData
+        interface DailyProductUsage {
+            productId: string;
+            productName: string;
+            productType: string;
+            producedUnits: number;
+            consumedAmount: number;
+            isDirect: boolean;
+            isSemiFinished: boolean;
+            details: Array<{
+                type: "DIRECT" | "SEMI_FINISHED";
+                semiFinishedName?: string;
+                amountPerUnit: number;
+                consumed: number;
+            }>;
+        }
+
+        interface DailyData {
+            date: string;
+            dayOfWeek: string;
+            shortDay: string;
+            rawDate: Date;
+            totalConsumed: number;
+            totalPurchased: number;
+            productsMap: Map<string, DailyProductUsage>;
+        }
+
+        const dailyMap = new Map<string, DailyData>();
+
+        const getOrCreateDaily = (dateObj: Date): DailyData => {
+            const dateStr = dateObj.toISOString().split("T")[0];
+            let existing = dailyMap.get(dateStr);
+            if (!existing) {
+                const dayIndex = dateObj.getDay();
+                existing = {
+                    date: dateStr,
+                    dayOfWeek: POLISH_WEEKDAYS[dayIndex],
+                    shortDay: POLISH_SHORT_WEEKDAYS[dayIndex],
+                    rawDate: new Date(dateStr),
+                    totalConsumed: 0,
+                    totalPurchased: 0,
+                    productsMap: new Map(),
+                };
+                dailyMap.set(dateStr, existing);
+            }
+            return existing;
+        };
+
+        // A. Zużycie bezpośrednie z receptur
+        for (const rec of ingredient.recipeIngredients) {
+            const amountPerUnit = Number(rec.amount || 0);
+            if (!rec.bakeryProduct || !rec.bakeryProduct.productions) continue;
+
+            const prodId = rec.bakeryProduct.id;
+            const prodName = rec.bakeryProduct.name;
+            const prodType = rec.bakeryProduct.type;
+
+            for (const prod of rec.bakeryProduct.productions) {
+                if (!prod.producedAmount || prod.producedAmount <= 0) continue;
+                const prodDate = new Date(prod.date);
+                const daily = getOrCreateDaily(prodDate);
+
+                const consumed = prod.producedAmount * amountPerUnit;
+                daily.totalConsumed += consumed;
+
+                let pUsage = daily.productsMap.get(prodId);
+                if (!pUsage) {
+                    pUsage = {
+                        productId: prodId,
+                        productName: prodName,
+                        productType: prodType,
+                        producedUnits: prod.producedAmount,
+                        consumedAmount: 0,
+                        isDirect: true,
+                        isSemiFinished: false,
+                        details: [],
+                    };
+                    daily.productsMap.set(prodId, pUsage);
+                } else {
+                    pUsage.isDirect = true;
+                }
+
+                pUsage.consumedAmount += consumed;
+                pUsage.details.push({
+                    type: "DIRECT",
+                    amountPerUnit,
+                    consumed,
+                });
+            }
+        }
+
+        // B. Zużycie pośrednie z półproduktów
+        for (const semiIng of ingredient.semiFinishedIngredients) {
+            const amountPerSemi = Number(semiIng.amount || 0);
+            if (!semiIng.semiFinished || !semiIng.semiFinished.bakeryRecipes) continue;
+            const semiName = semiIng.semiFinished.name;
+
+            for (const rec of semiIng.semiFinished.bakeryRecipes) {
+                const amountSemiPerProduct = Number(rec.amount || 0);
+                const multiplier = amountSemiPerProduct * amountPerSemi;
+                if (!rec.bakeryProduct || !rec.bakeryProduct.productions) continue;
+
+                const prodId = rec.bakeryProduct.id;
+                const prodName = rec.bakeryProduct.name;
+                const prodType = rec.bakeryProduct.type;
+
+                for (const prod of rec.bakeryProduct.productions) {
+                    if (!prod.producedAmount || prod.producedAmount <= 0) continue;
+                    const prodDate = new Date(prod.date);
+                    const daily = getOrCreateDaily(prodDate);
+
+                    const consumed = prod.producedAmount * multiplier;
+                    daily.totalConsumed += consumed;
+
+                    let pUsage = daily.productsMap.get(prodId);
+                    if (!pUsage) {
+                        pUsage = {
+                            productId: prodId,
+                            productName: prodName,
+                            productType: prodType,
+                            producedUnits: prod.producedAmount,
+                            consumedAmount: 0,
+                            isDirect: false,
+                            isSemiFinished: true,
+                            details: [],
+                        };
+                        daily.productsMap.set(prodId, pUsage);
+                    } else {
+                        pUsage.isSemiFinished = true;
+                    }
+
+                    pUsage.consumedAmount += consumed;
+                    pUsage.details.push({
+                        type: "SEMI_FINISHED",
+                        semiFinishedName: semiName,
+                        amountPerUnit: multiplier,
+                        consumed,
+                    });
+                }
+            }
+        }
+
+        // C. Zakupy przypisane do dni
+        for (const pos of allPositions) {
+            const daily = getOrCreateDaily(pos.rawDate);
+            daily.totalPurchased += pos.quantity;
+        }
+
+        // Przekształcamy dzienną mapę w tablicę posortowaną chronologicznie malejąco (najnowsze na początku)
+        const allDailyEntries = Array.from(dailyMap.values()).map((d) => ({
+            date: d.date,
+            dayOfWeek: d.dayOfWeek,
+            shortDay: d.shortDay,
+            rawDate: d.rawDate,
+            totalConsumed: Math.round(d.totalConsumed * 100) / 100,
+            totalPurchased: Math.round(d.totalPurchased * 100) / 100,
+            products: Array.from(d.productsMap.values()).map((p) => ({
+                productId: p.productId,
+                productName: p.productName,
+                productType: p.productType,
+                producedUnits: p.producedUnits,
+                consumedAmount: Math.round(p.consumedAmount * 100) / 100,
+                isDirect: p.isDirect,
+                isSemiFinished: p.isSemiFinished,
+                details: p.details.map((dt) => ({
+                    type: dt.type,
+                    semiFinishedName: dt.semiFinishedName || null,
+                    amountPerUnit: Math.round(dt.amountPerUnit * 1000) / 1000,
+                    consumed: Math.round(dt.consumed * 100) / 100,
+                })),
+            })).sort((a, b) => b.consumedAmount - a.consumedAmount),
+        }));
+
+        allDailyEntries.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
+
+        // D. Tygodniowa agregacja (ISO weeks)
+        function getISOWeekInfo(date: Date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+            const weekYear = d.getUTCFullYear();
+
+            const monday = new Date(date);
+            const day = monday.getDay();
+            const diffToMonday = monday.getDate() - day + (day === 0 ? -6 : 1);
+            monday.setDate(diffToMonday);
+
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const formatD = (dt: Date) => `${pad(dt.getDate())}.${pad(dt.getMonth() + 1)}`;
+            const label = `Tydzień ${weekNo} (${formatD(monday)} - ${formatD(sunday)}.${sunday.getFullYear()})`;
+            const shortLabel = `T${weekNo} (${formatD(monday)}-${formatD(sunday)})`;
+            const key = `${weekYear}-W${pad(weekNo)}`;
+
+            return {
+                key,
+                weekNumber: weekNo,
+                year: weekYear,
+                label,
+                shortLabel,
+                startDate: monday.toISOString().split("T")[0],
+                endDate: sunday.toISOString().split("T")[0],
+                mondayDate: monday,
+            };
+        }
+
+        const weeklyMap = new Map<
+            string,
+            {
+                key: string;
+                weekNumber: number;
+                year: number;
+                label: string;
+                shortLabel: string;
+                startDate: string;
+                endDate: string;
+                mondayDate: Date;
+                totalConsumed: number;
+                totalPurchased: number;
+                daysWithProduction: number;
+                productsMap: Map<string, { productId: string; productName: string; productType: string; producedUnits: number; consumedAmount: number }>;
+            }
+        >();
+
+        for (const entry of allDailyEntries) {
+            const weekInfo = getISOWeekInfo(entry.rawDate);
+            let w = weeklyMap.get(weekInfo.key);
+            if (!w) {
+                w = {
+                    ...weekInfo,
+                    totalConsumed: 0,
+                    totalPurchased: 0,
+                    daysWithProduction: 0,
+                    productsMap: new Map(),
+                };
+                weeklyMap.set(weekInfo.key, w);
+            }
+
+            w.totalConsumed += entry.totalConsumed;
+            w.totalPurchased += entry.totalPurchased;
+            if (entry.totalConsumed > 0) {
+                w.daysWithProduction += 1;
+            }
+
+            for (const p of entry.products) {
+                let wp = w.productsMap.get(p.productId);
+                if (!wp) {
+                    wp = {
+                        productId: p.productId,
+                        productName: p.productName,
+                        productType: p.productType,
+                        producedUnits: 0,
+                        consumedAmount: 0,
+                    };
+                    w.productsMap.set(p.productId, wp);
+                }
+                wp.producedUnits += p.producedUnits;
+                wp.consumedAmount += p.consumedAmount;
+            }
+        }
+
+        const weeklyHistory = Array.from(weeklyMap.values()).map((w) => ({
+            key: w.key,
+            weekNumber: w.weekNumber,
+            year: w.year,
+            label: w.label,
+            shortLabel: w.shortLabel,
+            startDate: w.startDate,
+            endDate: w.endDate,
+            mondayDate: w.mondayDate,
+            totalConsumed: Math.round(w.totalConsumed * 100) / 100,
+            totalPurchased: Math.round(w.totalPurchased * 100) / 100,
+            avgDailyConsumed: Math.round((w.totalConsumed / 7) * 100) / 100,
+            daysWithProduction: w.daysWithProduction,
+            products: Array.from(w.productsMap.values()).map((p) => ({
+                ...p,
+                consumedAmount: Math.round(p.consumedAmount * 100) / 100,
+            })).sort((a, b) => b.consumedAmount - a.consumedAmount),
+        }));
+        weeklyHistory.sort((a, b) => b.mondayDate.getTime() - a.mondayDate.getTime());
+
+        // E. Miesięczna agregacja (Monthly history)
+        const monthlyMap = new Map<
+            string,
+            {
+                key: string;
+                year: number;
+                monthIndex: number;
+                label: string;
+                shortLabel: string;
+                monthDate: Date;
+                totalConsumed: number;
+                totalPurchased: number;
+                daysWithProduction: number;
+                productsMap: Map<string, { productId: string; productName: string; productType: string; producedUnits: number; consumedAmount: number }>;
+            }
+        >();
+
+        for (const entry of allDailyEntries) {
+            const ymKey = `${entry.rawDate.getFullYear()}-${String(entry.rawDate.getMonth() + 1).padStart(2, "0")}`;
+            let m = monthlyMap.get(ymKey);
+            if (!m) {
+                const y = entry.rawDate.getFullYear();
+                const mIdx = entry.rawDate.getMonth();
+                m = {
+                    key: ymKey,
+                    year: y,
+                    monthIndex: mIdx,
+                    label: `${POLISH_MONTHS_FULL[mIdx]} ${y}`,
+                    shortLabel: `${MONTH_NAMES[mIdx]} ${String(y).slice(-2)}`,
+                    monthDate: new Date(y, mIdx, 1),
+                    totalConsumed: 0,
+                    totalPurchased: 0,
+                    daysWithProduction: 0,
+                    productsMap: new Map(),
+                };
+                monthlyMap.set(ymKey, m);
+            }
+
+            m.totalConsumed += entry.totalConsumed;
+            m.totalPurchased += entry.totalPurchased;
+            if (entry.totalConsumed > 0) {
+                m.daysWithProduction += 1;
+            }
+
+            for (const p of entry.products) {
+                let mp = m.productsMap.get(p.productId);
+                if (!mp) {
+                    mp = {
+                        productId: p.productId,
+                        productName: p.productName,
+                        productType: p.productType,
+                        producedUnits: 0,
+                        consumedAmount: 0,
+                    };
+                    m.productsMap.set(p.productId, mp);
+                }
+                mp.producedUnits += p.producedUnits;
+                mp.consumedAmount += p.consumedAmount;
+            }
+        }
+
+        const monthlyHistory = Array.from(monthlyMap.values()).map((m) => ({
+            key: m.key,
+            year: m.year,
+            monthIndex: m.monthIndex,
+            label: m.label,
+            shortLabel: m.shortLabel,
+            monthDate: m.monthDate,
+            totalConsumed: Math.round(m.totalConsumed * 100) / 100,
+            totalPurchased: Math.round(m.totalPurchased * 100) / 100,
+            estimatedCost: Math.round(m.totalConsumed * runningPrice * 100) / 100,
+            daysWithProduction: m.daysWithProduction,
+            products: Array.from(m.productsMap.values()).map((p) => ({
+                ...p,
+                consumedAmount: Math.round(p.consumedAmount * 100) / 100,
+            })).sort((a, b) => b.consumedAmount - a.consumedAmount),
+        }));
+        monthlyHistory.sort((a, b) => b.monthDate.getTime() - a.monthDate.getTime());
+
+        // F. Ogólny ranking wyrobów (Product Ranking across all time)
+        const productRankingMap = new Map<
+            string,
+            {
+                productId: string;
+                productName: string;
+                productType: string;
+                totalConsumed: number;
+                totalProducedUnits: number;
+                isDirect: boolean;
+                isSemiFinished: boolean;
+            }
+        >();
+
+        let grandTotalConsumed = 0;
+        for (const entry of allDailyEntries) {
+            for (const p of entry.products) {
+                let pr = productRankingMap.get(p.productId);
+                if (!pr) {
+                    pr = {
+                        productId: p.productId,
+                        productName: p.productName,
+                        productType: p.productType,
+                        totalConsumed: 0,
+                        totalProducedUnits: 0,
+                        isDirect: p.isDirect,
+                        isSemiFinished: p.isSemiFinished,
+                    };
+                    productRankingMap.set(p.productId, pr);
+                } else {
+                    if (p.isDirect) pr.isDirect = true;
+                    if (p.isSemiFinished) pr.isSemiFinished = true;
+                }
+                pr.totalConsumed += p.consumedAmount;
+                pr.totalProducedUnits += p.producedUnits;
+                grandTotalConsumed += p.consumedAmount;
+            }
+        }
+
+        const productRanking = Array.from(productRankingMap.values())
+            .map((pr) => ({
+                ...pr,
+                totalConsumed: Math.round(pr.totalConsumed * 100) / 100,
+                percentage: grandTotalConsumed > 0 ? Math.round((pr.totalConsumed / grandTotalConsumed) * 1000) / 10 : 0,
+            }))
+            .sort((a, b) => b.totalConsumed - a.totalConsumed);
+
+        // G. Wolumen do kafelka głównego (ostatnie 6 miesięcy - Volume History)
+        const volumeHistory = monthsRange.map((m) => {
+            const found = monthlyHistory.find((mh) => mh.year === m.year && mh.monthIndex === m.monthIndex);
+            return {
+                month: m.label,
+                consumed: found ? found.totalConsumed : 0,
+                purchased: found ? found.totalPurchased : 0,
+            };
+        });
+
+        // H. Statystyki podsumowujące (Stats)
         const currentPrice = deliveriesHistory.length > 0
             ? deliveriesHistory[0].price
             : Number(ingredient.calculatedPrice || 0);
@@ -311,9 +684,31 @@ export async function GET(
             priceTrend = "down";
         }
 
-        const avgMonthlyConsumption = Math.round(totalConsumedAcrossMonths / (monthsRange.length || 1));
+        const totalConsumed6m = volumeHistory.reduce((acc, v) => acc + v.consumed, 0);
+        const avgMonthlyConsumption = Math.round(totalConsumed6m / (monthsRange.length || 1));
 
         const bestSupplier = suppliersRanking.find((s) => s.isBest);
+
+        // Szczytowy dzień (peak day)
+        let peakDay: { date: string; dayOfWeek: string; amount: number } | null = null;
+        for (const d of allDailyEntries) {
+            if (!peakDay || d.totalConsumed > peakDay.amount) {
+                if (d.totalConsumed > 0) {
+                    peakDay = {
+                        date: d.date,
+                        dayOfWeek: d.dayOfWeek,
+                        amount: d.totalConsumed,
+                    };
+                }
+            }
+        }
+
+        // Ostatnie 30 dni zużycia
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const last30DaysEntries = allDailyEntries.filter((d) => d.rawDate >= thirtyDaysAgo);
+        const last30DaysConsumed = Math.round(last30DaysEntries.reduce((acc, d) => acc + d.totalConsumed, 0) * 100) / 100;
+        const avgDailyLast30Days = Math.round((last30DaysConsumed / 30) * 100) / 100;
 
         const responseData = {
             id: ingredient.id,
@@ -327,11 +722,25 @@ export async function GET(
                 avgMonthlyConsumption,
                 bestSupplierName: bestSupplier?.name || null,
                 bestSupplierPrice: bestSupplier?.lastPrice || null,
+                totalAllTimeConsumed: Math.round(grandTotalConsumed * 100) / 100,
+                last30DaysConsumed,
+                avgDailyLast30Days,
+                peakDay,
+                topProduct: productRanking.length > 0 ? {
+                    name: productRanking[0].productName,
+                    percentage: productRanking[0].percentage,
+                    amount: productRanking[0].totalConsumed,
+                } : null,
             },
             priceHistory,
             volumeHistory,
             suppliersRanking,
             deliveriesHistory,
+            // Nowe struktury do szczegółowego podglądu zużycia:
+            dailyHistory: allDailyEntries,
+            weeklyHistory,
+            monthlyHistory,
+            productRanking,
         };
 
         return NextResponse.json(responseData);
@@ -343,3 +752,4 @@ export async function GET(
         );
     }
 }
+

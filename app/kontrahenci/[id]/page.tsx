@@ -34,6 +34,23 @@ import {
     X,
 } from "lucide-react";
 
+// Helper do formatowania daty: YYYY-MM-DD -> DD-MM-YYYY
+function formatDate(dateStr?: string | Date | null): string {
+    if (!dateStr) return "-";
+    const str = typeof dateStr === "string" ? dateStr : dateStr.toISOString();
+    const cleanDate = str.split("T")[0];
+    const parts = cleanDate.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return str;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
 interface InvoicePosition {
     id: string;
     name: string;
@@ -155,10 +172,13 @@ export default function ContractorDetailPage() {
             // Inicjalizacja domyślnych jednostek dla listy zakupów
             const initialSelection: Record<string, { selected: boolean; quantity: string; unit: string; note: string }> = {};
             json.purchasedProducts.forEach((p) => {
+                let u = (p.unit || "szt").toLowerCase();
+                if (u === "l") u = "litry";
+                if (!["szt", "litry", "kg", "opak"].includes(u)) u = "szt";
                 initialSelection[p.id] = {
                     selected: false,
                     quantity: "1",
-                    unit: p.unit || "kg",
+                    unit: u,
                     note: "",
                 };
             });
@@ -225,8 +245,11 @@ export default function ContractorDetailPage() {
 
     // Obsługa zaznaczania produktu do zamówienia
     const toggleProductSelection = (productId: string, defaultUnit: string) => {
+        let u = (defaultUnit || "szt").toLowerCase();
+        if (u === "l") u = "litry";
+        if (!["szt", "litry", "kg", "opak"].includes(u)) u = "szt";
         setSelectedItems((prev) => {
-            const current = prev[productId] || { selected: false, quantity: "1", unit: defaultUnit, note: "" };
+            const current = prev[productId] || { selected: false, quantity: "1", unit: u, note: "" };
             return {
                 ...prev,
                 [productId]: {
@@ -310,10 +333,10 @@ export default function ContractorDetailPage() {
         );
 
         if (selectedList.length === 0) {
-            return "Brak wybranych produktów. Zaznacz produkty na liście poniżej, aby wygenerować zamówienie.";
+            return "";
         }
 
-        const dateFormatted = new Date().toLocaleDateString("pl-PL");
+        const dateFormatted = formatDate(new Date());
         const displayName = data.contractor.customName || data.contractor.name;
         const officialNameNotice =
             data.contractor.customName && data.contractor.customName !== data.contractor.name
@@ -323,12 +346,20 @@ export default function ContractorDetailPage() {
         const header = `Dzień dobry, poproszę do piekarni MWS:\n`;
 
         const itemsText = selectedList
-            .map((item, index) => {
+            .map((item) => {
                 const config = selectedItems[item.id];
-                const qtyStr = config?.quantity || "1";
-                const unitStr = config?.unit || item.unit || "szt";
+                const qtyStr = (config?.quantity || "1").trim();
+                const unitStr = (config?.unit || item.unit || "szt").trim();
                 const noteStr = config?.note ? ` (${config.note})` : "";
-                return `${index + 1}. ${item.name} — ${qtyStr} ${unitStr}${noteStr}`;
+
+                const isPieces = ["szt", "szt.", "sztuka", "sztuk", "sztuki", "x"].includes(unitStr.toLowerCase());
+
+                if (isPieces) {
+                    const formattedQty = qtyStr.toLowerCase().endsWith("x") ? qtyStr : `${qtyStr}x`;
+                    return `${formattedQty} ${item.name}${noteStr}`;
+                } else {
+                    return `${qtyStr} ${unitStr} ${item.name}${noteStr}`;
+                }
             })
             .join("\n");
 
@@ -349,7 +380,7 @@ export default function ContractorDetailPage() {
         return (
             <div className="min-h-screen bg-ui-white flex items-center justify-center pb-20">
                 <div className="flex flex-col items-center gap-3 text-ui-secondary">
-                    <Loader2 size={32} className="animate-spin text-amber-700" />
+                    <Loader2 size={32} className="animate-spin text-ui-accent" />
                     <p className="font-medium text-sm">Ładowanie karty kontrahenta i historii zakupów...</p>
                 </div>
             </div>
@@ -413,10 +444,10 @@ export default function ContractorDetailPage() {
                             </h1>
                             <button
                                 onClick={handleOpenEditNameModal}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary font-bold text-xs transition-colors cursor-pointer shadow-sm"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary font-bold text-xs transition-colors cursor-pointer shadow-sm"
                                 title="Zmień własną nazwę kontrahenta"
                             >
-                                <Edit3 size={13} className="text-amber-700" />
+                                <Edit3 size={13} className="text-ui-accent" />
                                 Zmień nazwę
                             </button>
                         </div>
@@ -426,7 +457,7 @@ export default function ContractorDetailPage() {
                             <span className="font-semibold text-ui-secondary">Nazwa z faktury:</span>
                             <span className="text-ui-black font-medium">{contractor.name}</span>
                             {contractor.customName && contractor.customName !== contractor.name && (
-                                <span className="text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded">
+                                <span className="text-[10px] font-bold bg-ui-white text-ui-accent border border-ui-accent px-1.5 py-0.2 rounded">
                                     Własna nazwa aktywna
                                 </span>
                             )}
@@ -436,7 +467,7 @@ export default function ContractorDetailPage() {
                         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3.5 text-xs text-ui-secondary">
                             {contractor.address && contractor.address !== 'Pobrano z KSeF' && (
                                 <div className="flex items-center gap-1.5">
-                                    <MapPin size={14} className="text-amber-800 shrink-0" />
+                                    <MapPin size={14} className="text-ui-accent shrink-0" />
                                     <span>{contractor.address}</span>
                                 </div>
                             )}
@@ -475,12 +506,12 @@ export default function ContractorDetailPage() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setActiveTab("SHOPPING_LIST")}
-                            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+                            className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
                         >
                             <ShoppingCart size={17} />
                             Generuj listę zakupów
                             {selectedCount > 0 && (
-                                <span className="bg-white text-amber-900 font-extrabold px-1.5 py-0.2 rounded-full text-[11px]">
+                                <span className="bg-white text-ui-accent font-extrabold px-1.5 py-0.2 rounded-full text-[11px]">
                                     {selectedCount}
                                 </span>
                             )}
@@ -533,30 +564,7 @@ export default function ContractorDetailPage() {
                 </div>
 
                 {/* 3. Ostatnie zakupy */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Ostatnie zakupy</span>
-                        <Calendar size={18} className="text-ui-primary" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-black">
-                            {stats.lastPurchaseDate ? new Date(stats.lastPurchaseDate).toLocaleDateString("pl-PL") : "Brak"}
-                        </div>
-                    </div>
-                </div>
 
-                {/* 4. Kupowane produkty */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Katalog kupowanych pozycji</span>
-                        <Package size={18} className="text-ui-primary" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-black">
-                            {data.purchasedProducts.length} <span className="text-xs font-semibold text-ui-secondary">produktów</span>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* ========================================================= */}
@@ -566,7 +574,7 @@ export default function ContractorDetailPage() {
                 <button
                     onClick={() => setActiveTab("PRODUCTS")}
                     className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "PRODUCTS"
-                        ? "border-ui-primary text-amber-950 bg-amber-50/40 rounded-t-xl"
+                        ? "border-ui-primary text-ui-primary"
                         : "border-transparent text-ui-secondary hover:text-ui-black"
                         }`}
                 >
@@ -577,7 +585,7 @@ export default function ContractorDetailPage() {
                 <button
                     onClick={() => setActiveTab("INVOICES")}
                     className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "INVOICES"
-                        ? "border-ui-primary text-amber-950 bg-amber-50/40 rounded-t-xl"
+                        ? "border-ui-primary text-ui-primary"
                         : "border-transparent text-ui-secondary hover:text-ui-black"
                         }`}
                 >
@@ -588,14 +596,14 @@ export default function ContractorDetailPage() {
                 <button
                     onClick={() => setActiveTab("SHOPPING_LIST")}
                     className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "SHOPPING_LIST"
-                        ? "border-amber-700 text-amber-950 bg-amber-50/40 rounded-t-xl"
+                        ? "border-ui-accent text-ui-primary"
                         : "border-transparent text-ui-secondary hover:text-ui-black"
                         }`}
                 >
                     <ShoppingCart size={16} />
                     Lista zakupów
                     {selectedCount > 0 && (
-                        <span className="ml-1 bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full text-[11px]">
+                        <span className="ml-1 bg-ui-accent text-white font-extrabold px-2 py-0.5 rounded-full text-[11px]">
                             {selectedCount}
                         </span>
                     )}
@@ -616,7 +624,7 @@ export default function ContractorDetailPage() {
                                 placeholder="Szukaj produktu po nazwie..."
                                 value={productSearch}
                                 onChange={(e) => setProductSearch(e.target.value)}
-                                className="w-full bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 py-2 text-xs text-ui-black focus:outline-none focus:border-amber-600 shadow-sm"
+                                className="w-full bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 py-2 text-xs text-ui-black focus:outline-none focus:border-ui-accent shadow-sm"
                             />
                         </div>
 
@@ -661,7 +669,7 @@ export default function ContractorDetailPage() {
                                             <tr
                                                 key={prod.id}
                                                 onClick={() => toggleProductSelection(prod.id, prod.unit)}
-                                                className={`hover:bg-ui-accent/5 transition-colors cursor-pointer ${isSelected ? "bg-amber-50/40" : ""
+                                                className={`hover:bg-ui-accent/5 transition-colors cursor-pointer ${isSelected ? "bg-ui-accent/10" : ""
                                                     }`}
                                             >
                                                 {/* Checkbox do zamówienia */}
@@ -670,7 +678,7 @@ export default function ContractorDetailPage() {
                                                         type="checkbox"
                                                         checked={isSelected}
                                                         onChange={() => toggleProductSelection(prod.id, prod.unit)}
-                                                        className="w-4 h-4 rounded border-ui-accent text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                        className="w-4 h-4 rounded border-ui-accent text-ui-accent focus:ring-ui-accent cursor-pointer"
                                                     />
                                                 </td>
 
@@ -691,13 +699,13 @@ export default function ContractorDetailPage() {
                                                 </td>
 
                                                 {/* Wydano łącznie */}
-                                                <td className="py-3 px-3 text-right font-black text-amber-950">
+                                                <td className="py-3 px-3 text-right font-black text-ui-secondary">
                                                     {prod.totalSpent > 0 ? `${prod.totalSpent.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł` : "—"}
                                                 </td>
 
                                                 {/* Data ostatniego zakupu */}
                                                 <td className="py-3 px-3 text-right text-ui-secondary font-medium">
-                                                    {prod.lastPurchasedDate !== "-" ? prod.lastPurchasedDate : "—"}
+                                                    {prod.lastPurchasedDate && prod.lastPurchasedDate !== "-" ? formatDate(prod.lastPurchasedDate) : "—"}
                                                 </td>
                                             </tr>
                                         );
@@ -722,7 +730,7 @@ export default function ContractorDetailPage() {
                             placeholder="Szukaj po numerze faktury lub dacie..."
                             value={invoiceSearch}
                             onChange={(e) => setInvoiceSearch(e.target.value)}
-                            className="w-full bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 py-2 text-xs text-ui-black focus:outline-none focus:border-amber-600 shadow-sm"
+                            className="w-full bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 py-2 text-xs text-ui-black focus:outline-none focus:border-ui-accent shadow-sm"
                         />
                     </div>
 
@@ -746,7 +754,7 @@ export default function ContractorDetailPage() {
                                             className="p-4 bg-ui-white hover:bg-ui-accent/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-amber-100/70 text-amber-900 rounded-xl">
+                                                <div className="p-2 bg-ui-accent/20 text-ui-accent rounded-xl">
                                                     <FileText size={18} />
                                                 </div>
                                                 <div>
@@ -757,7 +765,7 @@ export default function ContractorDetailPage() {
                                                                 Sprzedaż
                                                             </span>
                                                         ) : (
-                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 uppercase tracking-wider">
+                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-ui-accent/20 text-ui-accent uppercase tracking-wider">
                                                                 Zakup
                                                             </span>
                                                         )}
@@ -766,14 +774,14 @@ export default function ContractorDetailPage() {
                                                         </span>
                                                     </div>
                                                     <div className="text-[11px] text-ui-secondary flex items-center gap-3 mt-0.5">
-                                                        <span>Wystawiono: <b>{inv.issuedDate}</b></span>
+                                                        <span>Wystawiono: <b>{formatDate(inv.issuedDate)}</b></span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center justify-between sm:justify-end gap-6">
                                                 <div className="text-right">
-                                                    <div className="text-base font-black text-amber-950">
+                                                    <div className="text-base font-black text-ui-secondary">
                                                         {inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                     </div>
                                                     <div className="text-[11px] text-ui-secondary">
@@ -846,9 +854,6 @@ export default function ContractorDetailPage() {
                                     <h3 className="text-base font-bold text-ui-black">
                                         Wybierz produkty do zamówienia
                                     </h3>
-                                    <p className="text-xs text-ui-secondary">
-                                        Zaznacz surowce i wpisz potrzebne ilości
-                                    </p>
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -870,7 +875,7 @@ export default function ContractorDetailPage() {
                             {/* Tabela do wpisywania ilości */}
                             <div className="border border-ui-accent rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
                                 <table className="w-full text-left text-xs border-collapse">
-                                    <thead className="sticky top-0 bg-ui-accent/20 z-10">
+                                    <thead className="bg-ui-accent/15">
                                         <tr className="border-b border-ui-accent text-ui-secondary font-bold uppercase text-[9px]">
                                             <th className="py-2.5 px-3 w-10 text-center">Wybór</th>
                                             <th className="py-2.5 px-3">Produkt</th>
@@ -889,7 +894,7 @@ export default function ContractorDetailPage() {
                                             return (
                                                 <tr
                                                     key={prod.id}
-                                                    className={`hover:bg-ui-accent/5 transition-colors ${itemState.selected ? "bg-amber-50/50" : ""
+                                                    className={`hover:bg-ui-accent/5 transition-colors ${itemState.selected ? "bg-ui-accent/10" : ""
                                                         }`}
                                                 >
                                                     <td className="py-2.5 px-3 text-center">
@@ -897,7 +902,7 @@ export default function ContractorDetailPage() {
                                                             type="checkbox"
                                                             checked={itemState.selected}
                                                             onChange={() => toggleProductSelection(prod.id, prod.unit)}
-                                                            className="w-4 h-4 rounded border-ui-accent text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                            className="w-4 h-4 rounded border-ui-accent text-ui-accent focus:ring-ui-accent cursor-pointer"
                                                         />
                                                     </td>
 
@@ -921,21 +926,24 @@ export default function ContractorDetailPage() {
                                                                         updateItemQuantity(prod.id, e.target.value)
                                                                     }
                                                                     placeholder="ilość"
-                                                                    className="w-20 bg-ui-white border border-amber-400 rounded-lg px-2 py-1 text-center font-bold text-xs text-ui-black focus:outline-none focus:border-amber-600 shadow-sm"
+                                                                    className="w-16 bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-sm"
                                                                 />
-                                                                <input
-                                                                    type="text"
-                                                                    value={itemState.unit}
+                                                                <select
+                                                                    value={itemState.unit === "l" ? "litry" : itemState.unit}
                                                                     onChange={(e) =>
                                                                         updateItemUnit(prod.id, e.target.value)
                                                                     }
-                                                                    placeholder="jedn."
-                                                                    className="w-14 bg-ui-white border border-ui-accent rounded-lg px-1.5 py-1 text-center text-xs text-ui-secondary focus:outline-none"
-                                                                />
+                                                                    className="bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-semibold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-sm cursor-pointer"
+                                                                >
+                                                                    <option value="szt">szt</option>
+                                                                    <option value="litry">litry</option>
+                                                                    <option value="kg">kg</option>
+                                                                    <option value="opak">opak</option>
+                                                                </select>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[11px] text-ui-secondary/50 italic">
-                                                                nie zaznaczono
+                                                            <span className="text-[11px] text-ui-secondary/50 font-medium">
+                                                                {prod.unit}
                                                             </span>
                                                         )}
                                                     </td>
@@ -949,7 +957,7 @@ export default function ContractorDetailPage() {
 
                         {/* Pole uwag do zamówienia */}
                         <div className="mt-5">
-                            <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
+                            <label className="block text-xs font-bold text-ui-secondary tracking-wider mb-1.5">
                                 Dodatkowe uwagi do zamówienia:
                             </label>
                             <textarea
@@ -957,36 +965,31 @@ export default function ContractorDetailPage() {
                                 value={orderNotes}
                                 onChange={(e) => setOrderNotes(e.target.value)}
                                 placeholder="np. Proszę o dostawę do godziny 7:00..."
-                                className="w-full bg-ui-white border border-ui-accent rounded-xl p-3 text-xs text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
+                                className="w-full bg-ui-white border border-ui-accent rounded-xl p-3 text-xs text-ui-black focus:outline-none focus:border-ui-accent transition-all shadow-sm"
                             />
                         </div>
                     </div>
 
                     {/* Prawa kolumna: Podgląd gotowego tekstu do skopiowania */}
-                    <div className="lg:col-span-5 bg-amber-50/40 border border-amber-200/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                    <div className="lg:col-span-5 bg-ui-accent/10 border border-ui-accent/40 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
                         <div>
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
-                                    <Sparkles size={18} className="text-amber-800" />
-                                    <h3 className="text-sm font-bold text-amber-950 uppercase tracking-wider">
+                                    <h3 className="text-sm font-bold text-ui-primary tracking-wider">
                                         Gotowa lista do skopiowania
                                     </h3>
                                 </div>
-                                <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
+                                <span className="text-xs font-bold bg-ui-accent/20 text-ui-primary px-2 py-0.5 rounded-full">
                                     {selectedCount} pozycji
                                 </span>
                             </div>
-
-                            <p className="text-xs text-ui-secondary mb-3">
-                                Poniższy tekst możesz skopiować jednym kliknięciem i wkleić w SMS, e-mail lub WhatsApp do dostawcy:
-                            </p>
 
                             <div className="relative">
                                 <textarea
                                     readOnly
                                     rows={14}
                                     value={generatedShoppingListText}
-                                    className="w-full bg-ui-white border border-amber-300/80 rounded-xl p-3.5 text-xs text-ui-black font-mono leading-relaxed focus:outline-none shadow-inner resize-none"
+                                    className="w-full bg-ui-white border border-ui-accent/40 rounded-lg p-3.5 text-xs text-ui-black font-mono leading-relaxed focus:outline-none shadow-inner resize-none"
                                 />
                             </div>
                         </div>
@@ -997,8 +1000,8 @@ export default function ContractorDetailPage() {
                                 onClick={handleCopyList}
                                 disabled={selectedCount === 0}
                                 className={`flex-1 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer ${copiedToClipboard
-                                    ? "bg-emerald-600 text-white"
-                                    : "bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50"
+                                    ? "bg-ui-accent text-white"
+                                    : "bg-ui-primary hover:bg-ui-primary/60 text-white "
                                     }`}
                             >
                                 {copiedToClipboard ? (
@@ -1044,7 +1047,7 @@ export default function ContractorDetailPage() {
                     >
                         <div className="flex items-center justify-between border-b border-ui-accent pb-3">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2 bg-amber-100 text-amber-900 rounded-xl">
+                                <div className="p-2 bg-ui-accent/20 text-ui-accent rounded-xl">
                                     <Edit3 size={18} />
                                 </div>
                                 <h3 className="text-base font-bold text-ui-black">
@@ -1070,7 +1073,7 @@ export default function ContractorDetailPage() {
                                     value={customNameInput}
                                     onChange={(e) => setCustomNameInput(e.target.value)}
                                     placeholder={contractor.name}
-                                    className="w-full bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2.5 text-sm font-bold text-ui-black focus:outline-none focus:border-amber-600 shadow-sm"
+                                    className="w-full bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2.5 text-sm font-bold text-ui-black focus:outline-none focus:border-ui-accent shadow-sm"
                                 />
                                 <p className="text-[11px] text-ui-secondary mt-1.5 leading-normal">
                                     Domyślnie taka sama jak nazwa z faktury. Własna nazwa ułatwi Ci szybką identyfikację dostawcy w całym programie.
@@ -1088,7 +1091,7 @@ export default function ContractorDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => setCustomNameInput(contractor.name)}
-                                    className="text-xs font-semibold text-amber-800 hover:underline cursor-pointer"
+                                    className="text-xs font-semibold text-ui-accent hover:underline cursor-pointer"
                                 >
                                     Przywróć z faktury
                                 </button>
@@ -1104,7 +1107,7 @@ export default function ContractorDetailPage() {
                                     <button
                                         type="submit"
                                         disabled={isSavingCustomName}
-                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-ui-accent hover:bg-ui-accent/80 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                                     >
                                         {isSavingCustomName ? (
                                             <>

@@ -17,10 +17,27 @@ import {
     Plus,
     Trash2,
     Edit2,
-    ArrowRightLeft
+    ArrowRightLeft,
+    AlertCircle
 } from "lucide-react";
 
 type InvoiceStatus = "WAITING" | "IMPORTED" | "REJECTED";
+
+// Helper do formatowania daty: YYYY-MM-DD -> DD-MM-YYYY
+function formatDate(dateStr?: string): string {
+    if (!dateStr) return "-";
+    const cleanDate = dateStr.split("T")[0];
+    const parts = cleanDate.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+}
 
 interface PositionItem {
     id: string;
@@ -78,9 +95,10 @@ interface CategorySelectProps {
     value: string;
     onChange: (val: string) => void;
     primaryCatId?: string;
+    isWarning?: boolean;
 }
 
-function CategorySelect({ categories, value, onChange, primaryCatId }: CategorySelectProps) {
+function CategorySelect({ categories, value, onChange, primaryCatId, isWarning }: CategorySelectProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     const orderedCategories = React.useMemo(() => {
@@ -101,9 +119,12 @@ function CategorySelect({ categories, value, onChange, primaryCatId }: CategoryS
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border border-ui-accent bg-ui-white hover:bg-ui-accent/10 transition-all shadow-sm cursor-pointer text-xs ${isPrimary ? "text-ui-black" : "text-ui-primary"}`}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all shadow-sm cursor-pointer text-xs ${isWarning
+                    ? "border-amber-400 bg-amber-50/50 text-ui-black hover:bg-amber-100/60 ring-1 ring-amber-300"
+                    : "border-ui-accent bg-ui-white hover:bg-ui-accent/10 " + (isPrimary ? "text-ui-black" : "text-ui-primary")
+                    }`}
             >
-                <span className="truncate">
+                <span className="truncate font-semibold">
                     {selectedCategory ? selectedCategory.name : "Wybierz kategorię"}
                 </span>
                 <ChevronDown size={14} className="shrink-0 ml-1 opacity-60" />
@@ -124,7 +145,7 @@ function CategorySelect({ categories, value, onChange, primaryCatId }: CategoryS
                                         onChange(cat.id);
                                         setIsOpen(false);
                                     }}
-                                    className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors cursor-pointer hover:bg-ui-accent/15 text-ui-black ${isSelected ? "bg-ui-accent/10" : ""}`}
+                                    className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors cursor-pointer hover:bg-ui-accent/15 text-ui-black ${isSelected ? "bg-ui-accent/10 font-bold" : ""}`}
                                 >
                                     <span className="truncate">{cat.name}</span>
                                 </button>
@@ -146,9 +167,10 @@ interface SearchableSelectProps {
     placeholder: string;
     onChange: (ingredientId: string) => void;
     onAddNew?: (searchPhrase: string) => void;
+    isWarning?: boolean;
 }
 
-function SearchableIngredientSelect({ ingredients, value, placeholder, onChange, onAddNew }: SearchableSelectProps) {
+function SearchableIngredientSelect({ ingredients, value, placeholder, onChange, onAddNew, isWarning }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
 
@@ -162,9 +184,13 @@ function SearchableIngredientSelect({ ingredients, value, placeholder, onChange,
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-ui-accent bg-ui-white text-ui-black text-xs transition-all shadow-sm cursor-pointer hover:bg-ui-accent/10"
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs transition-all shadow-sm cursor-pointer ${!selectedItem && isWarning
+                    ? "border-amber-400 bg-amber-100/80 text-amber-950 font-bold hover:bg-amber-200/70 ring-2 ring-amber-300/70 animate-pulse"
+                    : "border-ui-accent bg-ui-white text-ui-black hover:bg-ui-accent/10"
+                    }`}
             >
-                <span className="truncate">
+                <span className="truncate flex items-center gap-1.5 font-semibold">
+                    {!selectedItem && isWarning && <AlertCircle size={13} className="text-amber-700 shrink-0" />}
                     {selectedItem ? `${selectedItem.name} (${selectedItem.unit})` : placeholder}
                 </span>
                 <ChevronDown size={14} className="shrink-0 ml-1 opacity-60" />
@@ -188,7 +214,7 @@ function SearchableIngredientSelect({ ingredients, value, placeholder, onChange,
 
                         <div className="overflow-y-auto divide-y divide-ui-accent/30 pr-1 flex-1 min-h-[40px]">
                             {filtered.length === 0 ? (
-                                <div className="text-center py-3 text-ui-secondary text-[11px] italic">
+                                <div className="text-center py-3 text-ui-secondary text-[11px] ">
                                     Brak wyników
                                 </div>
                             ) : (
@@ -513,14 +539,14 @@ export default function FakturyPage() {
                     <button
                         onClick={() => setActiveTab("WAITING")}
                         className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "WAITING"
-                            ? "border-amber-500 text-amber-700 bg-amber-50/50 rounded-t-xl"
+                            ? "border-ui-accent text-ui-primary bg-ui-accent/20 rounded-t-xl"
                             : "border-transparent text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
                         <Clock size={16} />
                         Do weryfikacji
                         {waitingCount > 0 && (
-                            <span className="bg-amber-200 text-amber-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                            <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
                                 {waitingCount}
                             </span>
                         )}
@@ -576,7 +602,7 @@ export default function FakturyPage() {
                             <tr className="bg-ui-accent/10 text-ui-secondary text-xs font-bold uppercase tracking-wider border-b border-ui-accent">
                                 <th className="p-4 text-left">Numer Faktury</th>
                                 <th className="p-1">{invoiceDirection === "COST" ? "Dostawca" : "Nabywca / Klient"}</th>
-                                <th className="p-4 max-w-[80px] leading-tight text-left">Wystawiono</th>
+                                <th className="p-4 max-w-[80px] leading-tight text-left">Data wystawienia</th>
                                 <th className="p-4 text-left">Kwota Brutto</th>
                                 <th className="p-4 text-center">Akcja</th>
                             </tr>
@@ -616,8 +642,8 @@ export default function FakturyPage() {
                                                 </div>
                                             </td>
                                             <td className="p-1 text-ui-primary font-medium text-sm max-w-xs truncate text-left">{doc.contractorName}</td>
-                                            <td className="p-4 text-ui-primary text-sm font-medium text-left">{doc.issueDate}</td>
-                                            <td className="p-4 text-left font-bold text-ui-black text-sm">{Number(doc.grossAmount || 0).toFixed(2)} zł</td>
+                                            <td className="p-4 text-ui-primary text-sm font-medium text-left">{formatDate(doc.issueDate)}</td>
+                                            <td className="p-4 text-left text-ui-black text-sm">{Number(doc.grossAmount || 0).toFixed(2)} zł</td>
                                             <td className="p-4 text-center">
                                                 {/* LOGIKA PRZYCISKÓW ZALEŻNA OD TRYBU FAKTURY */}
                                                 {invoiceDirection === "SALES" ? (
@@ -758,7 +784,7 @@ export default function FakturyPage() {
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-ui-accent/10 p-4 rounded-xl border border-ui-accent/40">
                                 <div>
                                     <span className="text-xs text-ui-secondary font-bold block">Data wystawienia:</span>
-                                    <span className="text-ui-primary">{selectedDoc.issueDate}</span>
+                                    <span className="text-ui-primary font-medium">{formatDate(selectedDoc.issueDate)}</span>
                                 </div>
                                 <div>
                                     <span className="text-xs text-ui-secondary font-bold block">Wartość Netto:</span>
@@ -914,7 +940,6 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
             });
 
             if (res.ok) {
-                alert("Zmiany zostały pomyślnie zapisane!");
                 onSuccess();
             } else {
                 const err = await res.json();
@@ -973,6 +998,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
         }
     };
 
+    const newItemsCount = (doc.positions || []).filter(pos => !pos.categoryId).length;
+
     return (
         <div className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-ui-white w-full max-w-5xl rounded-2xl shadow-2xl border border-ui-accent flex flex-col my-8 relative">
@@ -989,10 +1016,15 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                     <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md uppercase tracking-wider">Edycja</span>
                                 )}
                             </h2>
-                            <div className="flex items-center gap-3 mt-1.5">
-                                <span className="text-sm font text-ui-primary">
+                            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                <span className="text-sm font-semibold text-ui-primary">
                                     KSeF: {doc.docNumber}
                                 </span>
+                                {doc.issueDate && (
+                                    <span className="text-xs text-ui-secondary">
+                                        • Data wystawienia: <b className="text-ui-black font-semibold">{formatDate(doc.issueDate)}</b>
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1010,6 +1042,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                 </div>
 
                 <div className="p-6 space-y-4 flex-1">
+                    {/* Baner informujący o nowych, niezmapowanych pozycjach */}
+
                     <div className="border border-ui-accent rounded-xl shadow-sm overflow-visible">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
@@ -1022,20 +1056,30 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                             </thead>
                             <tbody className="divide-y divide-ui-accent/40">
                                 {(doc.positions || []).map((pos) => {
+                                    const isOriginallyMapped = Boolean(pos.categoryId);
                                     const currentMapping = mappingState[pos.productId] || { categoryId: defaultCategoryId, multiplier: "1" };
                                     const isFoodCategory = currentMapping.categoryId === foodCategory?.id;
+                                    const isMissingIngredient = isFoodCategory && !currentMapping.ingredientId;
+                                    const isNewProduct = !isOriginallyMapped;
 
                                     const selectedIngredient = ingredients.find(i => i.id === currentMapping.ingredientId);
                                     const needsMultiplier = selectedIngredient && selectedIngredient.unit !== pos.unit;
 
                                     return (
-                                        <tr key={pos.id} className="hover:bg-ui-accent/5 transition-colors">
+                                        <tr
+                                            key={pos.id}
+                                            className={`transition-colors ${isNewProduct
+                                                ? "bg-amber-500/[0.08] hover:bg-amber-500/[0.14] border-l-4 border-l-amber-500"
+                                                : "hover:bg-ui-accent/5 border-l-4 border-l-emerald-500/50"
+                                                }`}
+                                        >
                                             <td className="p-3.5 text-left">
                                                 <div className="font-bold text-ui-black text-sm">{pos.name}</div>
+
                                             </td>
 
                                             <td className="p-3.5 text-center whitespace-nowrap align-center">
-                                                <div className=" text-ui-primary text-sm">{pos.quantity} {pos.unit}</div>
+                                                <div className="text-ui-primary text-sm font-semibold">{pos.quantity} {pos.unit}</div>
                                             </td>
 
                                             <td className="p-3.5 align-center text-left">
@@ -1043,6 +1087,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                     categories={categories}
                                                     value={currentMapping.categoryId}
                                                     primaryCatId={foodCategory?.id}
+                                                    isWarning={isNewProduct}
                                                     onChange={(newCatId) => handleCategoryChange(pos.productId, newCatId)}
                                                 />
                                             </td>
@@ -1056,7 +1101,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                             <SearchableIngredientSelect
                                                                 ingredients={ingredients}
                                                                 value={currentMapping.ingredientId}
-                                                                placeholder="-- Wyszukaj surowiec --"
+                                                                placeholder="Wybierz surowiec"
+                                                                isWarning={isMissingIngredient}
                                                                 onChange={(id) => handleIngredientChange(pos.productId, id)}
                                                                 onAddNew={(phrase) => setNewIngredientConfig({
                                                                     isOpen: true,
@@ -1067,8 +1113,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                         );
                                                     } else {
                                                         SelectorComponent = (
-                                                            <div className="text-[11px] text-black px-3 py-2 bg-white border shadow-sm border-ui-accent rounded-xl block text-center font-medium animate-fade-in">
-                                                                -
+                                                            <div className="text-[11px] text-ui-secondary px-3 py-2 bg-ui-accent/10 border border-ui-accent/40 rounded-xl block text-center font-medium animate-fade-in">
+                                                                Nie dotyczy (brak surowca)
                                                             </div>
                                                         );
                                                     }
@@ -1210,7 +1256,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                 }}
                                 className="flex-1 py-2 rounded-xl bg-ui-primary text-white font-bold hover:bg-ui-primary/90 text-xs transition-colors shadow-sm cursor-pointer"
                             >
-                                Zapisz i Wybierz
+                                Zapisz i wybierz
                             </button>
                         </div>
                     </div>

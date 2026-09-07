@@ -51,13 +51,14 @@ export async function GET(request: NextRequest) {
             const firstDay = new Date(Date.UTC(year, month - 1, 1));
             const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
-            // Pobieramy wszystkie wyroby (aby znać aktualne ceny sprzedaży)
+            // Pobieramy wszystkie wyroby
             const products = await prisma.bakeryProduct.findMany({
-                select: { id: true, name: true, type: true, sellingPrice: true },
+                orderBy: { name: "asc" },
+                select: { id: true, name: true, type: true, sellingPrice: true, productionCost: true },
             });
-            const productPriceMap = new Map<string, number>();
+            const productMap = new Map<string, typeof products[0]>();
             products.forEach((p) => {
-                productPriceMap.set(p.id, Number(p.sellingPrice || 0));
+                productMap.set(p.id, p);
             });
 
             // Pobieramy wszystkie wpisy produkcji w danym miesiącu
@@ -67,6 +68,9 @@ export async function GET(request: NextRequest) {
                         gte: firstDay,
                         lte: lastDay,
                     },
+                },
+                include: {
+                    bakeryProduct: true,
                 },
             });
 
@@ -84,7 +88,6 @@ export async function GET(request: NextRequest) {
                     });
                 }
             } catch {
-                // Tabela dailyIncome może jeszcze nie istnieć w DB przed db push
                 dbIncomes = [];
             }
 
@@ -105,6 +108,16 @@ export async function GET(request: NextRequest) {
                     fiscalIncome: number;
                     hasReport: boolean;
                     productsCount: number;
+                    products: Array<{
+                        productId: string;
+                        productName: string;
+                        productType: string;
+                        sellingPrice: number;
+                        producedAmount: number;
+                        soldAmount: number;
+                        salesIncome: number;
+                        soldOutTime?: string;
+                    }>;
                 }
             > = {};
 
@@ -123,8 +136,32 @@ export async function GET(request: NextRequest) {
                     fiscalIncome: fiscalFromDb > 0 ? fiscalFromDb : fiscalFromExtras,
                     hasReport: false,
                     productsCount: 0,
+                    products: [],
                 };
             }
+
+            // Agregacja miesięczna per produkt
+            const monthlyProductMap = new Map<string, {
+                productId: string;
+                productName: string;
+                productType: string;
+                sellingPrice: number;
+                producedAmount: number;
+                soldAmount: number;
+                salesIncome: number;
+            }>();
+
+            products.forEach((p) => {
+                monthlyProductMap.set(p.id, {
+                    productId: p.id,
+                    productName: p.name,
+                    productType: p.type,
+                    sellingPrice: Number(p.sellingPrice || 0),
+                    producedAmount: 0,
+                    soldAmount: 0,
+                    salesIncome: 0,
+                });
+            });
 
             // Sumowanie wpisów produkcji
             monthlyProductions.forEach((prod) => {
@@ -138,19 +175,42 @@ export async function GET(request: NextRequest) {
                         fiscalIncome: dbIncomeMap.get(dStr) || extras[dStr]?.fiscalIncome || 0,
                         hasReport: false,
                         productsCount: 0,
+                        products: [],
                     };
                 }
 
-                const price = productPriceMap.get(prod.bakeryProductId) || 0;
+                const product = productMap.get(prod.bakeryProductId) || prod.bakeryProduct;
+                const price = Number(product?.sellingPrice || 0);
                 const produced = prod.producedAmount || 0;
                 const sold = prod.soldAmount || 0;
+                const income = sold * price;
+                const soldOutTime = extras[dStr]?.soldOutTimes?.[prod.bakeryProductId] || prod.soldOutTime || "";
 
                 if (produced > 0 || sold > 0) {
                     daysMap[dStr].hasReport = true;
                     daysMap[dStr].totalProduced += produced;
                     daysMap[dStr].totalSold += sold;
-                    daysMap[dStr].bakerySalesIncome += sold * price;
+                    daysMap[dStr].bakerySalesIncome += income;
                     daysMap[dStr].productsCount += 1;
+
+                    daysMap[dStr].products.push({
+                        productId: prod.bakeryProductId,
+                        productName: product?.name || "Produkt",
+                        productType: product?.type || "BREAD",
+                        sellingPrice: price,
+                        producedAmount: produced,
+                        soldAmount: sold,
+                        salesIncome: income,
+                        soldOutTime: soldOutTime || undefined,
+                    });
+
+                    // Dodaj do podsumowania miesięcznego
+                    const mProd = monthlyProductMap.get(prod.bakeryProductId);
+                    if (mProd) {
+                        mProd.producedAmount += produced;
+                        mProd.soldAmount += sold;
+                        mProd.salesIncome += income;
+                    }
                 }
             });
 
@@ -176,9 +236,8 @@ export async function GET(request: NextRequest) {
                 monthBakeryIncome += dayItem.bakerySalesIncome;
                 monthFiscalIncome += dayItem.fiscalIncome;
 
-                // Dni bez raportu: dni robocze/soboty od początku miesiąca do dzisiaj
                 const dObj = new Date(dayItem.date);
-                const dayOfWeek = dObj.getUTCDay(); // 0 = Niedziela
+                const dayOfWeek = dObj.getUTCDay();
                 const isPastOrToday = dayItem.date <= todayStr;
                 const isSunday = dayOfWeek === 0;
 
@@ -187,9 +246,16 @@ export async function GET(request: NextRequest) {
                 }
             });
 
+            const monthlyProducts = Array.from(monthlyProductMap.values()).map((p) => ({
+                ...p,
+                sellThroughRate: p.producedAmount > 0 ? Math.round((p.soldAmount / p.producedAmount) * 1000) / 10 : 0,
+            })).sort((a, b) => b.soldAmount - a.soldAmount);
+
             return NextResponse.json({
                 month: monthParam,
                 days: daysList,
+                products,
+                monthlyProducts,
                 stats: {
                     monthProduced,
                     monthSold,
