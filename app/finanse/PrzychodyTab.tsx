@@ -627,20 +627,20 @@ export default function PrzychodyTab() {
             {/* ---------------- KARTY PODSUMOWANIA KPI ---------------- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* KARTA 1: CAŁKOWITY UTARG */}
-                <div className="bg-gradient-to-br from-ui-primary to-slate-900 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
-                    <div className="text-[11px] uppercase font-bold text-ui-accent tracking-wider flex items-center justify-between">
+                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                    <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                            <DollarSign size={15} className="text-ui-accent" />
+                            <DollarSign size={15} className="text-ui-secondary" />
                             Całkowity utarg
                         </span>
-                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-md font-semibold">
+                        <span className="text-[10px] text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md font-semibold">
                             {activeStats.daysCount} dni z raportem
                         </span>
                     </div>
-                    <div className="mt-2 text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                         {formatCurrency(activeStats.totalIncome)}
                     </div>
-                    <div className="text-[11px] text-ui-accent/80 mt-1 flex items-center justify-between font-medium">
+                    <div className="text-[11px] text-ui-secondary mt-1 flex items-center justify-between font-medium">
                         <span>Śr. dzienna: <strong>{formatCurrency(activeStats.avgDailyIncome)}</strong></span>
                     </div>
                 </div>
@@ -650,14 +650,14 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Wheat size={15} className="text-ui-primary" />
+                                <Wheat size={15} className="text-ui-secondary" />
                                 Sprzedaż pieczywa
                             </span>
-                            <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
+                            <span className="text-[11px] font-black text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-md">
                                 {activeStats.bakerySharePercent}% utargu
                             </span>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-ui-black tracking-tight">
+                        <div className="mt-2 text-2xl font-black text-ui-primary tracking-tight">
                             {formatCurrency(activeStats.bakerySalesIncome)}
                         </div>
                     </div>
@@ -669,7 +669,7 @@ export default function PrzychodyTab() {
                             />
                         </div>
                         <div className="text-[10px] text-ui-secondary mt-1 font-semibold flex justify-between">
-                            <span>Sprzedano: <strong>{activeStats.totalSold.toLocaleString("pl-PL")} szt.</strong></span>
+                            <span>Sprzedano: {activeStats.totalSold.toLocaleString("pl-PL")} szt.</span>
                             <span>Wyprodukowano: {activeStats.totalProduced.toLocaleString("pl-PL")} szt.</span>
                         </div>
                     </div>
@@ -680,10 +680,10 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <ShoppingBag size={15} className="text-blue-600" />
+                                <ShoppingBag size={15} className="text-ui-secondary" />
                                 Inne przychody
                             </span>
-                            <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                            <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md border border-ui-accent/10">
                                 {activeStats.otherSharePercent}% utargu
                             </span>
                         </div>
@@ -693,26 +693,7 @@ export default function PrzychodyTab() {
                     </div>
                 </div>
 
-                {/* KARTA 4: REKORD I WYPRZEDANIE */}
-                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                    <div>
-                        <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                                <Award size={15} className="text-amber-500" />
-                                Rekord (Peak)
-                            </span>
-                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                {activeStats.sellThroughRate}% wyprzedania
-                            </span>
-                        </div>
-                        <div className="mt-2 text-2xl font-black text-ui-black tracking-tight">
-                            {formatCurrency(activeStats.peakAmount)}
-                        </div>
-                    </div>
-                    <div className="text-[11px] text-ui-secondary font-semibold mt-2 truncate">
-                        Data: <strong className="text-ui-primary">{activeStats.peakLabel}</strong>
-                    </div>
-                </div>
+
             </div>
 
             {/* ---------------- SEKCJA WYKRESÓW ---------------- */}
@@ -843,9 +824,9 @@ export default function PrzychodyTab() {
                                 <div className="text-[10px] text-ui-secondary">{formatCurrency(activeStats.bakerySalesIncome)}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-blue-50">
-                                <div className="text-[10px] text-blue-600 font-bold">Inne:</div>
-                                <div className="font-black text-blue-900 text-sm">{activeStats.otherSharePercent}%</div>
-                                <div className="text-[10px] text-blue-700">{formatCurrency(activeStats.otherIncome)}</div>
+                                <div className="text-[10px] text-ui-primary font-bold">Inne:</div>
+                                <div className="font-black text-ui-primary text-sm">{activeStats.otherSharePercent}%</div>
+                                <div className="text-[10px] text-ui-primary">{formatCurrency(activeStats.otherIncome)}</div>
                             </div>
                         </div>
                     </div>

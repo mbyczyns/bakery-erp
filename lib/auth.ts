@@ -14,11 +14,15 @@ export type { AuthUser, UserRole };
 export { AUTH_COOKIE_NAME, createSessionToken, verifySessionToken, isPathAllowedForRole };
 
 // -------------------------------------------------------------
-// 1. STANDARDOWY HASH SHA-512 (128 ZNAKÓW HEX)
-// np. printf "%s" "haslo" | openssl dgst -sha512
+// 1. STANDARDOWY HASH SHA-512 & SOLONY FORMAT CRYPT
 // -------------------------------------------------------------
 export function hashPasswordSHA512(password: string): string {
     return crypto.createHash("sha512").update(password).digest("hex");
+}
+
+export function hashPassword(password: string): string {
+    const salt = crypto.randomBytes(8).toString("hex");
+    return sha512Crypt(password, salt);
 }
 
 // -------------------------------------------------------------

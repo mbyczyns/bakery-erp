@@ -462,7 +462,7 @@ export default function PrzepisSzczegolyPage({
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary font-bold text-xs transition-colors cursor-pointer shadow-sm"
                             title="Edytuj przepis"
                         >
-                            <Edit3 size={14} className="text-amber-700" />
+                            <Edit3 size={14} className="text-ui-secondary" />
                             Edytuj przepis
                         </button>
                         <button
@@ -481,7 +481,7 @@ export default function PrzepisSzczegolyPage({
                         <div className="text-[11px] uppercase tracking-wider font-bold text-ui-secondary">
                             Koszt surowcowy (Foodcost)
                         </div>
-                        <div className="text-xl font-black text-amber-950">
+                        <div className="text-xl font-black text-ui-primary">
                             {totalFoodCost.toFixed(2)} zł <span className="text-xs font-semibold text-ui-secondary">/ szt.</span>
                         </div>
                     </div>
@@ -505,12 +505,12 @@ export default function PrzepisSzczegolyPage({
             </div>
 
             {/* GŁÓWNE KARTY KPI */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 mb-8">
                 {/* Karta 1: Foodcost */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
                         <span className="text-xs font-bold uppercase tracking-wider">Foodcost / 1 szt.</span>
-                        <Scale size={18} className="text-amber-700" />
+                        <Scale size={18} className="text-ui-secondary" />
                     </div>
                     <div>
                         <div className="text-2xl font-black text-ui-black">
@@ -526,10 +526,10 @@ export default function PrzepisSzczegolyPage({
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
                         <span className="text-xs font-bold uppercase tracking-wider">Aktualna marża</span>
-                        <Percent size={18} className={currentMargin >= 50 ? "text-emerald-600" : "text-amber-600"} />
+                        <Percent size={18} className={currentMargin >= 50 ? "text-ui-secondary" : "text-ui-secondary"} />
                     </div>
                     <div>
-                        <div className={`text-2xl font-black ${currentMargin >= 50 ? "text-emerald-700" : currentMargin > 0 ? "text-amber-800" : "text-ui-secondary"}`}>
+                        <div className={`text-2xl font-black ${currentMargin >= 50 ? "text-ui-secondary" : currentMargin > 0 ? "text-ui-secondary" : "text-ui-secondary"}`}>
                             {currentSellingPrice > 0 ? `${currentMargin.toFixed(1)}%` : "—"}
                         </div>
                         <p className="text-[11px] text-ui-secondary mt-1">
@@ -540,37 +540,7 @@ export default function PrzepisSzczegolyPage({
                     </div>
                 </div>
 
-                {/* Karta 3: Produkcja ostatnie 30 dni */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider">Wypieczono (30 dni)</span>
-                        <PackageCheck size={18} className="text-blue-600" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-black">
-                            {productionStats.totalProduced} <span className="text-sm font-medium">szt.</span>
-                        </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            Sprzedano: <b>{productionStats.totalSold} szt.</b> ({productionStats.sellThroughRate.toFixed(0)}%)
-                        </p>
-                    </div>
-                </div>
 
-                {/* Karta 4: Przychód ze sprzedaży */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider">Przychód (30 dni)</span>
-                        <Coins size={18} className="text-emerald-600" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-black">
-                            {productionStats.totalRevenue.toLocaleString("pl-PL")} <span className="text-sm font-medium">zł</span>
-                        </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            Straty / niesprzedane: <b>{productionStats.totalUnsold} szt.</b>
-                        </p>
-                    </div>
-                </div>
             </div>
 
             {/* SEKCJA 1: ROZPISANY FOODCOST & KALKULATOR CENY */}
@@ -578,17 +548,17 @@ export default function PrzepisSzczegolyPage({
                 {/* LEWA KOLUMNA: ROZPISANY FOODCOST (7 kolumn) */}
                 <div className="lg:col-span-7 space-y-6">
                     <div className="bg-ui-white border border-ui-accent rounded-2xl p-6 shadow-sm">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-ui-accent">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-ui-accent">
                             <div>
                                 <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                                    <Scale size={20} className="text-amber-800" />
+                                    <Scale size={20} className="text-ui-secondary" />
                                     Foodcost
                                 </h2>
                             </div>
 
                             {/* Przelicznik partii */}
-                            <div className="flex items-center gap-2 bg-amber-50/80 border border-amber-200/80 px-3 py-1.5 rounded-xl">
-                                <span className="text-xs font-bold text-amber-950 whitespace-nowrap">
+                            <div className="grid grid-cols-5 gap-2 bg-ui-accent/10 p-2 rounded-xl border border-ui-accent/40">
+                                <span className="text-xs font-bold text-ui-primary flex items-center justify-center whitespace-nowrap">
                                     Partia:
                                 </span>
                                 {[1, 10, 50, 100].map((size) => (
@@ -596,8 +566,8 @@ export default function PrzepisSzczegolyPage({
                                         key={size}
                                         onClick={() => setPreviewBatchSize(size)}
                                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${previewBatchSize === size
-                                            ? "bg-amber-800 text-white shadow-sm"
-                                            : "text-amber-900 hover:bg-amber-200/60"
+                                            ? "bg-ui-primary text-white shadow-sm"
+                                            : "text-ui-secondary hover:bg-amber-200/60"
                                             }`}
                                     >
                                         {size} szt.
@@ -643,7 +613,7 @@ export default function PrzepisSzczegolyPage({
                                     })}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="border-t-2 border-ui-accent font-bold text-xs bg-amber-50/50">
+                                    <tr className="border-t-2 border-ui-accent font-bold text-xs bg-ui-secondary/5">
                                         <td className="py-3 px-3 text-ui-black" colSpan={2}>
                                             ŁĄCZNY KOSZT WYTWORZENIA (FOODCOST)
                                             {previewBatchSize > 1 && (
@@ -668,8 +638,8 @@ export default function PrzepisSzczegolyPage({
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                                    <Calculator size={20} className="text-emerald-700" />
-                                    Kalkulator Ceny
+                                    <Calculator size={20} className="text-ui-secondary" />
+                                    Kalkulator ceny
                                 </h2>
                             </div>
                         </div>
@@ -782,17 +752,17 @@ export default function PrzepisSzczegolyPage({
                         </div>
 
                         {/* KARTA WYNIKÓW KALKULACJI */}
-                        <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4.5 space-y-3 mb-6">
+                        <div className="bg-ui-accent/5 border border-ui-accent/40 rounded-xl p-4.5 space-y-3 mb-6">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                                <span className="text-xs font-bold text-ui-black uppercase tracking-wider">
                                     Sugerowana cena (Brutto):
                                 </span>
-                                <div className="text-2xl font-black text-emerald-950">
+                                <div className="text-2xl font-black text-ui-black">
                                     {finalGrossToSave.toFixed(2)} zł
                                 </div>
                             </div>
 
-                            <div className="pt-2.5 border-t border-emerald-200/80 space-y-2 text-xs text-emerald-950">
+                            <div className="pt-2.5 border-t border-ui-accent/40 space-y-2 text-xs text-ui-black">
                                 <div className="flex items-center justify-between">
                                     <span className="text-ui-secondary font-medium">Cena netto (w tym VAT 5%):</span>
                                     <span className="font-bold">{finalNetToSave.toFixed(2)} zł</span>
@@ -812,17 +782,12 @@ export default function PrzepisSzczegolyPage({
 
                                 <div className="flex items-center justify-between">
                                     <span className="text-ui-secondary font-medium">Marża handlowa:</span>
-                                    <span className="font-extrabold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">
+                                    <span className="font-extrabold text-ui-black bg-ui-accent/5 px-2 py-0.5 rounded">
                                         {activeMargin.toFixed(1)}%
                                     </span>
                                 </div>
 
-                                <div className="flex items-center justify-between">
-                                    <span className="text-ui-secondary font-medium">Narzut (Markup):</span>
-                                    <span className="font-bold">
-                                        {(calcMode === "FROM_MARGIN" ? markupFromMargin : markupFromPrice).toFixed(1)}%
-                                    </span>
-                                </div>
+
                             </div>
                         </div>
 

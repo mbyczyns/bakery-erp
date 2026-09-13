@@ -16,7 +16,8 @@ import {
     Milk,
     LogOut,
     User,
-    Shield
+    Shield,
+    Users
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -48,7 +49,7 @@ export default function Sidebar() {
             case "MANAGER":
                 return { label: "MANAGER", color: "bg-blue-500/20 text-blue-300 border-blue-500/40" };
             case "BAKER":
-                return { label: "PIEKARZ", color: "bg-amber-500/20 text-amber-300 border-amber-500/40" };
+                return { label: "PRACOWNIK", color: "bg-amber-500/20 text-amber-300 border-amber-500/40" };
             default:
                 return { label: role || "USER", color: "bg-gray-500/20 text-gray-300 border-gray-500/40" };
         }
@@ -82,11 +83,10 @@ export default function Sidebar() {
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className={`flex items-center gap-x-4 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                                    isActive
+                                className={`flex items-center gap-x-4 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isActive
                                         ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
                                         : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
-                                }`}
+                                    }`}
                                 title={isCollapsed ? item.name : undefined}
                             >
                                 <Icon size={20} className="shrink-0" />

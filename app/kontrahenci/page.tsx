@@ -272,12 +272,12 @@ export default function KontrahenciPage() {
                                             className="hover:bg-ui-accent/5 transition-colors cursor-pointer group"
                                         >
                                             {/* Nazwa */}
-                                            <td className="p-4 font-bold text-ui-black group-hover:text-ui-primary transition-colors">
+                                            <td className="p-4 text-black group-hover:text-ui-primary transition-colors">
                                                 <div className="truncate pr-4 text-sm" title={c.displayName || c.customName || c.name}>
                                                     {c.displayName || c.customName || c.name}
                                                 </div>
                                                 {c.customName && c.customName !== c.name && (
-                                                    <div className="text-[11px] font-normal text-ui-secondary truncate" title={c.name}>
+                                                    <div className="text-[11px] font-normal text-gray-600 truncate" title={c.name}>
                                                         Faktura: {c.name}
                                                     </div>
                                                 )}

@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
-import { User, Tags, Sliders, Save, ShieldCheck, Plus, X, Tag } from "lucide-react";
+import React from "react";
+import { User, Sliders, Save, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import ZespolSection from "@/components/ZespolSection";
 
 export default function KonfiguracjaPage() {
     const { user } = useAuth();
+
+    const isManagerOrAdmin = user?.role === "ADMIN" || user?.role === "MANAGER";
 
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
@@ -14,16 +17,14 @@ export default function KonfiguracjaPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-ui-black">Konfiguracja</h1>
-                    <p className="text-ui-black/60 text-sm mt-1">
-                        Zarządzaj ustawieniami globalnymi i bezpieczeństwem aplikacji.
-                    </p>
+
                 </div>
             </div>
 
             {/* Kontener na sekcje ustawień */}
             <div className="space-y-6 w-full">
 
-                {/* SEKCJA 1: Konto użytkownika */}
+                {/* SEKCJA 1: Konto zalogowanego użytkownika */}
                 <div className="bg-ui-white rounded-2xl p-6 shadow-sm border border-ui-accent hover:border-ui-secondary transition-all duration-300">
 
                     {/* Nagłówek sekcji */}
@@ -33,7 +34,6 @@ export default function KonfiguracjaPage() {
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-ui-black">Konto użytkownika</h2>
-                            <p className="text-xs text-ui-black/50">Zarządzaj danymi użytkownika i bezpieczeństwem.</p>
                         </div>
                     </div>
 
@@ -85,18 +85,12 @@ export default function KonfiguracjaPage() {
                     </div>
                 </div>
 
-                {/* SEKCJA 2: Parametry piekarni (Domyślne ustawienia) */}
-                <div className="bg-ui-white rounded-2xl p-6 shadow-sm border border-ui-accent hover:border-ui-secondary transition-all duration-300">
-                    <div className="flex items-center gap-3 mb-6 border-b border-ui-accent/30 pb-3">
-                        <div className="bg-ui-accent/20 p-2 rounded-lg text-ui-primary">
-                            <Sliders size={20} className="text-ui-secondary" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-ui-black">Sekcja 3</h2>
-                            <p className="text-xs text-ui-black/50">Sekcja 3.</p>
-                        </div>
-                    </div>
-                </div>
+                {/* SEKCJA 2: Zespół i pracownicy (Dostępna TYLKO dla Managerów i Administratorów) */}
+                {isManagerOrAdmin && (
+                    <ZespolSection />
+                )}
+
+
 
             </div>
         </div>

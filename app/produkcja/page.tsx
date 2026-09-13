@@ -7,21 +7,17 @@ import {
     Clock,
     Coins,
     Receipt,
-    PackageCheck,
     AlertCircle,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
     ChevronDown,
     ChevronUp,
-    Eye,
     Edit3,
     Layers,
     Wheat,
     Croissant,
     Pizza,
-    TrendingUp,
-    TrendingDown,
     List,
     CalendarDays,
     X,
@@ -30,14 +26,10 @@ import {
     Sparkles,
     AlertTriangle,
     Search,
-    ShoppingBag,
-    Boxes,
-    Percent,
     Copy,
     ArrowRight,
     CheckCheck,
-    Info,
-    Calendar,
+    FileText,
     Flame
 } from "lucide-react";
 
@@ -86,6 +78,7 @@ interface MonthStats {
 interface ProductionDetailItem {
     bakeryProductId: string;
     producedAmount: string;
+    leftoverAmount: string;
     soldAmount: string;
     soldOutTime: string;
 }
@@ -383,16 +376,28 @@ export default function ProdukcjaPage() {
                     );
 
                     let initProduced = "";
-                    if (existingProd && existingProd.producedAmount > 0) {
+                    if (existingProd && Number(existingProd.producedAmount) > 0) {
                         initProduced = String(existingProd.producedAmount);
                     } else if (prefillProducedMap && prefillProducedMap[prod.id] !== undefined) {
                         initProduced = String(prefillProducedMap[prod.id]);
                     }
 
+                    let initSold = "";
+                    let initLeftover = "";
+                    if (existingProd) {
+                        const pVal = Number(existingProd.producedAmount) || 0;
+                        const sVal = Number(existingProd.soldAmount) || 0;
+                        if (sVal > 0 || pVal > 0) {
+                            initSold = String(sVal);
+                            initLeftover = String(Math.max(0, Math.round((pVal - sVal) * 100) / 100));
+                        }
+                    }
+
                     itemsMap[prod.id] = {
                         bakeryProductId: prod.id,
                         producedAmount: initProduced,
-                        soldAmount: existingProd && existingProd.soldAmount > 0 ? String(existingProd.soldAmount) : "",
+                        leftoverAmount: initLeftover,
+                        soldAmount: initSold,
                         soldOutTime: data.soldOutTimes?.[prod.id] || existingProd?.soldOutTime || "",
                     };
                 });
@@ -410,13 +415,60 @@ export default function ProdukcjaPage() {
         field: keyof ProductionDetailItem,
         value: string
     ) => {
-        setFormItems((prev) => ({
-            ...prev,
-            [productId]: {
-                ...prev[productId],
-                [field]: value,
-            },
-        }));
+        setFormItems((prev) => {
+            const current = prev[productId] || {
+                bakeryProductId: productId,
+                producedAmount: "",
+                leftoverAmount: "",
+                soldAmount: "",
+                soldOutTime: "",
+            };
+
+            const updated = { ...current, [field]: value };
+
+            const parseNum = (val: string) => {
+                if (val === "" || val === undefined || val === null) return null;
+                const parsed = parseFloat(String(val).replace(",", "."));
+                return isNaN(parsed) ? null : parsed;
+            };
+
+            if (field === "leftoverAmount") {
+                const prod = parseNum(current.producedAmount);
+                const left = parseNum(value);
+                if (prod !== null && left !== null) {
+                    const sold = Math.max(0, Math.round((prod - left) * 100) / 100);
+                    updated.soldAmount = String(sold);
+                } else if (left === null && prod !== null && current.soldAmount === "") {
+                    updated.soldAmount = "";
+                }
+            } else if (field === "producedAmount") {
+                const prod = parseNum(value);
+                const left = parseNum(current.leftoverAmount);
+                const sold = parseNum(current.soldAmount);
+
+                if (prod !== null) {
+                    if (left !== null) {
+                        const newSold = Math.max(0, Math.round((prod - left) * 100) / 100);
+                        updated.soldAmount = String(newSold);
+                    } else if (sold !== null) {
+                        const newLeft = Math.max(0, Math.round((prod - sold) * 100) / 100);
+                        updated.leftoverAmount = String(newLeft);
+                    }
+                }
+            } else if (field === "soldAmount") {
+                const prod = parseNum(current.producedAmount);
+                const sold = parseNum(value);
+                if (prod !== null && sold !== null) {
+                    const left = Math.max(0, Math.round((prod - sold) * 100) / 100);
+                    updated.leftoverAmount = String(left);
+                }
+            }
+
+            return {
+                ...prev,
+                [productId]: updated,
+            };
+        });
     };
 
     const handleSaveReportForm = async () => {
@@ -425,8 +477,8 @@ export default function ProdukcjaPage() {
 
         const itemsPayload = Object.values(formItems).map((it) => ({
             bakeryProductId: it.bakeryProductId,
-            producedAmount: parseInt(it.producedAmount, 10) || 0,
-            soldAmount: parseInt(it.soldAmount, 10) || 0,
+            producedAmount: parseFloat(String(it.producedAmount).replace(",", ".")) || 0,
+            soldAmount: parseFloat(String(it.soldAmount).replace(",", ".")) || 0,
             soldOutTime: it.soldOutTime || null,
         }));
 
@@ -718,15 +770,15 @@ export default function ProdukcjaPage() {
                         Wprowadź raport dzienny
                     </button>
 
-                    <div className="flex items-center bg-white border border-ui-accent rounded-xl shadow-xs p-1">
+                    <div className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-accent/20 hover:bg-ui-accent/20 text-ui-primary px-4 py-1 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer">
                         <button
                             onClick={handlePrevMonth}
-                            className="p-1.5 hover:bg-ui-accent/15 rounded-lg text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
+                            className="p-2 hover:bg-ui-accent/15 rounded-lg text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
                             title="Poprzedni miesiąc"
                         >
                             <ChevronLeft size={16} />
                         </button>
-                        <span className="px-3 text-xs font-black text-ui-primary min-w-[120px] text-center">
+                        <span className="px-2 text-sm font-medium min-w-[120px] text-center">
                             {POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]} {currentMonth.split("-")[0]}
                         </span>
                         <button
@@ -741,23 +793,20 @@ export default function ProdukcjaPage() {
             </div>
 
             {/* ---------------- KARTY PODSUMOWANIA MIESIĄCA (KPI) ---------------- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
 
                 {/* KARTA 3: UTARG Z WYPIEKÓW */}
                 <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Wheat size={15} className="text-ui-primary" />
+                                <Coins size={15} className="text-ui-secondary" />
                                 Utarg ze sprzedaży wypieków
                             </span>
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl flex items-center justify-center font-black text-ui-primary tracking-tight">
                             {formatCurrency(stats.monthBakeryIncome)}
                         </div>
-                    </div>
-                    <div className="text-[11px] text-ui-secondary font-medium mt-2">
-                        Kasa fiskalna: <strong>{formatCurrency(stats.monthFiscalIncome)}</strong>
                     </div>
                 </div>
 
@@ -766,7 +815,7 @@ export default function ProdukcjaPage() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <CheckCircle2 size={15} className="text-emerald-600" />
+                                <CheckCircle2 size={15} className="text-ui-secondary" />
                                 Kompletność raportów
                             </span>
                         </div>
@@ -990,7 +1039,7 @@ export default function ProdukcjaPage() {
                                                                             className="p-1 hover:bg-amber-100 hover:text-amber-800 rounded-lg transition-colors cursor-pointer"
                                                                             title="Sugerowany plan produkcji na ten dzień"
                                                                         >
-                                                                            <Sparkles size={14} className="text-amber-600" />
+                                                                            <FileText size={14} className="text-ui-secondary" />
                                                                         </button>
                                                                     )}
                                                                     <span className="text-[10px] font-bold">{day.products?.length || 0}</span>
@@ -1013,9 +1062,9 @@ export default function ProdukcjaPage() {
                                                                                             e.stopPropagation();
                                                                                             openProductionPlanModal(day.date);
                                                                                         }}
-                                                                                        className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:text-amber-800 font-bold hover:underline cursor-pointer"
+                                                                                        className="inline-flex items-center gap-1 text-[11px] text-ui-secondary hover:text-ui-secondary font-bold hover:underline cursor-pointer"
                                                                                     >
-                                                                                        <Sparkles size={13} /> Sugerowany plan dla tej daty
+                                                                                        <FileText size={13} /> Sugerowany plan dla tej daty
                                                                                     </button>
                                                                                 )}
                                                                                 <button
@@ -1046,15 +1095,15 @@ export default function ProdukcjaPage() {
                                                                                     </thead>
                                                                                     <tbody className="divide-y divide-ui-accent/30">
                                                                                         {day.products.map((p) => {
-                                                                                            const unsold = p.producedAmount - p.soldAmount;
+                                                                                            const unsold = Math.max(0, Math.round((p.producedAmount - p.soldAmount) * 100) / 100);
                                                                                             return (
                                                                                                 <tr key={p.productId} className="hover:bg-ui-accent/5">
                                                                                                     <td className="p-2.5 font-bold text-ui-black">{p.productName}</td>
                                                                                                     <td className="p-2.5 text-right text-ui-secondary">{p.sellingPrice.toFixed(2)} zł</td>
-                                                                                                    <td className="p-2.5 text-right font-semibold text-ui-black">{p.producedAmount} szt.</td>
-                                                                                                    <td className="p-2.5 text-right font-black text-emerald-900">{p.soldAmount} szt.</td>
+                                                                                                    <td className="p-2.5 text-right font-semibold text-ui-black">{p.producedAmount.toLocaleString("pl-PL")} szt.</td>
+                                                                                                    <td className="p-2.5 text-right font-black text-emerald-900">{p.soldAmount.toLocaleString("pl-PL")} szt.</td>
                                                                                                     <td className="p-2.5 text-right font-medium text-rose-700">
-                                                                                                        {unsold > 0 ? `-${unsold} szt.` : "0"}
+                                                                                                        {unsold > 0 ? `-${unsold.toLocaleString("pl-PL")} szt.` : "0"}
                                                                                                     </td>
                                                                                                     <td className="p-2.5 text-center">
                                                                                                         {p.soldOutTime ? (
@@ -1306,9 +1355,6 @@ export default function ProdukcjaPage() {
                                 <Wheat size={16} className="text-ui-primary" />
                                 Ilość sztuk wyprodukowanych i sprzedanych w miesiącu
                             </h3>
-                            <p className="text-xs text-ui-secondary mt-0.5">
-                                Szczegółowe zestawienie wolumenów produkcji dla poszczególnych wyrobów piekarni
-                            </p>
                         </div>
                         <div className="text-xs text-ui-secondary font-medium">
                             Pozycji w zestawieniu: <strong className="text-ui-black">{filteredProductsRanking.length}</strong>
@@ -1325,7 +1371,7 @@ export default function ProdukcjaPage() {
                                     <th className="py-3 px-3.5 text-right">Cena sprzedaży</th>
                                     <th className="py-3 px-3.5 text-right">Wyprodukowano</th>
                                     <th className="py-3 px-3.5 text-right">Sprzedano</th>
-                                    <th className="py-3 px-3.5 text-right">Niesprzedane / zwroty</th>
+                                    <th className="py-3 px-3.5 text-right">Niesprzedane</th>
                                     <th className="py-3 px-3.5 text-center">Wskaźnik wyprzedania</th>
                                     <th className="py-3 px-3.5 text-right">Łączny utarg</th>
                                 </tr>
@@ -1489,7 +1535,7 @@ export default function ProdukcjaPage() {
                                     {hasData ? (
                                         <div className="space-y-0.5 text-right">
                                             <div className="text-[11px] font-bold text-ui-black">
-                                                {cell.dayData?.totalSold} / {cell.dayData?.totalProduced} szt.
+                                                {cell.dayData?.totalSold?.toLocaleString("pl-PL")} / {cell.dayData?.totalProduced?.toLocaleString("pl-PL")} szt.
                                             </div>
                                             <div className="text-xs font-black text-ui-primary">
                                                 {formatCurrency(cell.dayData?.bakerySalesIncome || 0)}
@@ -1530,9 +1576,7 @@ export default function ProdukcjaPage() {
                                     <Edit3 size={20} className="text-ui-primary" />
                                     Raport dzienny: {formatDate(formDate)}
                                 </h2>
-                                <p className="text-xs text-ui-secondary mt-0.5">
-                                    Wprowadź ilości wyprodukowane, sprzedane oraz godzinę wyprzedania
-                                </p>
+
                             </div>
                             <button
                                 onClick={() => setIsFormModalOpen(false)}
@@ -1552,9 +1596,7 @@ export default function ProdukcjaPage() {
                                     </div>
                                     <div>
                                         <div className="font-bold text-sm text-emerald-950">Łączny utarg z kasy fiskalnej</div>
-                                        <div className="text-[11px] text-emerald-800">
-                                            Wpisz całkowity utarg zarejestrowany na kasie za ten dzień
-                                        </div>
+
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1595,9 +1637,10 @@ export default function ProdukcjaPage() {
                                                 <thead>
                                                     <tr className="bg-ui-accent/5 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
                                                         <th className="p-2.5">Wyrób</th>
-                                                        <th className="p-2.5 text-right w-24">Cena</th>
+                                                        <th className="p-2.5 text-right w-20">Cena</th>
                                                         <th className="p-2.5 text-center w-28">Wyprodukowano</th>
-                                                        <th className="p-2.5 text-center w-28">Sprzedano</th>
+                                                        <th className="p-2.5 text-center w-28">Zostało (szt.)</th>
+                                                        <th className="p-2.5 text-center w-24">Sprzedano</th>
                                                         <th className="p-2.5 text-left w-36">Godzina wyprzedania</th>
                                                     </tr>
                                                 </thead>
@@ -1606,12 +1649,14 @@ export default function ProdukcjaPage() {
                                                         const it = formItems[prod.id] || {
                                                             bakeryProductId: prod.id,
                                                             producedAmount: "",
+                                                            leftoverAmount: "",
                                                             soldAmount: "",
                                                             soldOutTime: "",
                                                         };
-                                                        const prodAmt = parseInt(it.producedAmount, 10) || 0;
-                                                        const soldAmt = parseInt(it.soldAmount, 10) || 0;
-                                                        const isSoldOut = prodAmt > 0 && soldAmt >= prodAmt;
+                                                        const prodAmt = parseFloat(String(it.producedAmount).replace(",", ".")) || 0;
+                                                        const leftAmt = parseFloat(String(it.leftoverAmount).replace(",", ".")) || 0;
+                                                        const soldAmt = parseFloat(String(it.soldAmount).replace(",", ".")) || 0;
+                                                        const isSoldOut = prodAmt > 0 && (it.leftoverAmount === "0" || leftAmt === 0);
 
                                                         return (
                                                             <tr key={prod.id} className="hover:bg-ui-accent/5">
@@ -1620,6 +1665,7 @@ export default function ProdukcjaPage() {
                                                                 <td className="p-2.5 text-center">
                                                                     <input
                                                                         type="number"
+                                                                        step="0.5"
                                                                         min="0"
                                                                         placeholder="0"
                                                                         value={it.producedAmount}
@@ -1630,26 +1676,34 @@ export default function ProdukcjaPage() {
                                                                 <td className="p-2.5 text-center">
                                                                     <input
                                                                         type="number"
+                                                                        step="0.5"
                                                                         min="0"
                                                                         placeholder="0"
-                                                                        value={it.soldAmount}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "soldAmount", e.target.value)}
-                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-emerald-300 bg-emerald-50/50 font-black text-xs text-emerald-950 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                                                        value={it.leftoverAmount}
+                                                                        onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value)}
+                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-amber-300 bg-amber-50/60 font-bold text-xs text-amber-950 focus:outline-none focus:ring-1 focus:ring-amber-500"
                                                                     />
+                                                                </td>
+                                                                <td className="p-2.5 text-center">
+                                                                    {prodAmt > 0 ? (
+                                                                        <span className="inline-block px-2.5 py-1 rounded-lg bg-ui-secondary/5 text-ui-secondary font-black text-xs border border-ui-secondary/20">
+                                                                            {soldAmt.toLocaleString("pl-PL")} szt.
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-ui-secondary/40 text-xs">—</span>
+                                                                    )}
                                                                 </td>
                                                                 <td className="p-2.5">
                                                                     {isSoldOut ? (
                                                                         <div className="flex items-center gap-1.5">
-                                                                            <Clock size={13} className="text-emerald-700 shrink-0" />
+                                                                            <Clock size={13} className="text-ui-primary shrink-0" />
                                                                             <input
                                                                                 type="time"
                                                                                 value={it.soldOutTime}
                                                                                 onChange={(e) => handleFormItemChange(prod.id, "soldOutTime", e.target.value)}
-                                                                                className="px-2 py-0.5 rounded-lg border border-emerald-300 bg-emerald-100 text-xs font-bold text-emerald-950"
+                                                                                className="px-2 py-0.5 rounded-lg border border-ui-primary bg-ui-primary/10 text-xs font-bold text-ui-primary focus:outline-none focus:ring-1 focus:ring-ui-primary"
                                                                             />
                                                                         </div>
-                                                                    ) : prodAmt > 0 && soldAmt < prodAmt ? (
-                                                                        <span className="text-[11px] text-ui-secondary">Zostało: {prodAmt - soldAmt} szt.</span>
                                                                     ) : (
                                                                         <span className="text-[11px] text-ui-secondary/40">—</span>
                                                                     )}
@@ -1714,19 +1768,16 @@ export default function ProdukcjaPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Modala Planu */}
-                        <div className="p-6 border-b border-ui-accent bg-gradient-to-r from-ui-accent/20 via-white to-amber-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="p-6 border-b border-ui-accent  flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2.5">
-                                    <div className="p-2 bg-ui-primary text-white rounded-xl shadow-xs">
-                                        <Sparkles size={20} className="text-amber-300" />
+                                    <div className="bg-ui-accent/20 p-2.5 rounded-xl text-ui-primary">
+                                        <FileText size={24} />
                                     </div>
                                     <div>
                                         <h2 className="text-xl font-extrabold text-ui-black tracking-tight">
-                                            Sugerowany Plan Produkcji
+                                            Sugerowany plan produkcji
                                         </h2>
-                                        <p className="text-xs text-ui-secondary">
-                                            Algorytm prognozowania wolumenów na podstawie 4 ostatnich tygodni, godzin wyprzedania oraz analizy anomalii
-                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -1764,7 +1815,7 @@ export default function ProdukcjaPage() {
                                                 fetchProductionPlan(newD);
                                             }
                                         }}
-                                        className="text-xs font-bold px-2.5 py-1 rounded-lg border-l border-ui-accent text-ui-primary bg-transparent focus:outline-none"
+                                        className="text-xs font-bold px-2.5 py-1 rounded-lg text-ui-primary bg-transparent"
                                     />
                                 </div>
 
@@ -1801,41 +1852,19 @@ export default function ProdukcjaPage() {
                                 <>
                                     {/* 1. KARTY KPI PLANU */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        {/* Łączna liczba sztuk */}
-                                        <div className="bg-gradient-to-br from-ui-primary/5 to-ui-primary/10 border border-ui-primary/20 rounded-2xl p-4 flex flex-col justify-between">
-                                            <div className="text-[11px] uppercase font-bold text-ui-secondary flex items-center justify-between">
-                                                <span className="flex items-center gap-1.5 text-ui-primary">
-                                                    <PackageCheck size={16} /> Sugerowana produkcja
-                                                </span>
-                                                <span className="text-[10px] font-black bg-ui-primary text-white px-2 py-0.5 rounded-md">
-                                                    {planData.dayName}
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 text-3xl font-black text-ui-black tracking-tight">
-                                                {planData.totals?.totalUnits.toLocaleString("pl-PL")}{" "}
-                                                <span className="text-base font-bold text-ui-secondary">szt.</span>
-                                            </div>
-                                            <div className="text-[11px] text-ui-secondary mt-1">
-                                                Wypieki z {planData.totals?.productsCount || 0} pozycji asortymentowych
-                                            </div>
-                                        </div>
 
                                         {/* Szacowany utarg */}
-                                        <div className="bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border border-emerald-300 rounded-2xl p-4 flex flex-col justify-between">
-                                            <div className="text-[11px] uppercase font-bold text-emerald-800 flex items-center justify-between">
+                                        <div className=" bg-white border border-ui-accent rounded-2xl p-4 flex flex-col justify-between shadow-2xs">
+                                            <div className="text-[11px] uppercase font-bold text-ui-secondary flex items-center justify-between">
                                                 <span className="flex items-center gap-1.5">
                                                     <Receipt size={16} /> Szacowany utarg
                                                 </span>
-                                                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                                                    Cena detaliczna
-                                                </span>
+
                                             </div>
-                                            <div className="mt-2 text-3xl font-black text-emerald-950 tracking-tight">
+                                            <div className="mt-2 text-3xl font-black text-ui-primary tracking-tight">
                                                 {formatCurrency(planData.totals?.estimatedRevenue || 0)}
                                             </div>
-                                            <div className="text-[11px] text-emerald-800 mt-1">
-                                                Przy 100% zrealizowanej sprzedaży planu
-                                            </div>
+
                                         </div>
 
                                         {/* Szacowany koszt i marża */}
@@ -1845,11 +1874,8 @@ export default function ProdukcjaPage() {
                                                     <Coins size={16} /> Koszt surowcowy / Marża
                                                 </span>
                                             </div>
-                                            <div className="mt-2 text-2xl font-black text-ui-black tracking-tight">
+                                            <div className="mt-2 text-3xl font-black text-ui-primary tracking-tight">
                                                 {formatCurrency(planData.totals?.estimatedProfit || 0)}
-                                            </div>
-                                            <div className="text-[11px] text-ui-secondary mt-1">
-                                                Koszt recepturowy: <strong>{formatCurrency(planData.totals?.estimatedProductionCost || 0)}</strong>
                                             </div>
                                         </div>
 
@@ -1864,20 +1890,8 @@ export default function ProdukcjaPage() {
                                                     {planData.dataQuality?.availableWeeksCount || 0}/4 tyg.
                                                 </span>
                                             </div>
-                                            <div className="mt-2 text-xl font-extrabold text-ui-black">
-                                                {planData.dataQuality?.hasFullHistory ? (
-                                                    <span className="text-emerald-700 flex items-center gap-1.5">
-                                                        <CheckCircle2 size={18} /> Pełna historia
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-amber-700 flex items-center gap-1.5">
-                                                        <AlertTriangle size={18} /> Częściowe dane
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-[11px] text-ui-secondary mt-1">
-                                                {planData.dataQuality?.anomaliesCount ? `${planData.dataQuality.anomaliesCount} skorygowane anomalie` : "Wagi czasowe: 40/30/20/10%"}
-                                            </div>
+
+
                                         </div>
                                     </div>
 
@@ -1907,43 +1921,6 @@ export default function ProdukcjaPage() {
                                         </div>
                                     )}
 
-                                    {/* 3. PODSUMOWANIE ANALIZOWANYCH TYGODNI */}
-                                    <div className="bg-ui-accent/10 border border-ui-accent/40 rounded-2xl p-4">
-                                        <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider mb-2.5 flex items-center justify-between">
-                                            <span>Analizowane dni historyczne ({planData.dayName}):</span>
-                                            <span className="text-[10px] text-ui-secondary font-medium">
-                                                Śr. utarg historyczny: <strong>{formatCurrency(planData.dataQuality?.averageHistoricalIncome || 0)}</strong>
-                                            </span>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                            {planData.historicalWeeks?.map((hw) => (
-                                                <div
-                                                    key={hw.weekLabel}
-                                                    className={`bg-white border rounded-xl p-3 text-xs flex flex-col justify-between ${hw.isAnomaly
-                                                        ? "border-rose-300 bg-rose-50/20"
-                                                        : hw.hasData
-                                                            ? "border-ui-accent/60"
-                                                            : "border-dashed border-ui-accent/40 opacity-50"
-                                                        }`}
-                                                >
-                                                    <div className="flex items-center justify-between font-bold">
-                                                        <span className="text-ui-primary">{hw.weekLabel}</span>
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-ui-accent/20 text-ui-black">
-                                                            waga: {(hw.weight * 100).toFixed(0)}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="mt-1 font-semibold text-ui-black">{formatDate(hw.date)}</div>
-                                                    <div className="mt-1 text-[11px] text-ui-secondary flex items-center justify-between">
-                                                        <span>Utarg:</span>
-                                                        <strong className={hw.isAnomaly ? "text-rose-700" : "text-ui-primary"}>
-                                                            {hw.hasData ? formatCurrency(hw.effectiveIncome) : "Brak danych"}
-                                                        </strong>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
 
                                     {/* 4. FILTRY I WYSZUKIWARKA PRODUKTÓW W PLANIE */}
                                     <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -1988,11 +1965,10 @@ export default function ProdukcjaPage() {
                                                     <th className="p-3">Wyrób</th>
                                                     <th className="p-3">Kategoria</th>
                                                     <th className="p-3 text-right">Cena</th>
-                                                    <th className="p-3 text-right text-emerald-950 font-extrabold text-xs">
+                                                    <th className="p-3 text-right ">
                                                         Sugerowana produkcja
                                                     </th>
                                                     <th className="p-3 text-right">Szacowany utarg</th>
-                                                    <th className="p-3 text-center w-28">Szczegóły T-1..4</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-ui-accent/30 font-medium">

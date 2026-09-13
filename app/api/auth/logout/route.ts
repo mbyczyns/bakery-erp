@@ -7,12 +7,14 @@ export async function POST(request: NextRequest) {
         message: "Wylogowano pomyślnie",
     });
 
+    const isHttps = request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
+
     // Usunięcie ciasteczka
     response.cookies.set({
         name: AUTH_COOKIE_NAME,
         value: "",
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isHttps,
         sameSite: "lax",
         path: "/",
         maxAge: 0,

@@ -6,7 +6,7 @@ import {
     ArrowLeft, Loader2, Package, TrendingUp,
     ShoppingCart, Medal, History, Truck, Scale,
     ChevronDown, ChevronUp, CalendarDays, BarChart3,
-    Sparkles, ArrowRight
+    Sparkles, ArrowRight, Pencil, X, CheckCircle2
 } from "lucide-react";
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -44,36 +44,80 @@ export default function SkladnikDetailPage({
     const [showAllHistory, setShowAllHistory] = useState(false);
     const [isConsumptionModalOpen, setIsConsumptionModalOpen] = useState(false);
 
-    useEffect(() => {
-        const fetchIngredientDetails = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const res = await fetch(`/api/skladniki/${id}`);
-                if (!res.ok) {
-                    if (res.status === 404) {
-                        setError("Nie znaleziono wybranego składnika.");
-                    } else {
-                        const errJson = await res.json().catch(() => ({}));
-                        setError(errJson.error || "Wystąpił błąd podczas ładowania danych.");
-                    }
-                    setData(null);
-                    return;
-                }
-                const responseData = await res.json();
-                setData(responseData);
-            } catch (err) {
-                console.error("Błąd ładowania szczegółów:", err);
-                setError("Nie udało się połączyć z serwerem.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    // Stan edycji składnika
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editUnit, setEditUnit] = useState("kg");
+    const [editType, setEditType] = useState<string>("OTHER");
+    const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
+    const fetchIngredientDetails = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/skladniki/${id}`);
+            if (!res.ok) {
+                if (res.status === 404) {
+                    setError("Nie znaleziono wybranego składnika.");
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    setError(errJson.error || "Wystąpił błąd podczas ładowania danych.");
+                }
+                setData(null);
+                return;
+            }
+            const responseData = await res.json();
+            setData(responseData);
+            setEditName(responseData.name);
+            setEditUnit(responseData.unit || "kg");
+            setEditType(responseData.rawType || "OTHER");
+        } catch (err) {
+            console.error("Błąd ładowania szczegółów:", err);
+            setError("Nie udało się połączyć z serwerem.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
         if (id) {
             fetchIngredientDetails();
         }
     }, [id]);
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editName.trim()) {
+            alert("Wprowadź nazwę składnika.");
+            return;
+        }
+
+        setIsSubmittingEdit(true);
+        try {
+            const res = await fetch(`/api/skladniki/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: editName.trim(),
+                    unit: editUnit,
+                    type: editType,
+                }),
+            });
+
+            if (res.ok) {
+                setIsEditModalOpen(false);
+                await fetchIngredientDetails();
+            } else {
+                const err = await res.json();
+                alert(`Błąd: ${err.error || "Nie udało się zaktualizować składnika"}`);
+            }
+        } catch (err) {
+            console.error("Błąd aktualizacji:", err);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            setIsSubmittingEdit(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -120,7 +164,7 @@ export default function SkladnikDetailPage({
                             <h1 className="text-3xl font-bold text-ui-black tracking-tight">
                                 {data.name}
                             </h1>
-                            <div className="flex items-center gap-3 mt-2">
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
                                 <span className="text-xs font-bold text-ui-secondary bg-white px-3 py-1 rounded-lg border border-ui-accent shadow-sm tracking-wider">
                                     {data.type}
                                 </span>
@@ -134,9 +178,23 @@ export default function SkladnikDetailPage({
                                 )}
                             </div>
                         </div>
+
+                        <button
+                            onClick={() => {
+                                setEditName(data.name);
+                                setEditUnit(data.unit || "kg");
+                                setEditType(data.rawType || "OTHER");
+                                setIsEditModalOpen(true);
+                            }}
+                            className="flex items-center gap-2 border border-ui-accent bg-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-xs cursor-pointer self-start sm:self-center"
+                        >
+                            <Pencil size={15} />
+                            Edytuj składnik
+                        </button>
                     </div>
                 </div>
             </div>
+
 
             <div className="grid grid-cols-1 lg:grid-cols-3 col-span-2 gap-6 mb-6">
                 <div className="bg-white border border-ui-accent rounded-2xl shadow-sm flex flex-col h-full overflow-hidden">
@@ -339,6 +397,110 @@ export default function SkladnikDetailPage({
                 monthlyHistory={data.monthlyHistory || []}
                 productRanking={data.productRanking || []}
             />
+
+            {/* MODAL EDYCJI SKŁADNIKA */}
+            {isEditModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setIsEditModalOpen(false)}
+                >
+                    <div
+                        className="bg-ui-white w-full max-w-md rounded-2xl shadow-2xl border border-ui-accent overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                            <h2 className="text-base font-bold text-ui-black flex items-center gap-2">
+                                <Pencil size={18} className="text-ui-primary" />
+                                Edytuj składnik
+                            </h2>
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="p-1 rounded-full hover:bg-ui-accent/20 text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                    Nazwa składnika
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    className="w-full h-[42px] bg-ui-white border border-ui-accent rounded-xl px-4 text-sm focus:outline-none focus:border-ui-secondary transition-all font-medium"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                        Typ Składnika
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={editType}
+                                            onChange={(e) => setEditType(e.target.value)}
+                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
+                                        >
+                                            <option value="FLOUR">Mąka</option>
+                                            <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
+                                            <option value="DAIRY">Nabiał</option>
+                                            <option value="OTHER">Inne</option>
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                        Jednostka Miary
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={editUnit}
+                                            onChange={(e) => setEditUnit(e.target.value)}
+                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
+                                        >
+                                            <option value="kg">kg (kilogram)</option>
+                                            <option value="l">l (litr)</option>
+                                            <option value="szt">szt (sztuka)</option>
+                                            <option value="g">g (gram)</option>
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-ui-accent flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold text-xs hover:bg-ui-accent/30 transition-colors cursor-pointer"
+                                >
+                                    Anuluj
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingEdit}
+                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSubmittingEdit && <Loader2 size={14} className="animate-spin" />}
+                                    <CheckCircle2 size={16} />
+                                    Zapisz zmiany
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

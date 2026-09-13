@@ -10,38 +10,43 @@ export interface AuthUser {
 export const AUTH_COOKIE_NAME = "auth_token";
 const AUTH_SECRET = process.env.AUTH_SECRET || "mws-bakery-secret-key-2026-auth-token-salt";
 
-// Proste kodowanie i dekodowanie Base64URL bezpieczne dla Edge Runtime i Node.js
+// Proste kodowanie i dekodowanie Base64URL bezpieczne dla Edge Runtime, Browser i Node.js
 function toBase64Url(str: string): string {
-    if (typeof Buffer !== "undefined") {
-        return Buffer.from(str, "utf-8").toString("base64url");
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
     }
-    return btoa(unescape(encodeURIComponent(str)))
+    return btoa(binary)
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=+$/, "");
 }
 
 function fromBase64Url(b64url: string): string {
-    if (typeof Buffer !== "undefined") {
-        return Buffer.from(b64url, "base64url").toString("utf-8");
-    }
     const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
-    return decodeURIComponent(escape(atob(b64)));
+    const padded = b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, "=");
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const decoder = new TextDecoder();
+    return decoder.decode(bytes);
 }
 
-// Obliczenie podpisu HMAC-SHA256 za pomocą Web Crypto API (natywne w Edge i Node 18+)
+// Obliczenie podpisu HMAC-SHA256 za pomocą natywnego Web Crypto API (dostępne w Edge Runtime i Node.js 18+)
 async function getHmacSignature(data: string): Promise<string> {
     const encoder = new TextEncoder();
     const keyData = encoder.encode(AUTH_SECRET);
-    const cryptoObj = typeof globalThis !== "undefined" ? globalThis.crypto : null;
+    const cryptoSubtle = globalThis.crypto?.subtle;
 
-    if (!cryptoObj || !cryptoObj.subtle) {
-        // Fallback dla starszych środowisk z node:crypto
-        const nodeCrypto = await import("crypto");
-        return nodeCrypto.createHmac("sha256", AUTH_SECRET).update(data).digest("base64url");
+    if (!cryptoSubtle) {
+        throw new Error("Web Crypto API (crypto.subtle) is not available in this environment.");
     }
 
-    const cryptoKey = await cryptoObj.subtle.importKey(
+    const cryptoKey = await cryptoSubtle.importKey(
         "raw",
         keyData,
         { name: "HMAC", hash: "SHA-256" },
@@ -49,15 +54,21 @@ async function getHmacSignature(data: string): Promise<string> {
         ["sign"]
     );
 
-    const signatureBuffer = await cryptoObj.subtle.sign(
+    const signatureBuffer = await cryptoSubtle.sign(
         "HMAC",
         cryptoKey,
         encoder.encode(data)
     );
 
     const signatureArray = Array.from(new Uint8Array(signatureBuffer));
-    const base64 = btoa(String.fromCharCode(...signatureArray));
-    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    let binary = "";
+    for (let i = 0; i < signatureArray.length; i++) {
+        binary += String.fromCharCode(signatureArray[i]);
+    }
+    return btoa(binary)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
 }
 
 // Generowanie tokenu sesyjnego

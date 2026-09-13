@@ -182,9 +182,9 @@ export async function GET(request: NextRequest) {
 
                 const product = productMap.get(prod.bakeryProductId) || prod.bakeryProduct;
                 const price = Number(product?.sellingPrice || 0);
-                const produced = prod.producedAmount || 0;
-                const sold = prod.soldAmount || 0;
-                const income = sold * price;
+                const produced = Number(prod.producedAmount || 0);
+                const sold = Number(prod.soldAmount || 0);
+                const income = Math.round(sold * price * 100) / 100;
                 const soldOutTime = extras[dStr]?.soldOutTimes?.[prod.bakeryProductId] || prod.soldOutTime || "";
 
                 if (produced > 0 || sold > 0) {
@@ -377,8 +377,8 @@ export async function POST(request: NextRequest) {
 
         // 3. Zapis/Aktualizacja wpisów produkcji
         const operations = items.map((item: any) => {
-            const producedAmt = Math.max(0, parseInt(item.producedAmount, 10) || 0);
-            const soldAmt = Math.max(0, parseInt(item.soldAmount, 10) || 0);
+            const producedAmt = Math.max(0, parseFloat(String(item.producedAmount).replace(",", ".")) || 0);
+            const soldAmt = Math.max(0, parseFloat(String(item.soldAmount).replace(",", ".")) || 0);
 
             return prisma.dailyProduction.upsert({
                 where: {

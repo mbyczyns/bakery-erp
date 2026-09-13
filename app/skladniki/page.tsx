@@ -9,7 +9,8 @@ import {
     X,
     Filter,
     ChevronDown,
-    CheckCircle2
+    CheckCircle2,
+    Pencil
 } from "lucide-react";
 
 type IngredientType = "FLOUR" | "FRUIT" | "DAIRY" | "OTHER";
@@ -28,7 +29,7 @@ interface Ingredient {
 
 const TYPE_CONFIG: Record<IngredientType, { label: string; badge: string }> = {
     FLOUR: { label: "Mąka", badge: "bg-amber-50 text-amber-800 border-amber-200" },
-    FRUIT: { label: "Owoce / Warzywa", badge: "bg-green-50 text-green-800 border-green-300" },
+    FRUIT: { label: "Owoce/Warzywa/Bakalie", badge: "bg-green-50 text-green-800 border-green-300" },
     DAIRY: { label: "Nabiał", badge: "bg-blue-50 text-blue-800 border-blue-200" },
     OTHER: { label: "Inne", badge: "bg-gray-50 text-gray-700 border-gray-200" }
 };
@@ -45,6 +46,14 @@ export default function SkladnikiPage() {
     const [newIngredientUnit, setNewIngredientUnit] = useState("kg");
     const [newIngredientType, setNewIngredientType] = useState<IngredientType>("OTHER");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Stan edycji składnika
+    const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
+    const [editIngredientName, setEditIngredientName] = useState("");
+    const [editIngredientUnit, setEditIngredientUnit] = useState("kg");
+    const [editIngredientType, setEditIngredientType] = useState<IngredientType>("OTHER");
+    const [isEditingSubmitting, setIsEditingSubmitting] = useState(false);
+
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -108,6 +117,48 @@ export default function SkladnikiPage() {
         }
     };
 
+    const openEditModal = (item: Ingredient, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setEditingIngredient(item);
+        setEditIngredientName(item.name);
+        setEditIngredientUnit(item.unit || "kg");
+        setEditIngredientType(item.type || "OTHER");
+    };
+
+    const handleUpdateIngredient = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingIngredient || !editIngredientName.trim()) {
+            alert("Wprowadź nazwę składnika");
+            return;
+        }
+
+        setIsEditingSubmitting(true);
+        try {
+            const res = await fetch(`/api/skladniki/${editingIngredient.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: editIngredientName.trim(),
+                    unit: editIngredientUnit,
+                    type: editIngredientType,
+                }),
+            });
+
+            if (res.ok) {
+                setEditingIngredient(null);
+                await fetchData();
+            } else {
+                const err = await res.json();
+                alert(`Błąd: ${err.error || "Nie udało się zaktualizować składnika"}`);
+            }
+        } catch (error) {
+            console.error("Błąd podczas aktualizacji składnika:", error);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            setIsEditingSubmitting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
@@ -148,7 +199,7 @@ export default function SkladnikiPage() {
                         >
                             <option value="ALL">Wszystkie typy</option>
                             <option value="FLOUR">Mąki</option>
-                            <option value="FRUIT">Owoce / Warzywa</option>
+                            <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                             <option value="DAIRY">Nabiał</option>
                             <option value="OTHER">Inne</option>
                         </select>
@@ -159,28 +210,30 @@ export default function SkladnikiPage() {
                 </div>
             </div>
 
-            {/* Tabela składników z kolumną Typ i nowymi polami z faktur */}
+            {/* Tabela składników z kolumną Typ, Ceną i Akcjami edycji */}
             <div className="bg-ui-white border border-ui-accent rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[850px] text-left border-collapse table-fixed">
                         <colgroup>
+                            <col style={{ width: "25%" }} />
+                            <col style={{ width: "20%" }} />
                             <col style={{ width: "30%" }} />
                             <col style={{ width: "15%" }} />
-                            <col style={{ width: "35%" }} />
-                            <col style={{ width: "20%" }} />
+                            <col style={{ width: "10%" }} />
                         </colgroup>
                         <thead>
                             <tr className="bg-ui-accent/10 text-ui-secondary text-xs font-bold uppercase tracking-wider border-b border-ui-accent">
-                                <th className="p-4">Nazwa Składnika</th>
+                                <th className="p-4">Nazwa</th>
                                 <th className="p-4">Typ</th>
                                 <th className="p-4">Ostatni Dostawca</th>
                                 <th className="p-4 text-right">Cena</th>
+                                <th className="p-4 text-center">Akcje</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-ui-accent/40 text-sm">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={4} className="p-12 text-center text-ui-secondary">
+                                    <td colSpan={5} className="p-12 text-center text-ui-secondary">
                                         <div className="flex items-center justify-center gap-2">
                                             <Loader2 size={18} className="animate-spin text-emerald-600" />
                                             Pobieranie składników...
@@ -189,7 +242,7 @@ export default function SkladnikiPage() {
                                 </tr>
                             ) : filteredIngredients.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="p-8 text-center text-ui-secondary italic">
+                                    <td colSpan={5} className="p-8 text-center text-ui-secondary italic">
                                         Nie znaleziono składników.
                                     </td>
                                 </tr>
@@ -203,7 +256,7 @@ export default function SkladnikiPage() {
                                             className="hover:bg-ui-accent/5 transition-colors cursor-pointer group"
                                             onClick={() => router.push(`/skladniki/${item.id}`)}
                                         >
-                                            <td className="p-4 font-bold text-ui-black group-hover:text-ui-primary transition-colors">
+                                            <td className="p-4 text-ui-black group-hover:text-ui-primary transition-colors">
                                                 <div className="truncate pr-2">
                                                     {item.name}
                                                     <span className="ml-2 text-xs font-normal text-ui-secondary bg-ui-accent/30 px-2 py-0.5 rounded-md">
@@ -221,12 +274,12 @@ export default function SkladnikiPage() {
                                             <td className="p-4 truncate">
                                                 {item.lastSupplierName ? (
                                                     <div>
-                                                        <div className="font-semibold text-ui-primary truncate">
+                                                        <div className="text-ui-primary truncate">
                                                             {item.lastSupplierName}
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-ui-secondary  text-sm">Brak historii</span>
+                                                    <span className="text-ui-secondary text-sm">Brak historii</span>
                                                 )}
                                             </td>
 
@@ -240,6 +293,17 @@ export default function SkladnikiPage() {
                                                 ) : (
                                                     <span className="text-ui-secondary">—</span>
                                                 )}
+                                            </td>
+
+                                            <td className="p-4 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => openEditModal(item, e)}
+                                                    className="inline-flex items-center justify-center p-2 rounded-lg border border-ui-accent/60 bg-ui-white hover:bg-ui-accent/30 text-ui-secondary hover:text-ui-primary transition-all cursor-pointer shadow-2xs"
+                                                    title="Edytuj składnik"
+                                                >
+                                                    <Pencil size={15} />
+                                                </button>
                                             </td>
                                         </tr>
                                     );
@@ -260,11 +324,23 @@ export default function SkladnikiPage() {
                         className="bg-ui-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-ui-accent"
                         onClick={(e) => e.stopPropagation()}
                     >
+                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                            <h2 className="text-base font-bold text-ui-black flex items-center gap-2">
+                                <Plus size={18} className="text-ui-primary" />
+                                Dodaj nowy składnik
+                            </h2>
+                            <button
+                                onClick={() => setIsAddModalOpen(false)}
+                                className="p-1 rounded-full hover:bg-ui-accent/20 text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
 
                         <form onSubmit={handleAddIngredient} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
-                                    Nazwa
+                                    Nazwa składnika
                                 </label>
                                 <input
                                     type="text"
@@ -272,8 +348,7 @@ export default function SkladnikiPage() {
                                     placeholder="np. Mąka Pszenna Typ 750"
                                     value={newIngredientName}
                                     onChange={(e) => setNewIngredientName(e.target.value)}
-                                    // Ujednolicona wysokość i zaokrąglenia
-                                    className="w-full h-[42px] bg-ui-white border border-ui-accent rounded-xl px-4 text-sm focus:outline-none focus:border-ui-secondary transition-all"
+                                    className="w-full h-[42px] bg-ui-white border border-ui-accent rounded-xl px-4 text-sm focus:outline-none focus:border-ui-secondary transition-all font-medium"
                                 />
                             </div>
 
@@ -286,10 +361,10 @@ export default function SkladnikiPage() {
                                         <select
                                             value={newIngredientType}
                                             onChange={(e) => setNewIngredientType(e.target.value as IngredientType)}
-                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all"
+                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
                                         >
                                             <option value="FLOUR">Mąka</option>
-                                            <option value="FRUIT">Owoce / Warzywa</option>
+                                            <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
                                             <option value="OTHER">Inne</option>
                                         </select>
@@ -307,8 +382,7 @@ export default function SkladnikiPage() {
                                         <select
                                             value={newIngredientUnit}
                                             onChange={(e) => setNewIngredientUnit(e.target.value)}
-                                            // Dodane h-[42px], appearance-none, pr-10 i pogrubiona czcionka text-sm
-                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all"
+                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
                                         >
                                             <option value="kg">kg (kilogram)</option>
                                             <option value="l">l (litr)</option>
@@ -338,6 +412,110 @@ export default function SkladnikiPage() {
                                     {isSubmitting && <Loader2 size={14} className="animate-spin" />}
                                     <CheckCircle2 size={16} />
                                     Zapisz
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal edycji składnika */}
+            {editingIngredient && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setEditingIngredient(null)}
+                >
+                    <div
+                        className="bg-ui-white w-full max-w-md rounded-2xl shadow-2xl border border-ui-accent overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                            <h2 className="text-base font-bold text-ui-black flex items-center gap-2">
+                                <Pencil size={18} className="text-ui-primary" />
+                                Edytuj składnik
+                            </h2>
+                            <button
+                                onClick={() => setEditingIngredient(null)}
+                                className="p-1 rounded-full hover:bg-ui-accent/20 text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateIngredient} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                    Nazwa składnika
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editIngredientName}
+                                    onChange={(e) => setEditIngredientName(e.target.value)}
+                                    className="w-full h-[42px] bg-ui-white border border-ui-accent rounded-xl px-4 text-sm focus:outline-none focus:border-ui-secondary transition-all font-medium"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                        Typ Składnika
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={editIngredientType}
+                                            onChange={(e) => setEditIngredientType(e.target.value as IngredientType)}
+                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
+                                        >
+                                            <option value="FLOUR">Mąka</option>
+                                            <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
+                                            <option value="DAIRY">Nabiał</option>
+                                            <option value="OTHER">Inne</option>
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                        Jednostka Miary
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={editIngredientUnit}
+                                            onChange={(e) => setEditIngredientUnit(e.target.value)}
+                                            className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
+                                        >
+                                            <option value="kg">kg (kilogram)</option>
+                                            <option value="l">l (litr)</option>
+                                            <option value="szt">szt (sztuka)</option>
+                                            <option value="g">g (gram)</option>
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-ui-accent flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingIngredient(null)}
+                                    className="px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold text-xs hover:bg-ui-accent/30 transition-colors cursor-pointer"
+                                >
+                                    Anuluj
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isEditingSubmitting}
+                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    {isEditingSubmitting && <Loader2 size={14} className="animate-spin" />}
+                                    <CheckCircle2 size={16} />
+                                    Zapisz zmiany
                                 </button>
                             </div>
                         </form>

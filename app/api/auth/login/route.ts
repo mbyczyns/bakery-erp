@@ -75,11 +75,14 @@ export async function POST(request: NextRequest) {
             message: "Zalogowano pomyślnie",
         });
 
+        // Ciasteczko ma flagę secure tylko, gdy połączenie faktycznie używa HTTPS
+        const isHttps = request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
+
         response.cookies.set({
             name: AUTH_COOKIE_NAME,
             value: token,
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: isHttps,
             sameSite: "lax",
             path: "/",
             maxAge: 7 * 24 * 60 * 60, // 7 dni

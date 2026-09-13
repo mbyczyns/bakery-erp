@@ -10,7 +10,7 @@ const MONTH_NAMES = [
 
 const TYPE_MAP: Record<string, string> = {
     FLOUR: "Mąka",
-    FRUIT: "Owoce / Warzywa",
+    FRUIT: "Owoce/Warzywa/Bakalie",
     DAIRY: "Nabiał",
     OTHER: "Inne",
 };
@@ -752,4 +752,42 @@ export async function GET(
         );
     }
 }
+
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        const body = await request.json();
+        const { name, unit, type } = body;
+
+        if (!name || typeof name !== "string" || !name.trim()) {
+            return NextResponse.json({ error: "Nazwa składnika jest wymagana." }, { status: 400 });
+        }
+
+        const validTypes = ["FLOUR", "FRUIT", "DAIRY", "OTHER"];
+        const updatedType = validTypes.includes(type) ? type : "OTHER";
+
+        const updated = await prisma.ingredient.update({
+            where: { id },
+            data: {
+                name: name.trim(),
+                type: updatedType,
+                ...(unit ? { unit: unit.trim() } : {}),
+            },
+        });
+
+        return NextResponse.json(updated);
+    } catch (error: any) {
+        console.error("Błąd aktualizacji składnika:", error);
+        return NextResponse.json(
+            { error: "Nie udało się zaktualizować składnika", details: error.message },
+            { status: 500 }
+        );
+    }
+}
+
+export const PUT = PATCH;
+
 

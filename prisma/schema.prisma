@@ -244,12 +244,12 @@ model RecipeIngredient {
 model DailyProduction {
   id              String        @id @default(uuid())
   date            DateTime      @db.Date
-  producedAmount  Int           @default(0)
-  soldAmount      Int           @default(0)
+  producedAmount  Decimal       @default(0.00) @db.Decimal(10, 2)
+  soldAmount      Decimal       @default(0.00) @db.Decimal(10, 2)
   soldOutTime     String?
   bakeryProductId String
   bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id])
-  salesIncome     Int           @default(0)
+  salesIncome     Decimal       @default(0.00) @db.Decimal(10, 2)
 
   createdById     String?
   createdBy       User?         @relation(fields: [createdById], references: [id])

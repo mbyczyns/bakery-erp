@@ -287,17 +287,7 @@ export default function PrzepisyPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => {
-                            setCreationKind("SEMI_FINISHED");
-                            setBatchSize("1");
-                            setIsAddModalOpen(true);
-                        }}
-                        className="flex items-center justify-center gap-2 border border-ui-accent hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
-                    >
-                        <Layers size={18} />
-                        Nowy półprodukt
-                    </button>
+
                     <button
                         onClick={() => {
                             setCreationKind("PRODUCT");
@@ -305,10 +295,11 @@ export default function PrzepisyPage() {
                             setBatchSize("10");
                             setIsAddModalOpen(true);
                         }}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
+                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
                     >
-                        <Plus size={18} />
-                        Nowy Przepis
+
+
+                        Nowy przepis
                     </button>
                 </div>
             </div>
@@ -370,7 +361,7 @@ export default function PrzepisyPage() {
                             <th className="p-4 text-right">
                                 {activeTab === "SEMI_FINISHED" ? "Koszt wytworzenia" : "Cena Sprzedaży"}
                             </th>
-                            <th className="p-4 text-center">Akcja</th>
+                            <th className="p-4 text-center"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ui-accent/40 text-sm">
@@ -437,10 +428,10 @@ export default function PrzepisyPage() {
                                     }}
                                     className="hover:bg-ui-accent/10 transition-colors cursor-pointer group"
                                 >
-                                    <td className="p-4 font-bold text-ui-black group-hover:text-amber-800 transition-colors">
+                                    <td className="p-4 text-ui-black group-hover:text-ui-primary transition-colors">
                                         {recipe.name}
                                     </td>
-                                    <td className="p-4 text-right font-bold text-ui-black">
+                                    <td className="p-4 text-right text-ui-black">
                                         {Number(recipe.sellingPrice || 0).toFixed(2)} zł
                                     </td>
                                     <td className="p-4 text-center">
@@ -449,7 +440,7 @@ export default function PrzepisyPage() {
                                                 e.stopPropagation();
                                                 router.push(`/przepisy/${recipe.id}`);
                                             }}
-                                            className="flex items-center gap-1 mx-auto text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                            className="flex items-center gap-1 mx-auto text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
                                         >
                                             Foodcost & Marża
                                             <ChevronRight size={14} />
@@ -667,14 +658,14 @@ export default function PrzepisyPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Modalu */}
-                        <div className="px-6 py-4 border-b border-ui-accent flex items-center justify-between bg-amber-50/70">
+                        <div className="px-6 py-4 border-b border-ui-accent flex items-center justify-between bg-white">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-amber-100 rounded-xl text-amber-800 shadow-sm">
+                                <div className="p-2.5 bg-ui-accent/10 rounded-xl text-ui-primary shadow-sm">
                                     {creationKind === "PRODUCT" ? <ChefHat size={22} /> : <Layers size={22} />}
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-ui-black leading-tight">
-                                        {creationKind === "PRODUCT" ? "Nowy Przepis" : "Nowy Półprodukt"}
+                                        {creationKind === "PRODUCT" ? "Nowy przepis" : "Nowy półprodukt"}
                                     </h2>
 
                                 </div>
@@ -958,7 +949,7 @@ export default function PrzepisyPage() {
                                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                                 >
                                     {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-                                    {creationKind === "PRODUCT" ? "Zapisz Przepis" : "Zapisz Półprodukt"}
+                                    {creationKind === "PRODUCT" ? "Zapisz przepis" : "Zapisz półprodukt"}
                                 </button>
                             </div>
                         </form>

@@ -18,7 +18,9 @@ import {
     Trash2,
     Edit2,
     ArrowRightLeft,
-    AlertCircle
+    AlertCircle,
+    CheckCircle,
+    Sparkles
 } from "lucide-react";
 
 type InvoiceStatus = "WAITING" | "IMPORTED" | "REJECTED";
@@ -631,19 +633,19 @@ export default function FakturyPage() {
 
                                     return (
                                         <tr key={doc.id} className="hover:bg-ui-accent/5 transition-colors">
-                                            <td className="p-4 font-semibold text-ui-black text-sm text-left">
+                                            <td className="p-4  text-black text-sm text-left">
                                                 <div className="flex items-center gap-2">
                                                     {doc.docNumber}
                                                     {doc.type === "MANUAL" && (
-                                                        <span className="text-[9px] bg-ui-accent/20 text-ui-secondary border border-ui-accent/40 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                                        <span className="text-[9px] bg-ui-accent/20 text-ui-secondary border border-ui-accent/40 px-1.5 py-0.5 rounded  uppercase tracking-wider">
                                                             Ręczna
                                                         </span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="p-1 text-ui-primary font-medium text-sm max-w-xs truncate text-left">{doc.contractorName}</td>
-                                            <td className="p-4 text-ui-primary text-sm font-medium text-left">{formatDate(doc.issueDate)}</td>
-                                            <td className="p-4 text-left text-ui-black text-sm">{Number(doc.grossAmount || 0).toFixed(2)} zł</td>
+                                            <td className="p-1 text-black text-sm max-w-xs truncate text-left">{doc.contractorName}</td>
+                                            <td className="p-4 text-black text-sm owtext-left">{formatDate(doc.issueDate)}</td>
+                                            <td className="p-4 text-left text-black text-sm">{Number(doc.grossAmount || 0).toFixed(2)} zł</td>
                                             <td className="p-4 text-center">
                                                 {/* LOGIKA PRZYCISKÓW ZALEŻNA OD TRYBU FAKTURY */}
                                                 {invoiceDirection === "SALES" ? (
@@ -651,7 +653,7 @@ export default function FakturyPage() {
                                                     <button
                                                         onClick={() => loadInvoiceDetails(doc, "VIEW")}
                                                         disabled={isThisLoading}
-                                                        className="border border-ui-accent hover:bg-ui-accent/20 text-ui-primary text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
+                                                        className="border border-ui-accent hover:bg-ui-accent/20 text-black text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
                                                     >
                                                         {isThisLoading ? (
                                                             <Loader2 size={14} className="animate-spin" />
@@ -684,7 +686,7 @@ export default function FakturyPage() {
                                                         <button
                                                             onClick={() => loadInvoiceDetails(doc, "VIEW")}
                                                             disabled={isThisLoading}
-                                                            className="border border-ui-accent hover:bg-ui-accent/20 text-ui-primary text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-60"
+                                                            className="border border-ui-accent hover:bg-ui-accent/20 text-ui-black text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-60"
                                                             title="Podgląd"
                                                         >
                                                             {isThisLoading ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
@@ -703,7 +705,7 @@ export default function FakturyPage() {
                                                     <button
                                                         onClick={() => loadInvoiceDetails(doc, "VIEW")}
                                                         disabled={isThisLoading}
-                                                        className="border border-ui-accent hover:bg-ui-accent/20 text-ui-primary text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
+                                                        className="border border-ui-accent hover:bg-ui-accent/20 text-black text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
                                                     >
                                                         {isThisLoading ? (
                                                             <Loader2 size={14} className="animate-spin" />
@@ -858,6 +860,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
     const foodCategory = categories.find((c) => c.name.toLowerCase() === "produkty spożywcze");
     const defaultCategoryId = foodCategory?.id || categories[0]?.id || "";
 
+    const [bulkCategoryId, setBulkCategoryId] = useState(defaultCategoryId);
+
     const [mappingState, setMappingState] = useState<
         Record<string, { categoryId: string; ingredientId?: string; multiplier: string }>
     >(() => {
@@ -871,6 +875,24 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
         });
         return initialState;
     });
+
+    const handleApplyCategoryToAll = (targetCatId?: string) => {
+        const catToApply = targetCatId || bulkCategoryId;
+        if (!catToApply) return;
+        setMappingState((prev) => {
+            const next = { ...prev };
+            (doc.positions || []).forEach((pos) => {
+                const current = prev[pos.productId] || { categoryId: defaultCategoryId, multiplier: "1" };
+                next[pos.productId] = {
+                    ...current,
+                    categoryId: catToApply,
+                    ingredientId: catToApply === foodCategory?.id ? current.ingredientId : undefined,
+                    multiplier: "1",
+                };
+            });
+            return next;
+        });
+    };
 
     const handleCategoryChange = (productId: string, categoryId: string) => {
         setMappingState((prev) => ({
@@ -974,7 +996,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 
     const handleCreateIngredient = async (name: string, unit: string, type: string) => {
         try {
-            const res = await fetch("/api/ingredients", {
+            const res = await fetch("/api/skladniki", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, unit, type })
@@ -1042,7 +1064,39 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                 </div>
 
                 <div className="p-6 space-y-4 flex-1">
-                    {/* Baner informujący o nowych, niezmapowanych pozycjach */}
+                    {/* Szybkie przypisanie wybranej kategorii do wszystkich pozycji faktury */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-ui-accent/10 border border-ui-accent rounded-xl p-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-ui-primary">
+                            <Sparkles size={16} className="text-emerald-600 shrink-0" />
+                            <span>Szybkie oznaczenie wszystkich pozycji kategorią:</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="relative">
+                                <select
+                                    value={bulkCategoryId}
+                                    onChange={(e) => setBulkCategoryId(e.target.value)}
+                                    className="h-9 bg-white border border-ui-accent rounded-xl pl-3 pr-8 text-xs font-semibold text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer appearance-none shadow-2xs"
+                                >
+                                    {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                    <ChevronDown size={14} />
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleApplyCategoryToAll(bulkCategoryId)}
+                                className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            >
+                                <CheckCircle2 size={14} />
+                                Przypisz wszystkim
+                            </button>
+                        </div>
+                    </div>
 
                     <div className="border border-ui-accent rounded-xl shadow-sm overflow-visible">
                         <table className="w-full text-left text-xs border-collapse">
@@ -1180,7 +1234,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                             disabled={isSubmitting || isRejecting}
                             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
                         >
-                            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                             {doc.status === "IMPORTED" ? "Zapisz poprawki" : "Zatwierdź"}
                         </button>
                     </div>
@@ -1212,7 +1266,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                             className="w-full bg-ui-accent/10 rounded-lg px-3 py-2 text-sm font-semibold border border-transparent focus:border-ui-primary focus:outline-none transition-all appearance-none"
                                         >
                                             <option value="FLOUR">Mąka</option>
-                                            <option value="FRUIT">Owoce / Bakalie</option>
+                                            <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
                                             <option value="OTHER">Inne</option>
                                         </select>
@@ -1429,7 +1483,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
 
     const handleCreateIngredient = async (name: string, unit: string, type: string) => {
         try {
-            const res = await fetch("/api/ingredients", {
+            const res = await fetch("/api/skladniki", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, unit, type })
@@ -1710,7 +1764,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                                             className="w-full bg-ui-accent/10 rounded-lg px-3 py-2 text-sm font-semibold border border-transparent focus:border-ui-primary focus:outline-none transition-all appearance-none"
                                         >
                                             <option value="FLOUR">Mąka</option>
-                                            <option value="FRUIT">Owoce / Bakalie</option>
+                                            <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
                                             <option value="OTHER">Inne</option>
                                         </select>
