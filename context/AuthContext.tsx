@@ -28,12 +28,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    const triggerAutoKsefSync = () => {
+        try {
+            fetch("/api/faktury/sync-ksef", { method: "POST" }).catch(() => {});
+        } catch {
+            // ciche pominięcie
+        }
+    };
+
     const fetchMe = async () => {
         try {
             const res = await fetch("/api/auth/me");
             if (res.ok) {
                 const data = await res.json();
                 setUser(data.user);
+                if (data.user) {
+                    triggerAutoKsefSync();
+                }
             } else {
                 setUser(null);
             }
@@ -60,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (res.ok && data.success) {
                 setUser(data.user);
+                triggerAutoKsefSync();
                 // Używamy window.location.href, aby przeglądarka załadowała świeży stan sesji i ciasteczka
                 window.location.href = "/produkcja";
                 return { success: true };
@@ -95,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user.role === "ADMIN" || user.role === "MANAGER") return true;
 
         if (user.role === "BAKER") {
-            const allowed = ["/produkcja", "/skladniki", "/przepisy"];
+            const allowed = ["/produkcja", "/skladniki", "/przepisy", "/powiadomienia"];
             return allowed.some((p) => path.startsWith(p));
         }
 

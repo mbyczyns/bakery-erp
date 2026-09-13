@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { hashPasswordSHA512, verifyPasswordSHA512, createSessionToken, AUTH_COOKIE_NAME, AuthUser } from "@/lib/auth";
+import { syncKsefInvoices } from "@/lib/ksef-sync";
 
 const prisma = new PrismaClient();
 
@@ -67,6 +68,11 @@ export async function POST(request: NextRequest) {
         };
 
         const token = await createSessionToken(authUser);
+
+        // Automatyczne pobranie najnowszych faktur z KSeF w tle po poprawnym zalogowaniu
+        void syncKsefInvoices(false).catch((err) => {
+            console.error("[KSeF Auto-Sync on Login] Błąd w tle:", err);
+        });
 
         // Tworzymy odpowiedź i ustawiamy ciasteczko HTTP-Only
         const response = NextResponse.json({
