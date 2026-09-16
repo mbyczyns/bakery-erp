@@ -97,7 +97,7 @@ export default function LoginPage() {
             {/* Główna sekcja z formularzem logowania */}
             <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-8">
                 <div className="w-full max-w-md">
-                    <div className="bg-white border border-ui-accent rounded-3xl shadow-xl p-8 sm:p-10 space-y-7">
+                    <div className="bg-white border border-ui-accent rounded-2xl sm:rounded-3xl shadow-xl p-6 sm:p-10 space-y-6 sm:space-y-7">
                         {/* Nagłówek formularza */}
                         <div className="text-center space-y-2">
                             <h1 className="text-2xl sm:text-3xl font-extrabold text-ui-black tracking-tight">

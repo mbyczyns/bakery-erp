@@ -34,36 +34,36 @@ function FinanseContent() {
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20">
             {/* ---------------- GŁÓWNY NAGŁÓWEK STRONY FINANSE ---------------- */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-ui-black flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ui-black flex items-center gap-2.5 sm:gap-3">
                         Finanse
                     </h1>
                 </div>
 
                 {/* ---------------- GŁÓWNY PRZEŁĄCZNIK ZAKŁADEK (PRZYCHODY / KOSZTY) ---------------- */}
-                <div className="flex items-center p-1.5 bg-ui-accent/15 rounded-2xl border border-ui-accent/40 shadow-xs">
+                <div className="flex items-center p-1 sm:p-1.5 bg-ui-accent/15 rounded-2xl border border-ui-accent/40 shadow-xs w-full sm:w-auto">
                     <button
                         onClick={() => handleTabChange("PRZYCHODY")}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                             activeTab === "PRZYCHODY"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
                         }`}
                     >
-                        <TrendingUp size={18} className={activeTab === "PRZYCHODY" ? "text-emerald-600" : ""} />
-                        Przychody
+                        <TrendingUp size={16} className={activeTab === "PRZYCHODY" ? "text-emerald-600" : ""} />
+                        <span>Przychody</span>
                     </button>
                     <button
                         onClick={() => handleTabChange("KOSZTY")}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                             activeTab === "KOSZTY"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
                         }`}
                     >
-                        <TrendingDown size={18} className={activeTab === "KOSZTY" ? "text-rose-600" : ""} />
-                        Koszty
+                        <TrendingDown size={16} className={activeTab === "KOSZTY" ? "text-rose-600" : ""} />
+                        <span>Koszty</span>
                     </button>
                 </div>
             </div>

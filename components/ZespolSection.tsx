@@ -325,21 +325,21 @@ export default function ZespolSection() {
             )}
 
             {/* Nagłówek sekcji */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-ui-accent/30 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 border-b border-ui-accent/30 pb-3 sm:pb-4">
                 <div className="flex items-center gap-3">
-                    <div className="bg-ui-accent/20 p-2.5 rounded-xl text-ui-primary">
-                        <Users size={22} className="text-ui-secondary" />
+                    <div className="bg-ui-accent/20 p-2 sm:p-2.5 rounded-xl text-ui-primary shrink-0">
+                        <Users size={20} className="text-ui-secondary" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-ui-black">Pracownicy</h2>
+                        <h2 className="text-lg sm:text-xl font-bold text-ui-black">Pracownicy</h2>
                     </div>
                 </div>
 
                 <button
                     onClick={handleOpenAddModal}
-                    className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm cursor-pointer"
                 >
-                    <UserPlus size={18} />
+                    <UserPlus size={16} />
                     <span>Dodaj pracownika</span>
                 </button>
             </div>

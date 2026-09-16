@@ -161,23 +161,22 @@ export default function KontrahenciPage() {
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
 
             {/* Nagłówek */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">Dostawcy i kontrahenci</h1>
-
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">Dostawcy i kontrahenci</h1>
                 </div>
 
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                 >
-                    <Plus size={18} />
+                    <Plus size={16} />
                     <span>Dodaj kontrahenta</span>
                 </button>
             </div>
 
-            {/* Zakładki */}
-            <div className="flex gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto scrollbar-none">
+            {/* Zakładki (przewijane poziomo na mobile) */}
+            <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
                 {([
                     { type: "ALL", label: "Wszyscy" },
                     { type: "SUPPLIER", label: "Dostawcy" },
@@ -191,9 +190,9 @@ export default function KontrahenciPage() {
                         <button
                             key={tab.type}
                             onClick={() => setActiveTab(tab.type)}
-                            className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 whitespace-nowrap cursor-pointer
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0
                                 ${isActive
-                                    ? "border-ui-secondary text-ui-secondary"
+                                    ? "border-ui-secondary text-ui-secondary font-bold"
                                     : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >

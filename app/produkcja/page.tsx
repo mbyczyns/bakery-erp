@@ -745,40 +745,39 @@ export default function ProdukcjaPage() {
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20">
             {/* ---------------- NAGŁÓWEK STRONY ---------------- */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-ui-black flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ui-black flex items-center gap-2.5 sm:gap-3">
                         Produkcja i sprzedaż
                     </h1>
                 </div>
 
                 {/* Akcje nagłówka: Sugerowany plan, Nowy raport, Miesiąc */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     <button
                         onClick={() => openProductionPlanModal()}
-                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                     >
-                        Sugerowany plan produkcji
+                        Sugerowany plan
                     </button>
-
 
                     <button
                         onClick={() => openNewReportModal()}
-                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
                     >
                         <Plus size={16} />
-                        Wprowadź raport dzienny
+                        <span>Raport dzienny</span>
                     </button>
 
-                    <div className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-accent/20 hover:bg-ui-accent/20 text-ui-primary px-4 py-1 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer">
+                    <div className="w-full sm:w-auto flex items-center justify-between sm:justify-center gap-2 border border-ui-accent bg-ui-accent/20 text-ui-primary px-3 py-1.5 sm:py-1 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm">
                         <button
                             onClick={handlePrevMonth}
-                            className="p-2 hover:bg-ui-accent/15 rounded-lg text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-ui-accent/15 rounded-lg text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
                             title="Poprzedni miesiąc"
                         >
                             <ChevronLeft size={16} />
                         </button>
-                        <span className="px-2 text-sm font-medium min-w-[120px] text-center">
+                        <span className="px-2 text-xs sm:text-sm font-bold min-w-[110px] text-center">
                             {POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]} {currentMonth.split("-")[0]}
                         </span>
                         <button

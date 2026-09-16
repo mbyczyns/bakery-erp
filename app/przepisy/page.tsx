@@ -279,15 +279,14 @@ export default function PrzepisyPage() {
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
             {/* Nagłówek */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">
                         Przepisy i foodcosty
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-2">
-
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
                         onClick={() => {
                             setCreationKind("PRODUCT");
@@ -295,17 +294,16 @@ export default function PrzepisyPage() {
                             setBatchSize("10");
                             setIsAddModalOpen(true);
                         }}
-                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                     >
-
-
+                        <Plus size={16} />
                         Nowy przepis
                     </button>
                 </div>
             </div>
 
-            {/* Zakładki */}
-            <div className="flex flex-wrap border-b border-ui-accent mb-6 gap-2">
+            {/* Zakładki (przewijane poziomo na mobile) */}
+            <div className="flex border-b border-ui-accent mb-6 gap-1.5 sm:gap-2 overflow-x-auto pb-0.5">
                 {(
                     [
                         { id: "BREAD", label: "Chleby" },
@@ -325,14 +323,14 @@ export default function PrzepisyPage() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${isActive
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${isActive
                                 ? "border-amber-600 text-amber-900 bg-amber-50/70 rounded-t-xl font-bold"
                                 : "border-transparent text-ui-secondary hover:text-ui-primary"
-                                } ${tab.id === "SEMI_FINISHED" ? "ml-auto" : ""}`}
+                                } ${tab.id === "SEMI_FINISHED" ? "md:ml-auto" : ""}`}
                         >
-                            {tab.icon && <tab.icon size={16} />}
+                            {tab.icon && <tab.icon size={15} />}
                             {tab.label}
-                            <span className="bg-amber-200/80 text-amber-950 text-xs px-2 py-0.5 rounded-full font-bold ml-1">
+                            <span className="bg-amber-200/80 text-amber-950 text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold ml-1">
                                 {count}
                             </span>
                         </button>

@@ -161,41 +161,41 @@ export default function SkladnikiPage() {
 
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">
                         Baza składników
                     </h1>
                 </div>
 
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                 >
-                    <Plus size={18} />
+                    <Plus size={16} />
                     Nowy składnik
                 </button>
             </div>
 
             {/* Wyszukiwarka i filtr typów */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mb-6">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-3.5 text-ui-secondary" size={20} />
+                    <Search className="absolute left-4 top-3 text-ui-secondary" size={18} />
                     <input
                         type="text"
-                        placeholder="Wyszukaj ..."
+                        placeholder="Wyszukaj składnik..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-ui-white pl-12 pr-4 py-3 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary transition-all text-sm"
+                        className="w-full bg-ui-white pl-11 pr-4 py-2.5 sm:py-3 rounded-xl border border-ui-accent text-ui-primary shadow-xs focus:outline-none focus:border-ui-secondary transition-all text-sm"
                     />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <div className="relative">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-auto">
                         <select
                             value={selectedTypeFilter}
                             onChange={(e) => setSelectedTypeFilter(e.target.value as FilterType)}
-                            className="bg-ui-white border border-ui-accent text-ui-primary text-sm rounded-xl pl-4 pr-10 py-3 shadow-sm focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none"
+                            className="w-full sm:w-auto bg-ui-white border border-ui-accent text-ui-primary text-xs sm:text-sm rounded-xl pl-4 pr-10 py-2.5 sm:py-3 shadow-xs focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none"
                         >
                             <option value="ALL">Wszystkie typy</option>
                             <option value="FLOUR">Mąki</option>

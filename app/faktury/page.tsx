@@ -481,38 +481,38 @@ export default function FakturyPage() {
 
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">
                         Faktury
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Ukrywamy opcję dodawania ręcznego dla faktur sprzedażowych */}
                     {invoiceDirection === "COST" && (
                         <button
                             onClick={() => setIsManualModalOpen(true)}
-                            className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm cursor-pointer"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm cursor-pointer"
                         >
-                            <Plus size={18} />
+                            <Plus size={16} />
                             Dodaj ręcznie
                         </button>
                     )}
                     <button
                         onClick={handleSyncKsef}
                         disabled={isSyncing}
-                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                     >
                         {isSyncing ? (
                             <>
-                                <Loader2 size={18} className="animate-spin text-ui-secondary" />
-                                Pobieram z KSeF...
+                                <Loader2 size={16} className="animate-spin text-ui-secondary" />
+                                <span>Pobieram...</span>
                             </>
                         ) : (
                             <>
-                                <Download size={18} />
-                                Pobierz z KSeF
+                                <Download size={16} />
+                                <span>Pobierz z KSeF</span>
                             </>
                         )}
                     </button>
@@ -520,35 +520,35 @@ export default function FakturyPage() {
             </div>
 
             {/* GŁÓWNY PRZEŁĄCZNIK: Kosztowe vs Sprzedażowe */}
-            <div className="flex bg-ui-accent/20 p-1 rounded-xl w-fit mb-6 border border-ui-accent/40 shadow-sm">
+            <div className="flex bg-ui-accent/20 p-1 rounded-xl w-full sm:w-fit mb-6 border border-ui-accent/40 shadow-xs">
                 <button
                     onClick={() => setInvoiceDirection("COST")}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "COST" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "COST" ? "bg-ui-white text-ui-primary shadow-xs" : "text-ui-secondary hover:text-ui-primary"}`}
                 >
                     Kosztowe
                 </button>
                 <button
                     onClick={() => setInvoiceDirection("SALES")}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "SALES" ? "bg-ui-white text-ui-primary shadow-sm" : "text-ui-secondary hover:text-ui-primary"}`}
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${invoiceDirection === "SALES" ? "bg-ui-white text-ui-primary shadow-xs" : "text-ui-secondary hover:text-ui-primary"}`}
                 >
                     Sprzedażowe
                 </button>
             </div>
 
-            {/* ZAKŁADKI STATUSÓW (Tylko dla faktur Kosztowych) */}
+            {/* ZAKŁADKI STATUSÓW (Tylko dla faktur Kosztowych - przewijane poziomo na mobile) */}
             {invoiceDirection === "COST" && (
-                <div className="flex flex-wrap border-b border-ui-accent mb-6 gap-2">
+                <div className="flex border-b border-ui-accent mb-6 gap-1.5 sm:gap-2 overflow-x-auto pb-0.5">
                     <button
                         onClick={() => setActiveTab("WAITING")}
-                        className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "WAITING"
-                            ? "border-ui-accent text-ui-primary bg-ui-accent/20 rounded-t-xl"
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "WAITING"
+                            ? "border-ui-accent text-ui-primary bg-ui-accent/20 rounded-t-xl font-bold"
                             : "border-transparent text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
-                        <Clock size={16} />
+                        <Clock size={15} />
                         Do weryfikacji
                         {waitingCount > 0 && (
-                            <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
+                            <span className="bg-ui-accent/30 text-ui-primary text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
                                 {waitingCount}
                             </span>
                         )}
@@ -556,28 +556,28 @@ export default function FakturyPage() {
 
                     <button
                         onClick={() => setActiveTab("IMPORTED")}
-                        className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "IMPORTED"
-                            ? "border-emerald-600 text-emerald-800 bg-emerald-50/50 rounded-t-xl"
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "IMPORTED"
+                            ? "border-emerald-600 text-emerald-800 bg-emerald-50/50 rounded-t-xl font-bold"
                             : "border-transparent text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
-                        <CheckCircle2 size={16} />
+                        <CheckCircle2 size={15} />
                         Zaakceptowane
-                        <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
+                        <span className="bg-ui-accent/30 text-ui-primary text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
                             {importedCount}
                         </span>
                     </button>
 
                     <button
                         onClick={() => setActiveTab("REJECTED")}
-                        className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all cursor-pointer ${activeTab === "REJECTED"
-                            ? "border-rose-500 text-rose-700 bg-rose-50/50 rounded-t-xl"
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "REJECTED"
+                            ? "border-rose-500 text-rose-700 bg-rose-50/50 rounded-t-xl font-bold"
                             : "border-transparent text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
-                        <XCircle size={16} />
+                        <XCircle size={15} />
                         Odrzucone
-                        <span className="bg-ui-accent/30 text-ui-primary text-xs px-2 py-0.5 rounded-full font-bold">
+                        <span className="bg-ui-accent/30 text-ui-primary text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
                             {rejectedCount}
                         </span>
                     </button>
@@ -1067,8 +1067,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                     {/* Szybkie przypisanie wybranej kategorii do wszystkich pozycji faktury */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-ui-accent/10 border border-ui-accent rounded-xl p-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-ui-primary">
-                            <Sparkles size={16} className="text-emerald-600 shrink-0" />
-                            <span>Szybkie oznaczenie wszystkich pozycji kategorią:</span>
+
+                            <span>Oznacz wszystkie:</span>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <div className="relative">

@@ -15,10 +15,17 @@ import {
     Microwave,
     Milk,
     LogOut,
-    Bell
+    Bell,
+    X,
+    Wheat
 } from "lucide-react";
 
-export default function Sidebar() {
+interface SidebarProps {
+    isMobile?: boolean;
+    onCloseMobile?: () => void;
+}
+
+export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProps = {}) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [notificationsCount, setNotificationsCount] = useState<number>(0);
     const pathname = usePathname();
@@ -80,16 +87,42 @@ export default function Sidebar() {
     const roleBadge = getRoleBadge(user?.role);
 
     return (
-        <div className={`relative flex flex-col justify-between bg-ui-primary text-ui-white h-screen p-5 pt-8 duration-300 ${isCollapsed ? "w-20" : "w-68"}`}>
+        <div className={`relative flex flex-col justify-between bg-ui-primary text-ui-white h-screen p-5 pt-6 sm:pt-8 duration-300 ${isMobile ? "w-full" : isCollapsed ? "w-20" : "w-68"}`}>
 
-            {/* Przycisk do chowania / rozwijania */}
-            <button
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="absolute flex items-center justify-center -right-3 top-9 w-7 h-7 bg-ui-accent text-ui-primary rounded-full border-2 border-ui-primary cursor-pointer hover:bg-ui-accent duration-200 shadow-md z-20"
-                title={isCollapsed ? "Rozwiń menu" : "Zwiń menu"}
-            >
-                {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
+            {/* Nagłówek dla wersji mobilnej */}
+            {isMobile && (
+                <div className="flex items-center justify-between pb-5 mb-3 border-b border-ui-white/15">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-ui-accent text-ui-primary rounded-xl shadow-xs">
+                            <Wheat size={18} />
+                        </div>
+                        <div>
+                            <span className="font-extrabold text-sm text-white tracking-tight block">Piekarnia MWS</span>
+                            <span className="text-[10px] text-ui-white/60 font-semibold uppercase tracking-wider block">System ERP</span>
+                        </div>
+                    </div>
+                    {onCloseMobile && (
+                        <button
+                            onClick={onCloseMobile}
+                            className="p-2 text-ui-white/70 hover:text-white hover:bg-ui-white/10 rounded-xl transition-colors cursor-pointer"
+                            title="Zamknij menu"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Przycisk do chowania / rozwijania (tylko na desktopie) */}
+            {!isMobile && (
+                <button
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="absolute flex items-center justify-center -right-3 top-9 w-7 h-7 bg-ui-accent text-ui-primary rounded-full border-2 border-ui-primary cursor-pointer hover:bg-ui-accent duration-200 shadow-md z-20"
+                    title={isCollapsed ? "Rozwiń menu" : "Zwiń menu"}
+                >
+                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                </button>
+            )}
 
             {/* Lista sekcji (Główne linki) */}
             <div className="flex-1 overflow-y-auto">
@@ -105,17 +138,18 @@ export default function Sidebar() {
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                onClick={() => onCloseMobile?.()}
                                 className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${isActive
                                         ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
                                         : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
                                     }`}
-                                title={isCollapsed ? item.name : undefined}
+                                title={!isMobile && isCollapsed ? item.name : undefined}
                             >
                                 <div className="flex items-center gap-x-4 min-w-0">
                                     <div className="relative shrink-0">
                                         <Icon size={20} />
                                     </div>
-                                    <span className={`origin-left duration-200 whitespace-nowrap text-sm ${isCollapsed ? "scale-0 w-0 opacity-0 hidden" : "scale-100"}`}>
+                                    <span className={`origin-left duration-200 whitespace-nowrap text-sm ${!isMobile && isCollapsed ? "scale-0 w-0 opacity-0 hidden" : "scale-100"}`}>
                                         {item.name}
                                     </span>
                                 </div>
@@ -131,27 +165,28 @@ export default function Sidebar() {
                 {canAccessPath("/powiadomienia") && (
                     <Link
                         href="/powiadomienia"
+                        onClick={() => onCloseMobile?.()}
                         className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${isNotificationsActive
                                 ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
                                 : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
                             }`}
-                        title={isCollapsed ? (notificationsCount > 0 ? `Powiadomienia (${notificationsCount})` : "Powiadomienia") : undefined}
+                        title={!isMobile && isCollapsed ? (notificationsCount > 0 ? `Powiadomienia (${notificationsCount})` : "Powiadomienia") : undefined}
                     >
                         <div className="flex items-center gap-x-4 min-w-0">
                             <div className="relative shrink-0">
                                 <Bell size={20} />
-                                {notificationsCount > 0 && isCollapsed && (
+                                {notificationsCount > 0 && !isMobile && isCollapsed && (
                                     <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 text-white font-black text-[9px] rounded-full flex items-center justify-center animate-pulse shadow-sm">
                                         {notificationsCount > 9 ? "9+" : notificationsCount}
                                     </span>
                                 )}
                             </div>
-                            <span className={`origin-left duration-200 whitespace-nowrap text-sm ${isCollapsed ? "scale-0 w-0 opacity-0 hidden" : "scale-100"}`}>
+                            <span className={`origin-left duration-200 whitespace-nowrap text-sm ${!isMobile && isCollapsed ? "scale-0 w-0 opacity-0 hidden" : "scale-100"}`}>
                                 Powiadomienia
                             </span>
                         </div>
 
-                        {notificationsCount > 0 && !isCollapsed && (
+                        {notificationsCount > 0 && (isMobile || !isCollapsed) && (
                             <span className="px-2 py-0.5 rounded-full bg-rose-500/90 text-white font-black text-[10px] shadow-2xs">
                                 {notificationsCount}
                             </span>
@@ -162,7 +197,7 @@ export default function Sidebar() {
                 {/* Profil zalogowanego użytkownika i wylogowanie */}
                 {user && (
                     <div className="pt-1">
-                        {!isCollapsed ? (
+                        {isMobile || !isCollapsed ? (
                             <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-ui-white/5 border border-ui-white/10">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-black text-xs shrink-0">

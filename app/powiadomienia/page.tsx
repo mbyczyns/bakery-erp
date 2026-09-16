@@ -10,19 +10,10 @@ import {
     CheckCircle2,
     RotateCw,
     ArrowRight,
-    ArrowUpRight,
     ChefHat,
-    DollarSign,
-    Sparkles,
-    Calendar,
-    Building2,
     Clock,
     X,
-    Pencil,
     Loader2,
-    Check,
-    Tag,
-    Eye,
     ReceiptEuro
 } from "lucide-react";
 
@@ -114,20 +105,6 @@ export default function PowiadomieniaPage() {
     const [invoices, setInvoices] = useState<UnmappedInvoiceAlert[]>([]);
     const [priceAlerts, setPriceAlerts] = useState<PriceIncreaseAlert[]>([]);
 
-    // Modal szybkiej edycji ceny sprzedaży produktu
-    const [priceEditModal, setPriceEditModal] = useState<{
-        isOpen: boolean;
-        productId: string;
-        productName: string;
-        currentPrice: number;
-        suggestedPrice: number;
-        newPrice: string;
-        ingredientName: string;
-        costIncrease: number;
-    } | null>(null);
-    const [isSavingPrice, setIsSavingPrice] = useState(false);
-    const [priceSaveSuccess, setPriceSaveSuccess] = useState(false);
-
     const fetchNotifications = async (showRefreshAnim = false) => {
         if (showRefreshAnim) setIsRefreshing(true);
         else setIsLoading(true);
@@ -136,9 +113,24 @@ export default function PowiadomieniaPage() {
             const res = await fetch("/api/powiadomienia");
             if (res.ok) {
                 const data = await res.json();
-                setSummary(data.summary || { totalCount: 0, unmappedInvoicesCount: 0, priceAlertsCount: 0, affectedProductsCount: 0 });
-                setInvoices(data.unmappedInvoices || []);
-                setPriceAlerts(data.priceAlerts || []);
+                const fetchedPriceAlerts: PriceIncreaseAlert[] = (data.priceAlerts || []).filter(
+                    (p: PriceIncreaseAlert) => p.priceDifference > 0 && p.percentIncrease > 0
+                );
+                const fetchedInvoices: UnmappedInvoiceAlert[] = data.unmappedInvoices || [];
+                const activeInvCount = fetchedInvoices.filter((i) => !i.isDismissed).length;
+                const activePriceCount = fetchedPriceAlerts.filter((p) => !p.isDismissed).length;
+                const totalAffProd = fetchedPriceAlerts
+                    .filter((p) => !p.isDismissed)
+                    .reduce((sum, p) => sum + p.affectedProducts.length, 0);
+
+                setSummary({
+                    totalCount: activeInvCount + activePriceCount,
+                    unmappedInvoicesCount: activeInvCount,
+                    priceAlertsCount: activePriceCount,
+                    affectedProductsCount: totalAffProd,
+                });
+                setInvoices(fetchedInvoices);
+                setPriceAlerts(fetchedPriceAlerts);
             }
         } catch (error) {
             console.error("Błąd pobierania powiadomień:", error);
@@ -214,70 +206,25 @@ export default function PowiadomieniaPage() {
         }
     };
 
-    // Zapis nowej ceny sprzedaży produktu
-    const handleSaveNewProductPrice = async () => {
-        if (!priceEditModal) return;
-        const parsedPrice = parseFloat(priceEditModal.newPrice.replace(",", "."));
-        if (isNaN(parsedPrice) || parsedPrice < 0) {
-            alert("Wprowadź prawidłową cenę wyrobu.");
-            return;
-        }
-
-        setIsSavingPrice(true);
-        setPriceSaveSuccess(false);
-
-        try {
-            const res = await fetch(`/api/przepisy/${priceEditModal.productId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sellingPrice: parsedPrice }),
-            });
-
-            if (res.ok) {
-                setPriceSaveSuccess(true);
-                // Aktualizujemy lokalny stan wyrobów w alertach
-                setPriceAlerts((prev) =>
-                    prev.map((pa) => ({
-                        ...pa,
-                        affectedProducts: pa.affectedProducts.map((prod) =>
-                            prod.productId === priceEditModal.productId
-                                ? { ...prod, currentSellingPrice: parsedPrice }
-                                : prod
-                        ),
-                    }))
-                );
-
-                setTimeout(() => {
-                    setPriceEditModal(null);
-                    setPriceSaveSuccess(false);
-                }, 900);
-            } else {
-                const err = await res.json();
-                alert(`Błąd: ${err.error || "Nie udało się zaktualizować ceny"}`);
-            }
-        } catch (error) {
-            console.error("Błąd zapisu nowej ceny:", error);
-            alert("Błąd połączenia z serwerem.");
-        } finally {
-            setIsSavingPrice(false);
-        }
-    };
-
     const activeInvoices = invoices.filter((i) => !i.isDismissed);
-    const activePriceAlerts = priceAlerts.filter((p) => !p.isDismissed);
+    const activePriceAlerts = priceAlerts.filter(
+        (p) => !p.isDismissed && p.priceDifference > 0 && p.percentIncrease > 0
+    );
 
-    const hasAnyDismissed = invoices.some((i) => i.isDismissed) || priceAlerts.some((p) => p.isDismissed);
+    const hasAnyDismissed =
+        invoices.some((i) => i.isDismissed) ||
+        priceAlerts.some((p) => p.isDismissed && p.priceDifference > 0 && p.percentIncrease > 0);
 
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 max-w-7xl mx-auto">
             {/* ========================================================= */}
             {/* NAGŁÓWEK STRONY I AKCJE                                   */}
             {/* ========================================================= */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-ui-black flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black flex items-center gap-2.5 sm:gap-3">
                         <div className="relative">
-                            <Bell className="text-ui-primary" size={32} />
+                            <Bell className="text-ui-primary" size={28} />
                             {summary.totalCount > 0 && (
                                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-white animate-pulse" />
                             )}
@@ -286,11 +233,11 @@ export default function PowiadomieniaPage() {
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
                     {hasAnyDismissed && (
                         <button
                             onClick={handleRestoreAll}
-                            className="px-3.5 py-2 text-xs font-semibold text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20 rounded-xl transition-colors cursor-pointer border border-ui-accent"
+                            className="flex-1 sm:flex-none text-center px-3 py-2 text-xs font-semibold text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20 rounded-xl transition-colors cursor-pointer border border-ui-accent"
                         >
                             Przywróć ukryte
                         </button>
@@ -299,138 +246,138 @@ export default function PowiadomieniaPage() {
                     {summary.totalCount > 0 && (
                         <button
                             onClick={handleDismissAll}
-                            className="px-3.5 py-2 text-xs font-semibold text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20 rounded-xl transition-colors cursor-pointer border border-ui-accent"
+                            className="flex-1 sm:flex-none text-center px-3 py-2 text-xs font-semibold text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20 rounded-xl transition-colors cursor-pointer border border-ui-accent"
                         >
-                            Oznacz wszystkie jako przeczytane
+                            Oznacz jako przeczytane
                         </button>
                     )}
 
                     <button
                         onClick={() => fetchNotifications(true)}
                         disabled={isRefreshing || isLoading}
-                        className="flex items-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-semibold shadow-sm transition-all text-xs cursor-pointer disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-semibold shadow-xs transition-all text-xs cursor-pointer disabled:opacity-50"
                     >
-                        <RotateCw size={15} className={isRefreshing ? "animate-spin text-emerald-600" : ""} />
-                        Odśwież
+                        <RotateCw size={14} className={isRefreshing ? "animate-spin text-emerald-600" : ""} />
+                        <span>Odśwież</span>
                     </button>
                 </div>
             </div>
 
             {/* ========================================================= */}
-            {/* KARTY PODSUMOWUJĄCE (KPIs)                                */}
+            {/* KARTY PODSUMOWUJĄCE (KPIs) – 2x2 na mobile, 4 w rzędzie na desktop */}
             {/* ========================================================= */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
                 {/* Wszystkie powiadomienia */}
                 <div
                     onClick={() => setActiveTab("ALL")}
-                    className={`bg-white border rounded-2xl p-5 shadow-sm transition-all cursor-pointer ${activeTab === "ALL" ? "border-ui-primary ring-2 ring-ui-primary/20 bg-ui-primary/5" : "border-ui-accent hover:border-ui-secondary"}`}
+                    className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "ALL" ? "border-ui-primary ring-2 ring-ui-primary/20 bg-ui-primary/5" : "border-ui-accent hover:border-ui-secondary"}`}
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Wszystkie alerty</span>
-                        <div className="p-2.5 rounded-xl bg-ui-primary/10 text-ui-primary">
-                            <Bell size={20} />
+                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ui-secondary truncate">Wszystkie alerty</span>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-ui-primary/10 text-ui-primary shrink-0">
+                            <Bell size={18} />
                         </div>
                     </div>
-                    <div className="text-3xl font-black text-ui-black mt-2">
+                    <div className="text-2xl sm:text-3xl font-black text-ui-black mt-1 sm:mt-2">
                         {summary.totalCount}
                     </div>
-                    <div className="text-xs text-ui-secondary mt-1">
-                        {summary.totalCount === 0 ? "Brak aktywnych alertów" : "Wymagających Twojej reakcji"}
+                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                        {summary.totalCount === 0 ? "Brak aktywnych" : "Wymagających reakcji"}
                     </div>
                 </div>
 
                 {/* Faktury do zmapowania */}
                 <div
                     onClick={() => setActiveTab("INVOICES")}
-                    className={`bg-white border rounded-2xl p-5 shadow-sm transition-all cursor-pointer ${activeTab === "INVOICES" ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30" : "border-ui-accent hover:border-amber-300"}`}
+                    className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "INVOICES" ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30" : "border-ui-accent hover:border-amber-300"}`}
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Do zmapowania</span>
-                        <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800">
-                            <FileText size={20} />
+                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-amber-800 truncate">Do zmapowania</span>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-amber-100 text-amber-800 shrink-0">
+                            <FileText size={18} />
                         </div>
                     </div>
-                    <div className="text-3xl font-black text-ui-black mt-2">
+                    <div className="text-2xl sm:text-3xl font-black text-ui-black mt-1 sm:mt-2">
                         {summary.unmappedInvoicesCount}
                     </div>
-                    <div className="text-xs text-ui-secondary mt-1">
-                        Faktur oczekujących na weryfikację
+                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                        Faktur do weryfikacji
                     </div>
                 </div>
 
                 {/* Wzrosty cen składników */}
                 <div
                     onClick={() => setActiveTab("PRICE_INCREASES")}
-                    className={`bg-white border rounded-2xl p-5 shadow-sm transition-all cursor-pointer ${activeTab === "PRICE_INCREASES" ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30" : "border-ui-accent hover:border-rose-300"}`}
+                    className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "PRICE_INCREASES" ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30" : "border-ui-accent hover:border-rose-300"}`}
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-rose-800">Wzrosty cen surowców</span>
-                        <div className="p-2.5 rounded-xl bg-rose-100 text-rose-800">
-                            <TrendingUp size={20} />
+                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-rose-800 truncate">Wzrosty cen</span>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-rose-100 text-rose-800 shrink-0">
+                            <TrendingUp size={18} />
                         </div>
                     </div>
-                    <div className="text-3xl font-black text-rose-950 mt-2">
+                    <div className="text-2xl sm:text-3xl font-black text-rose-950 mt-1 sm:mt-2">
                         {summary.priceAlertsCount}
                     </div>
-                    <div className="text-xs text-ui-secondary mt-1">
-                        Składników z podwyższoną ceną
+                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                        Składników z podwyżką
                     </div>
                 </div>
 
                 {/* Wyroby do rekalkulacji */}
                 <div
                     onClick={() => setActiveTab("PRICE_INCREASES")}
-                    className="bg-white border border-ui-accent rounded-2xl p-5 shadow-sm hover:border-emerald-300 transition-all cursor-pointer"
+                    className="bg-white border border-ui-accent rounded-2xl p-3.5 sm:p-5 shadow-xs hover:border-emerald-300 transition-all cursor-pointer"
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Wyroby do rewizji cen</span>
-                        <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-800">
-                            <ChefHat size={20} />
+                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-emerald-800 truncate">Rewizja cen</span>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-100 text-emerald-800 shrink-0">
+                            <ChefHat size={18} />
                         </div>
                     </div>
-                    <div className="text-3xl font-black text-emerald-950 mt-2">
+                    <div className="text-2xl sm:text-3xl font-black text-emerald-950 mt-1 sm:mt-2">
                         {summary.affectedProductsCount}
                     </div>
-                    <div className="text-xs text-ui-secondary mt-1">
-                        Produktów dotkniętych podwyżkami
+                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                        Produktów do korekty
                     </div>
                 </div>
             </div>
 
             {/* ========================================================= */}
-            {/* ZAKŁADKI FILTROWANIA                                      */}
+            {/* ZAKŁADKI FILTROWANIA (Przewijany pasek na telefonach)      */}
             {/* ========================================================= */}
-            <div className="flex items-center gap-2 border-b border-ui-accent/60 pb-3 mb-6 overflow-x-auto">
+            <div className="flex items-center gap-1.5 sm:gap-2 border-b border-ui-accent/60 pb-3 mb-6 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab("ALL")}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${activeTab === "ALL"
-                        ? "bg-ui-primary text-white shadow-sm"
+                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "ALL"
+                        ? "bg-ui-primary text-white shadow-xs"
                         : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20"
                         }`}
                 >
-                    Wszystkie powiadomienia ({summary.totalCount})
+                    Wszystkie ({summary.totalCount})
                 </button>
 
                 <button
                     onClick={() => setActiveTab("INVOICES")}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${activeTab === "INVOICES"
-                        ? "bg-amber-600 text-white shadow-sm"
+                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeTab === "INVOICES"
+                        ? "bg-amber-600 text-white shadow-xs"
                         : "text-ui-secondary hover:text-amber-800 hover:bg-amber-50"
                         }`}
                 >
                     <FileText size={14} />
-                    Faktury do zmapowania ({summary.unmappedInvoicesCount})
+                    Faktury ({summary.unmappedInvoicesCount})
                 </button>
 
                 <button
                     onClick={() => setActiveTab("PRICE_INCREASES")}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${activeTab === "PRICE_INCREASES"
-                        ? "bg-rose-600 text-white shadow-sm"
+                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeTab === "PRICE_INCREASES"
+                        ? "bg-rose-600 text-white shadow-xs"
                         : "text-ui-secondary hover:text-rose-800 hover:bg-rose-50"
                         }`}
                 >
                     <TrendingUp size={14} />
-                    Wzrosty cen składników ({summary.priceAlertsCount})
+                    Wzrosty cen ({summary.priceAlertsCount})
                 </button>
             </div>
 
@@ -671,31 +618,13 @@ export default function PowiadomieniaPage() {
                                                                 </div>
                                                             </div>
 
-                                                            <div className="mt-3 pt-2 border-t border-ui-accent/30 flex items-center justify-between gap-2">
+                                                            <div className="mt-3 pt-2.5 border-t border-ui-accent/30">
                                                                 <button
                                                                     onClick={() => router.push(`/przepisy/${prod.productId}`)}
-                                                                    className="text-[11px] font-semibold text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                                                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
                                                                 >
-                                                                    Otwórz przepis
-                                                                </button>
-
-                                                                <button
-                                                                    onClick={() =>
-                                                                        setPriceEditModal({
-                                                                            isOpen: true,
-                                                                            productId: prod.productId,
-                                                                            productName: prod.productName,
-                                                                            currentPrice: prod.currentSellingPrice,
-                                                                            suggestedPrice: prod.suggestedSellingPrice,
-                                                                            newPrice: String(prod.suggestedSellingPrice),
-                                                                            ingredientName: pa.ingredientName,
-                                                                            costIncrease: prod.foodCostIncrease,
-                                                                        })
-                                                                    }
-                                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-                                                                >
-                                                                    <Pencil size={12} />
-                                                                    Zmień cenę
+                                                                    <span>Otwórz przepis i kalkulację foodcost</span>
+                                                                    <ArrowRight size={13} />
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -708,112 +637,6 @@ export default function PowiadomieniaPage() {
                             </div>
                         </div>
                     )}
-                </div>
-            )}
-
-            {/* ========================================================= */}
-            {/* MODAL SZYBKIEJ ZMIANY CENY SPRZEDAŻY WYROBU              */}
-            {/* ========================================================= */}
-            {priceEditModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
-                    onClick={() => setPriceEditModal(null)}
-                >
-                    <div
-                        className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-ui-accent overflow-hidden"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
-                            <h2 className="text-base font-bold text-ui-black flex items-center gap-2">
-                                <Tag size={18} className="text-ui-primary" />
-                                Zmiana ceny sprzedaży wyrobu
-                            </h2>
-                            <button
-                                onClick={() => setPriceEditModal(null)}
-                                className="p-1 rounded-full hover:bg-ui-accent/20 text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div className="bg-ui-accent/10 rounded-2xl p-4 border border-ui-accent/60">
-                                <div className="text-xs text-ui-secondary font-medium">Produkt:</div>
-                                <div className="text-lg font-bold text-ui-black">{priceEditModal.productName}</div>
-                                <div className="text-xs text-rose-700 font-semibold mt-1">
-                                    Powód: Wzrost ceny składnika <strong>{priceEditModal.ingredientName}</strong> (+{priceEditModal.costIncrease.toFixed(2)} zł/szt.)
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 text-xs">
-                                <div className="p-3 rounded-xl bg-ui-white border border-ui-accent">
-                                    <div className="text-ui-secondary">Dotychczasowa cena:</div>
-                                    <div className="text-base font-bold text-ui-black mt-0.5">
-                                        {priceEditModal.currentPrice.toFixed(2)} zł
-                                    </div>
-                                </div>
-                                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                                    <div className="text-emerald-800">Sugerowana nowa cena:</div>
-                                    <div className="text-base font-black text-emerald-950 mt-0.5">
-                                        {priceEditModal.suggestedPrice.toFixed(2)} zł
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
-                                    Nowa cena sprzedaży brutto (zł):
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.05"
-                                    min="0"
-                                    value={priceEditModal.newPrice}
-                                    onChange={(e) =>
-                                        setPriceEditModal({
-                                            ...priceEditModal,
-                                            newPrice: e.target.value,
-                                        })
-                                    }
-                                    className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-4 text-base font-black text-ui-black focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                                />
-                            </div>
-
-                            <div className="pt-4 border-t border-ui-accent flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setPriceEditModal(null)}
-                                    className="px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold text-xs hover:bg-ui-accent/30 transition-colors cursor-pointer"
-                                >
-                                    Anuluj
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={handleSaveNewProductPrice}
-                                    disabled={isSavingPrice}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${priceSaveSuccess ? "bg-emerald-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
-                                >
-                                    {isSavingPrice ? (
-                                        <>
-                                            <Loader2 size={14} className="animate-spin" />
-                                            Zapisywanie...
-                                        </>
-                                    ) : priceSaveSuccess ? (
-                                        <>
-                                            <Check size={14} />
-                                            Zaktualizowano cenę!
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle2 size={14} />
-                                            Zapisz nową cenę
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             )}
         </div>

@@ -453,8 +453,8 @@ export default function KosztyTab() {
                     <button
                         onClick={() => setView("MONTHLY_FORM")}
                         className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${view === "MONTHLY_FORM"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
                         <Calendar size={14} />
@@ -463,8 +463,8 @@ export default function KosztyTab() {
                     <button
                         onClick={() => setView("YEARLY_MATRIX")}
                         className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${view === "YEARLY_MATRIX"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
                         <CalendarDays size={14} />
@@ -473,8 +473,8 @@ export default function KosztyTab() {
                     <button
                         onClick={() => setView("CHARTS")}
                         className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${view === "CHARTS"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
                         <BarChart3 size={14} />
@@ -483,8 +483,8 @@ export default function KosztyTab() {
                     <button
                         onClick={() => setView("SETTINGS")}
                         className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${view === "SETTINGS"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
                             }`}
                     >
                         <Settings size={14} />
@@ -516,23 +516,22 @@ export default function KosztyTab() {
 
             {/* ---------------- KARTY PODSUMOWANIA KPI ---------------- */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
                 {/* KARTA 1: ŁĄCZNE KOSZTY FIRMY */}
-                <div className="bg-gradient-to-br from-ui-primary to-slate-900 text-white rounded-2xl p-5 shadow-sm">
-                    <div className="text-[11px] uppercase font-bold text-ui-accent tracking-wider flex items-center justify-between">
+                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                    <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                            <DollarSign size={15} className="text-ui-accent" />
-                            Łączne koszty firmy
+                            <DollarSign size={15} className="text-ui-primary" />
+                            Łączne koszty
                         </span>
-                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-md font-semibold">
+                        <span className="text-[10px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
                             {costData?.monthName}
                         </span>
                     </div>
-                    <div className="mt-2 text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                         {formatCurrency(liveGrandEnterpriseTotal)}
                     </div>
-                    <div className="text-[11px] text-ui-accent/80 mt-1 flex items-center justify-between font-medium">
-                        <span>Płace/ZUS/PIT + Faktury</span>
-                    </div>
+
                 </div>
 
                 {/* KARTA 2: KOSZTY POZAFAKTUROWE */}
@@ -547,12 +546,12 @@ export default function KosztyTab() {
                                 {liveGrandEnterpriseTotal > 0 ? Math.round((liveOpTotal / liveGrandEnterpriseTotal) * 100) : 0}%
                             </span>
                         </div>
-                        <div className="mt-2 text-xl font-black text-ui-black tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                             {formatCurrency(liveOpTotal)}
                         </div>
                     </div>
                     <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
-                        <span>Wypłaty, ZUS, PIT</span>
+
                         {costData?.stats?.momChangePercent !== 0 && (
                             <span className={costData?.stats?.momChangePercent > 0 ? "text-rose-600 font-bold" : "text-emerald-600 font-bold"}>
                                 {costData?.stats?.momChangePercent > 0 ? `+${costData.stats.momChangePercent}%` : `${costData.stats.momChangePercent}%`} MoM
@@ -566,20 +565,19 @@ export default function KosztyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Receipt size={15} className="text-emerald-600" />
+                                <Receipt size={15} className="text-ui-primary" />
                                 Faktury kosztowe
                             </span>
-                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
                                 {liveGrandEnterpriseTotal > 0 ? Math.round((invoicesGross / liveGrandEnterpriseTotal) * 100) : 0}%
                             </span>
                         </div>
-                        <div className="mt-2 text-xl font-black text-ui-black tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                             {formatCurrency(invoicesGross)}
                         </div>
                     </div>
                     <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
                         <span>Netto: {formatCurrency(invoicesNet)}</span>
-                        <span>{invoicesCount} dok.</span>
                     </div>
                 </div>
             </div>
@@ -596,9 +594,6 @@ export default function KosztyTab() {
                                         <Briefcase size={14} className="text-ui-primary" />
                                         Koszty pozafakturowe ({costData?.monthName})
                                     </h3>
-                                    <p className="text-[11px] text-ui-secondary mt-0.5">
-                                        Wypłaty, ZUS, PIT oraz kategorie własne
-                                    </p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <button
@@ -612,8 +607,8 @@ export default function KosztyTab() {
                                         onClick={handleSaveCosts}
                                         disabled={isSaving}
                                         className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xs transition-all cursor-pointer ${saveSuccess
-                                                ? "bg-emerald-600 hover:bg-emerald-700"
-                                                : "bg-ui-primary hover:bg-slate-900"
+                                            ? "bg-emerald-600 hover:bg-emerald-700"
+                                            : "bg-ui-primary hover:bg-slate-900"
                                             }`}
                                     >
                                         {isSaving ? (
@@ -672,14 +667,10 @@ export default function KosztyTab() {
                                             className="pt-2.5 first:pt-0 flex items-center justify-between gap-3 group"
                                         >
                                             <div className="flex items-center gap-2.5 min-w-0">
-                                                <div className="w-8 h-8 rounded-lg bg-ui-accent/15 text-ui-primary flex items-center justify-center shrink-0">
-                                                    <Icon size={15} />
-                                                </div>
+
                                                 <div className="truncate">
                                                     <div className="font-bold text-xs text-ui-black truncate">{type.name}</div>
-                                                    <div className="text-[10px] text-ui-secondary">
-                                                        {numVal > 0 ? `${share}% płac/ZUS/PIT` : "Brak kwoty"}
-                                                    </div>
+
                                                 </div>
                                             </div>
 
@@ -722,9 +713,7 @@ export default function KosztyTab() {
                                             <PieIcon size={16} className="text-ui-primary" />
                                             Struktura wszystkich kosztów ({costData?.monthName})
                                         </h3>
-                                        <p className="text-[11px] text-ui-secondary mt-0.5">
-                                            Pozafakturowe + Pozycje i kategorie z faktur
-                                        </p>
+
                                     </div>
 
                                     {/* Filtry wykresu kołowego */}
@@ -841,9 +830,7 @@ export default function KosztyTab() {
                                     <ShoppingBag size={15} className="text-emerald-600" />
                                     Podział pozycji z faktur kosztowych za {costData?.monthName} {costData?.year}
                                 </h3>
-                                <p className="text-[11px] text-ui-secondary mt-0.5">
-                                    Zestawienie kategorii produktów na fakturach zakupu
-                                </p>
+
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold text-ui-secondary">

@@ -243,10 +243,13 @@ export async function GET(request: NextRequest) {
                 previousPrice = Number(ing.calculatedPrice);
             }
 
-            // Sprawdzamy czy nastąpił wzrost ceny
+            // Sprawdzamy czy nastąpił faktyczny wzrost ceny (min. 0.01 zł oraz > 0.0%)
             if (previousPrice !== null && latest.unitPrice > previousPrice) {
                 const diff = Math.round((latest.unitPrice - previousPrice) * 100) / 100;
                 const pct = Math.round((diff / previousPrice) * 1000) / 10;
+
+                // Pomijamy jeśli wzrost po zaokrągleniu wynosi 0.00 zł lub 0.0%
+                if (diff <= 0 || pct <= 0) continue;
 
                 // Szukamy wszystkich wyrobów powiązanych z tym składnikiem
                 const affectedMap = new Map<

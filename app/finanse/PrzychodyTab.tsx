@@ -625,23 +625,20 @@ export default function PrzychodyTab() {
             </div>
 
             {/* ---------------- KARTY PODSUMOWANIA KPI ---------------- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* KARTA 1: CAŁKOWITY UTARG */}
                 <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                     <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                            <DollarSign size={15} className="text-ui-secondary" />
+                            <DollarSign size={15} className="text-ui-primary" />
                             Całkowity utarg
                         </span>
-                        <span className="text-[10px] text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md font-semibold">
+                        <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
                             {activeStats.daysCount} dni z raportem
                         </span>
                     </div>
                     <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                         {formatCurrency(activeStats.totalIncome)}
-                    </div>
-                    <div className="text-[11px] text-ui-secondary mt-1 flex items-center justify-between font-medium">
-                        <span>Śr. dzienna: <strong>{formatCurrency(activeStats.avgDailyIncome)}</strong></span>
                     </div>
                 </div>
 
@@ -650,27 +647,15 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Wheat size={15} className="text-ui-secondary" />
+                                <Wheat size={15} className="text-ui-primary" />
                                 Sprzedaż pieczywa
                             </span>
-                            <span className="text-[11px] font-black text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-md">
+                            <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
                                 {activeStats.bakerySharePercent}% utargu
                             </span>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                             {formatCurrency(activeStats.bakerySalesIncome)}
-                        </div>
-                    </div>
-                    <div className="mt-3">
-                        <div className="w-full bg-ui-accent/20 h-2 rounded-full overflow-hidden">
-                            <div
-                                className="bg-ui-primary h-full rounded-full transition-all duration-500"
-                                style={{ width: `${Math.min(activeStats.bakerySharePercent, 100)}%` }}
-                            />
-                        </div>
-                        <div className="text-[10px] text-ui-secondary mt-1 font-semibold flex justify-between">
-                            <span>Sprzedano: {activeStats.totalSold.toLocaleString("pl-PL")} szt.</span>
-                            <span>Wyprodukowano: {activeStats.totalProduced.toLocaleString("pl-PL")} szt.</span>
                         </div>
                     </div>
                 </div>
@@ -680,14 +665,14 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <ShoppingBag size={15} className="text-ui-secondary" />
+                                <ShoppingBag size={15} className="text-ui-primary" />
                                 Inne przychody
                             </span>
                             <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md border border-ui-accent/10">
                                 {activeStats.otherSharePercent}% utargu
                             </span>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-ui-black tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                             {formatCurrency(activeStats.otherIncome)}
                         </div>
                     </div>
