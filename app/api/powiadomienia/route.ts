@@ -355,23 +355,161 @@ export async function GET(request: NextRequest) {
         }
 
         // =========================================================================
-        // 3. STATYSTYKI I STRUMIEŃ POWIADOMIEŃ
+        // 3. ANALIZA ZUŻYCIA SUROWCÓW I PRZYPOMNIENIA O ZAMÓWIENIU (>= 80% ZUŻYCIA)
+        // =========================================================================
+        const allDailyProductions = await prisma.dailyProduction.findMany({
+            select: {
+                date: true,
+                producedAmount: true,
+                bakeryProductId: true,
+            },
+        });
+
+        const orderReminders: Array<{
+            id: string;
+            ingredientId: string;
+            ingredientName: string;
+            ingredientUnit: string;
+            lastPurchaseDate: string;
+            lastPurchaseQuantity: number;
+            consumedQuantity: number;
+            remainingQuantity: number;
+            percentUsed: number;
+            lastSupplierName: string;
+            lastInvoiceNumber: string;
+            isDismissed: boolean;
+        }> = [];
+
+        for (const ing of ingredients) {
+            // Zbieramy wszystkie dostawy tego surowca
+            const deliveries: Array<{
+                date: string;
+                rawDate: Date;
+                quantity: number;
+                supplierName: string;
+                invoiceNumber: string;
+            }> = [];
+
+            for (const prod of ing.products) {
+                const multiplier = Number(prod.multiplier || 1) || 1;
+                for (const pos of prod.invoicePositions) {
+                    if (pos.invoice?.status === "REJECTED" || (pos.invoice as any)?.isSales) continue;
+                    if (!pos.invoice?.issuedDate) continue;
+
+                    const qty = Number(pos.quantity || 0) * multiplier;
+                    if (qty <= 0) continue;
+
+                    deliveries.push({
+                        date: new Date(pos.invoice.issuedDate).toISOString().split("T")[0],
+                        rawDate: new Date(pos.invoice.issuedDate),
+                        quantity: qty,
+                        supplierName:
+                            customNamesMap[pos.invoice.contractorId] ||
+                            pos.invoice.contractor?.name ||
+                            prod.supplier?.name ||
+                            "Dostawca",
+                        invoiceNumber: pos.invoice.invoiceNumber,
+                    });
+                }
+            }
+
+            deliveries.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
+
+            if (deliveries.length === 0) continue;
+
+            const latestDelivery = deliveries[0];
+            const latestPurchaseDateStr = latestDelivery.date;
+
+            // Sumujemy zakupy z dnia ostatniej dostawy
+            const latestPurchases = deliveries.filter((d) => d.date === latestPurchaseDateStr);
+            const latestPurchaseQuantity = latestPurchases.reduce((sum, d) => sum + d.quantity, 0);
+
+            if (latestPurchaseQuantity <= 0) continue;
+
+            // Sumujemy zużycie tego surowca w produkcji od daty ostatniego zakupu
+            let consumedSincePurchase = 0;
+
+            // A. Bezpośrednie użycie w recepturach wyrobów
+            for (const ri of ing.recipeIngredients || []) {
+                const bpId = ri.bakeryProductId;
+                const amountPerUnit = Number(ri.amount || 0);
+                if (amountPerUnit <= 0) continue;
+
+                for (const dp of allDailyProductions) {
+                    if (dp.bakeryProductId === bpId) {
+                        const dpDateStr = new Date(dp.date).toISOString().split("T")[0];
+                        if (dpDateStr >= latestPurchaseDateStr) {
+                            consumedSincePurchase += Number(dp.producedAmount || 0) * amountPerUnit;
+                        }
+                    }
+                }
+            }
+
+            // B. Pośrednie użycie przez półprodukty
+            for (const sfi of ing.semiFinishedIngredients || []) {
+                const amountPerSemi = Number(sfi.amount || 0);
+                if (amountPerSemi <= 0 || !sfi.semiFinished) continue;
+
+                for (const br of sfi.semiFinished.bakeryRecipes || []) {
+                    const bpId = br.bakeryProductId;
+                    const brAmount = Number(br.amount || 0);
+                    const effectiveAmount = amountPerSemi * brAmount;
+                    if (effectiveAmount <= 0) continue;
+
+                    for (const dp of allDailyProductions) {
+                        if (dp.bakeryProductId === bpId) {
+                            const dpDateStr = new Date(dp.date).toISOString().split("T")[0];
+                            if (dpDateStr >= latestPurchaseDateStr) {
+                                consumedSincePurchase += Number(dp.producedAmount || 0) * effectiveAmount;
+                            }
+                        }
+                    }
+                }
+            }
+
+            const percentUsed = (consumedSincePurchase / latestPurchaseQuantity) * 100;
+
+            // Jeśli zużyto >= 80% surowca z ostatniego zakupu
+            if (percentUsed >= 80) {
+                const alertId = `order-${ing.id}-${latestPurchaseDateStr}`;
+                orderReminders.push({
+                    id: alertId,
+                    ingredientId: ing.id,
+                    ingredientName: ing.name,
+                    ingredientUnit: ing.unit,
+                    lastPurchaseDate: latestPurchaseDateStr,
+                    lastPurchaseQuantity: Math.round(latestPurchaseQuantity * 100) / 100,
+                    consumedQuantity: Math.round(consumedSincePurchase * 100) / 100,
+                    remainingQuantity: Math.max(0, Math.round((latestPurchaseQuantity - consumedSincePurchase) * 100) / 100),
+                    percentUsed: Math.round(percentUsed * 10) / 10,
+                    lastSupplierName: latestDelivery.supplierName,
+                    lastInvoiceNumber: latestDelivery.invoiceNumber,
+                    isDismissed: dismissedIds.has(alertId),
+                });
+            }
+        }
+
+        // =========================================================================
+        // 4. STATYSTYKI I STRUMIEŃ POWIADOMIEŃ
         // =========================================================================
         const activeUnmappedCount = unmappedInvoiceAlerts.filter((a) => !a.isDismissed).length;
         const activePriceAlertsCount = priceAlerts.filter((a) => !a.isDismissed).length;
+        const activeOrderRemindersCount = orderReminders.filter((a) => !a.isDismissed).length;
         const totalAffectedProducts = priceAlerts
             .filter((a) => !a.isDismissed)
             .reduce((sum, a) => sum + a.affectedProducts.length, 0);
 
         return NextResponse.json({
             summary: {
-                totalCount: activeUnmappedCount + activePriceAlertsCount,
+                totalCount: activeUnmappedCount + activePriceAlertsCount + activeOrderRemindersCount,
                 unmappedInvoicesCount: activeUnmappedCount,
                 priceAlertsCount: activePriceAlertsCount,
+                orderRemindersCount: activeOrderRemindersCount,
                 affectedProductsCount: totalAffectedProducts,
             },
             unmappedInvoices: unmappedInvoiceAlerts,
             priceAlerts,
+            orderReminders,
         });
     } catch (error: any) {
         console.error("Błąd pobierania powiadomień:", error);

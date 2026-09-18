@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
                         product: {
                             include: {
                                 category: true,
+                                ingredient: true,
                             },
                         },
                     },
@@ -128,6 +129,34 @@ export async function GET(request: NextRequest) {
         let monthInvoicesCount = 0;
 
         const invoiceCategoryMap = new Map<string, { name: string; gross: number; net: number; count: number; itemsCount: number }>();
+
+        // Mapa podkategorii dla produktów spożywczych: key -> subcategory
+        const foodSubcategoryMap = new Map<string, {
+            key: string;
+            name: string;
+            gross: number;
+            net: number;
+            count: number;
+            itemsMap: Map<string, { name: string; gross: number; net: number; quantity: number; unit: string; count: number }>;
+        }>();
+
+        let foodGrossTotal = 0;
+        let foodNetTotal = 0;
+
+        // Pomocnicza funkcja kategoryzująca surowce spożywcze wg typów w bazie danych: FLOUR, FRUIT, DAIRY, OTHER
+        const getFoodSubcategoryInfo = (pos: any): { key: string; label: string } => {
+            const ingType = pos.product?.ingredient?.type;
+            if (ingType === "FLOUR") {
+                return { key: "FLOUR", label: "Mąka" };
+            }
+            if (ingType === "FRUIT") {
+                return { key: "FRUIT", label: "Owoce/Warzywa/Bakalie" };
+            }
+            if (ingType === "DAIRY") {
+                return { key: "DAIRY", label: "Nabiał" };
+            }
+            return { key: "OTHER", label: "Inne" };
+        };
 
         // Miesięczne sumy faktur w roku (12 miesięcy)
         const yearMonthlyInvoicesGross = new Array(12).fill(0);
@@ -156,6 +185,8 @@ export async function GET(request: NextRequest) {
                     inv.positions.forEach((pos) => {
                         const posGross = Number(pos.grossAmount || 0);
                         const posNet = Number(pos.netAmount || 0);
+                        const posQty = Number(pos.quantity || 1);
+                        const posUnit = pos.unit || pos.product?.unit || "szt";
 
                         // Kategoria pozycji z tabeli ProductCategory
                         const catName = pos.product?.category?.name || "Bez kategorii";
@@ -165,6 +196,46 @@ export async function GET(request: NextRequest) {
                         existing.net += posNet;
                         existing.itemsCount += 1;
                         invoiceCategoryMap.set(catName, existing);
+
+                        // Agregacja podkategorii spożywczych
+                        const isFood = catName.toLowerCase().includes("spożywcz") || catName.toLowerCase().includes("zywnosc") || !!pos.product?.ingredientId;
+                        if (isFood) {
+                            foodGrossTotal += posGross;
+                            foodNetTotal += posNet;
+
+                            const subcatInfo = getFoodSubcategoryInfo(pos);
+                            const existingSubcat = foodSubcategoryMap.get(subcatInfo.key) || {
+                                key: subcatInfo.key,
+                                name: subcatInfo.label,
+                                gross: 0,
+                                net: 0,
+                                count: 0,
+                                itemsMap: new Map(),
+                            };
+
+                            existingSubcat.gross += posGross;
+                            existingSubcat.net += posNet;
+                            existingSubcat.count += 1;
+
+                            // Pozycja surowca
+                            const itemName = pos.product?.ingredient?.name || pos.product?.name || pos.name || "Nieznany surowiec";
+                            const itemKey = itemName.toLowerCase().trim();
+                            const existingItem = existingSubcat.itemsMap.get(itemKey) || {
+                                name: itemName,
+                                gross: 0,
+                                net: 0,
+                                quantity: 0,
+                                unit: posUnit,
+                                count: 0,
+                            };
+                            existingItem.gross += posGross;
+                            existingItem.net += posNet;
+                            existingItem.quantity += posQty;
+                            existingItem.count += 1;
+                            existingSubcat.itemsMap.set(itemKey, existingItem);
+
+                            foodSubcategoryMap.set(subcatInfo.key, existingSubcat);
+                        }
                     });
                 } else {
                     const catName = "Bez kategorii";
@@ -177,12 +248,34 @@ export async function GET(request: NextRequest) {
             }
         });
 
+        // Przetworzone podkategorie spożywcze
+        const foodSubcategories = Array.from(foodSubcategoryMap.values()).map((subcat) => {
+            const itemsList = Array.from(subcat.itemsMap.values()).map((item) => ({
+                ...item,
+                gross: Math.round(item.gross * 100) / 100,
+                net: Math.round(item.net * 100) / 100,
+                quantity: Math.round(item.quantity * 100) / 100,
+            })).sort((a, b) => b.gross - a.gross);
+
+            return {
+                key: subcat.key,
+                name: subcat.name,
+                gross: Math.round(subcat.gross * 100) / 100,
+                net: Math.round(subcat.net * 100) / 100,
+                count: subcat.count,
+                sharePercent: foodGrossTotal > 0 ? Math.round((subcat.gross / foodGrossTotal) * 1000) / 10 : 0,
+                items: itemsList,
+            };
+        }).sort((a, b) => b.gross - a.gross);
+
         // Przetworzone typy/kategorie z faktur w wybranym miesiącu
         const invoiceCategories = Array.from(invoiceCategoryMap.values()).map((cat) => ({
             ...cat,
             gross: Math.round(cat.gross * 100) / 100,
             net: Math.round(cat.net * 100) / 100,
             sharePercent: monthInvoicesGross > 0 ? Math.round((cat.gross / monthInvoicesGross) * 1000) / 10 : 0,
+            hasSubcategories: cat.name.toLowerCase().includes("spożywcz"),
+            subcategories: cat.name.toLowerCase().includes("spożywcz") ? foodSubcategories : undefined,
         })).sort((a, b) => b.gross - a.gross);
 
         // Łączne koszty firmy w wybranym miesiącu (Pozafakturowe + Faktury Brutto)
@@ -307,6 +400,11 @@ export async function GET(request: NextRequest) {
                 netTotal: Math.round(monthInvoicesNet * 100) / 100,
                 vatTotal: Math.round(monthInvoicesVat * 100) / 100,
                 categories: invoiceCategories,
+                foodBreakdown: {
+                    grossTotal: Math.round(foodGrossTotal * 100) / 100,
+                    netTotal: Math.round(foodNetTotal * 100) / 100,
+                    subcategories: foodSubcategories,
+                },
             },
             // Łączne koszty firmy
             enterpriseTotals: {

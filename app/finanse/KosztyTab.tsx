@@ -27,7 +27,10 @@ import {
     Receipt,
     ShoppingBag,
     Boxes,
-    Percent
+    Percent,
+    ArrowLeft,
+    ChevronDown,
+    Sparkles
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -59,6 +62,23 @@ interface MonthlyCostItem {
     shareOfTotalPercent?: number;
 }
 
+interface FoodSubcategoryItem {
+    key: string;
+    name: string;
+    gross: number;
+    net: number;
+    count: number;
+    sharePercent: number;
+    items: {
+        name: string;
+        gross: number;
+        net: number;
+        quantity: number;
+        unit: string;
+        count: number;
+    }[];
+}
+
 interface InvoiceCategoryItem {
     name: string;
     gross: number;
@@ -66,16 +86,21 @@ interface InvoiceCategoryItem {
     count: number;
     itemsCount: number;
     sharePercent: number;
+    hasSubcategories?: boolean;
+    subcategories?: FoodSubcategoryItem[];
 }
 
 interface CombinedCostItem {
     id: string;
     name: string;
-    source: "OPERATIONAL" | "INVOICE";
+    source: "OPERATIONAL" | "INVOICE" | "FOOD_SUBCATEGORY";
     sourceLabel: string;
     value: number;
     netValue?: number;
     sharePercent: number;
+    hasSubcategories?: boolean;
+    key?: string;
+    items?: any[];
 }
 
 interface YearlyMatrixRow {
@@ -99,6 +124,13 @@ const COMBINED_PALETTE = [
     "#84cc16", // Limonkowy
     "#64748b", // Slate
 ];
+
+const FOOD_COLORS: Record<string, string> = {
+    FLOUR: "#d97706",    // Mąka
+    FRUIT: "#16a34a",    // Owoce/Warzywa/Bakalie
+    DAIRY: "#0284c7",    // Nabiał
+    OTHER: "#64748b",    // Inne
+};
 
 const MONTH_NAMES = [
     "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -132,6 +164,11 @@ export default function KosztyTab() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Stan drill-down (podział na kategorie spożywcze)
+    const [drillDownCategory, setDrillDownCategory] = useState<string | null>(null);
+    const [expandedSubcatKey, setExpandedSubcatKey] = useState<string | null>(null);
+    const [isTableFoodExpanded, setIsTableFoodExpanded] = useState(false);
 
     // Stan danych z API
     const [costData, setCostData] = useState<any>(null);
@@ -182,6 +219,7 @@ export default function KosztyTab() {
             y -= 1;
         }
         setSelectedMonth(`${y}-${String(m).padStart(2, "0")}`);
+        setDrillDownCategory(null);
     };
 
     const handleNextMonth = () => {
@@ -193,6 +231,7 @@ export default function KosztyTab() {
             y += 1;
         }
         setSelectedMonth(`${y}-${String(m).padStart(2, "0")}`);
+        setDrillDownCategory(null);
     };
 
     // Zmiana wartości w formularzu
@@ -338,6 +377,27 @@ export default function KosztyTab() {
     const pieChartItems = useMemo(() => {
         if (!costData) return [];
 
+        // Tryb drill-down dla produktów spożywczych
+        if (drillDownCategory) {
+            const foodBreakdown = costData.invoicesSummary?.foodBreakdown;
+            const subcategories: FoodSubcategoryItem[] = foodBreakdown?.subcategories || [];
+            const sum = foodBreakdown?.grossTotal || subcategories.reduce((acc, curr) => acc + curr.gross, 0);
+
+            return subcategories.map((subcat, idx) => ({
+                id: `food_${subcat.key}`,
+                key: subcat.key,
+                name: subcat.name,
+                source: "FOOD_SUBCATEGORY" as const,
+                sourceLabel: "Podkategoria surowców",
+                value: subcat.gross,
+                netValue: subcat.net,
+                itemsCount: subcat.count,
+                items: subcat.items,
+                sharePercent: sum > 0 ? Math.round((subcat.gross / sum) * 1000) / 10 : 0,
+                color: FOOD_COLORS[subcat.key] || COMBINED_PALETTE[idx % COMBINED_PALETTE.length],
+            })).sort((a, b) => b.value - a.value);
+        }
+
         const combined: CombinedCostItem[] = [];
 
         // 1. Koszty pozafakturowe z formularza na żywo
@@ -359,14 +419,16 @@ export default function KosztyTab() {
         const invCategories: InvoiceCategoryItem[] = costData.invoicesSummary?.categories || [];
         invCategories.forEach((cat) => {
             if (cat.gross > 0) {
+                const isFood = cat.name.toLowerCase().includes("spożywcz");
                 combined.push({
                     id: `inv_${cat.name}`,
                     name: cat.name,
                     source: "INVOICE",
-                    sourceLabel: "Faktury kosztowe",
+                    sourceLabel: isFood ? "Faktury (kliknij, aby rozbić)" : "Faktury kosztowe",
                     value: cat.gross,
                     netValue: cat.net,
                     sharePercent: 0,
+                    hasSubcategories: isFood,
                 });
             }
         });
@@ -387,7 +449,7 @@ export default function KosztyTab() {
                 color: COMBINED_PALETTE[idx % COMBINED_PALETTE.length],
             }))
             .sort((a, b) => b.value - a.value);
-    }, [costData, formValues, pieFilter]);
+    }, [costData, formValues, pieFilter, drillDownCategory]);
 
     if (isLoading && !costData) {
         return (
@@ -404,6 +466,7 @@ export default function KosztyTab() {
     const invoicesNet = costData?.invoicesSummary?.netTotal || 0;
     const invoicesCount = costData?.invoicesSummary?.count || 0;
     const invoiceCategoriesList: InvoiceCategoryItem[] = costData?.invoicesSummary?.categories || [];
+    const foodBreakdown = costData?.invoicesSummary?.foodBreakdown;
 
     return (
         <div className="space-y-6">
@@ -578,6 +641,11 @@ export default function KosztyTab() {
                     </div>
                     <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
                         <span>Netto: {formatCurrency(invoicesNet)}</span>
+                        {foodBreakdown?.grossTotal > 0 && (
+                            <span className="text-[10px] text-amber-900 bg-amber-100/70 px-2 py-0.5 rounded font-bold">
+                                Spożywcze: {formatCurrency(foodBreakdown.grossTotal)}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -704,48 +772,75 @@ export default function KosztyTab() {
                             </div>
                         </div>
 
-                        {/* PRAWA KOLUMNA: DUŻY WYKRES KOŁOWY Z WSZYSTKIMI KOSZTAMI (7/12) */}
-                        <div className="lg:col-span-7 bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                        {/* PRAWA KOLUMNA: DUŻY WYKRES KOŁOWY Z DRILL-DOWN (7/12) */}
+                        <div className="lg:col-span-7 bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between min-h-[460px]">
                             <div>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-ui-accent/40 mb-4">
-                                    <div>
-                                        <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                            <PieIcon size={16} className="text-ui-primary" />
-                                            Struktura wszystkich kosztów ({costData?.monthName})
-                                        </h3>
-
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-ui-accent/40 mb-3">
+                                    <div className="flex items-center gap-2">
+                                        {drillDownCategory ? (
+                                            <button
+                                                onClick={() => {
+                                                    setDrillDownCategory(null);
+                                                    setExpandedSubcatKey(null);
+                                                }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100/80 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs transition-all cursor-pointer shadow-2xs"
+                                            >
+                                                <ArrowLeft size={14} />
+                                                Wróć do wszystkich kosztów
+                                            </button>
+                                        ) : (
+                                            <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
+                                                <PieIcon size={16} className="text-ui-primary" />
+                                                Struktura wszystkich kosztów ({costData?.monthName})
+                                            </h3>
+                                        )}
                                     </div>
 
-                                    {/* Filtry wykresu kołowego */}
-                                    <div className="flex items-center gap-1 p-0.5 bg-ui-accent/15 rounded-lg border border-ui-accent/30 text-[11px] font-bold">
-                                        <button
-                                            onClick={() => setPieFilter("ALL")}
-                                            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${pieFilter === "ALL" ? "bg-white text-ui-primary shadow-2xs" : "text-ui-secondary hover:text-ui-primary"
-                                                }`}
-                                        >
-                                            Wszystko
-                                        </button>
-                                        <button
-                                            onClick={() => setPieFilter("INVOICES")}
-                                            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${pieFilter === "INVOICES" ? "bg-white text-ui-primary shadow-2xs" : "text-ui-secondary hover:text-ui-primary"
-                                                }`}
-                                        >
-                                            Faktury
-                                        </button>
-                                        <button
-                                            onClick={() => setPieFilter("OPERATIONAL")}
-                                            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${pieFilter === "OPERATIONAL" ? "bg-white text-ui-primary shadow-2xs" : "text-ui-secondary hover:text-ui-primary"
-                                                }`}
-                                        >
-                                            Płace/ZUS/PIT
-                                        </button>
-                                    </div>
+                                    {/* Filtry wykresu kołowego (widoczne tylko w widoku głównym) */}
+                                    {!drillDownCategory && (
+                                        <div className="flex items-center gap-1 p-0.5 bg-ui-accent/15 rounded-lg border border-ui-accent/30 text-[11px] font-bold">
+                                            <button
+                                                onClick={() => setPieFilter("ALL")}
+                                                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${pieFilter === "ALL" ? "bg-white text-ui-primary shadow-2xs" : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                Wszystko
+                                            </button>
+                                            <button
+                                                onClick={() => setPieFilter("INVOICES")}
+                                                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${pieFilter === "INVOICES" ? "bg-white text-ui-primary shadow-2xs" : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                Faktury
+                                            </button>
+                                            <button
+                                                onClick={() => setPieFilter("OPERATIONAL")}
+                                                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${pieFilter === "OPERATIONAL" ? "bg-white text-ui-primary shadow-2xs" : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                Płace/ZUS/PIT
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* Banner w trybie drill-down */}
+                                {drillDownCategory && (
+                                    <div className="mb-4 p-2.5 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-amber-950">
+                                            <ShoppingBag size={16} className="text-amber-700" />
+                                            <span>Szczegółowy podział kategorii: <b className="underline decoration-amber-400">{drillDownCategory}</b></span>
+                                        </div>
+                                        <span className="text-xs font-extrabold text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-lg">
+                                            Razem: {formatCurrency(foodBreakdown?.grossTotal || 0)}
+                                        </span>
+                                    </div>
+                                )}
 
                                 {/* DUŻY WYKRES KOŁOWY / DONUT */}
                                 {pieChartItems.length > 0 ? (
                                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                                        <div className="md:col-span-6 h-[260px] w-full flex items-center justify-center">
+                                        <div className="md:col-span-6 h-[270px] w-full flex items-center justify-center">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <PieChart>
                                                     <Pie
@@ -756,13 +851,26 @@ export default function KosztyTab() {
                                                         outerRadius={95}
                                                         paddingAngle={2}
                                                         dataKey="value"
+                                                        onClick={(entry) => {
+                                                            if (entry.hasSubcategories || entry.name.toLowerCase().includes("spożywcz")) {
+                                                                setDrillDownCategory("Produkty spożywcze");
+                                                            } else if (drillDownCategory && entry.key) {
+                                                                setExpandedSubcatKey(prev => prev === entry.key ? null : entry.key);
+                                                            }
+                                                        }}
+                                                        cursor="pointer"
                                                     >
                                                         {pieChartItems.map((entry: any, index: number) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                                            <Cell
+                                                                key={`cell-${index}`}
+                                                                fill={entry.color}
+                                                                stroke={expandedSubcatKey === entry.key ? "#000" : "#fff"}
+                                                                strokeWidth={expandedSubcatKey === entry.key ? 2 : 1}
+                                                            />
                                                         ))}
                                                     </Pie>
                                                     <Tooltip
-                                                        formatter={(val: number) => formatCurrency(val)}
+                                                        formatter={(val: number) => [formatCurrency(val), "Wartość brutto"]}
                                                         contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}
                                                     />
                                                 </PieChart>
@@ -770,34 +878,88 @@ export default function KosztyTab() {
                                         </div>
 
                                         {/* Lista legendy z podziałem */}
-                                        <div className="md:col-span-6 space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                                            {pieChartItems.map((item: any) => (
-                                                <div
-                                                    key={item.id}
-                                                    className="flex items-center justify-between text-xs p-1.5 rounded-lg hover:bg-ui-accent/10 transition-colors"
-                                                >
-                                                    <div className="flex items-center gap-2 truncate pr-2">
-                                                        <span
-                                                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                                                            style={{ backgroundColor: item.color }}
-                                                        />
-                                                        <div className="truncate">
-                                                            <span className="text-ui-primary font-semibold truncate block">
-                                                                {item.name}
-                                                            </span>
-                                                            <span className="text-[10px] text-ui-secondary">
-                                                                {item.sourceLabel}
-                                                            </span>
+                                        <div className="md:col-span-6 space-y-2 max-h-[290px] overflow-y-auto pr-1">
+                                            {pieChartItems.map((item: any) => {
+                                                const isFoodCategory = item.hasSubcategories || item.name.toLowerCase().includes("spożywcz");
+                                                const isExpanded = expandedSubcatKey === item.key;
+
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        className={`text-xs p-2 rounded-xl transition-all border ${isExpanded
+                                                            ? "bg-amber-50/80 border-amber-300 shadow-2xs"
+                                                            : "hover:bg-ui-accent/10 border-transparent"
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2 truncate pr-2">
+                                                                <span
+                                                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                    style={{ backgroundColor: item.color }}
+                                                                />
+                                                                <div className="truncate">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-ui-primary font-bold truncate block">
+                                                                            {item.name}
+                                                                        </span>
+                                                                        {isFoodCategory && !drillDownCategory && (
+                                                                            <button
+                                                                                onClick={() => setDrillDownCategory("Produkty spożywcze")}
+                                                                                className="text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors cursor-pointer shrink-0"
+                                                                                title="Rozwiń podział na mąkę, nabiał itp."
+                                                                            >
+                                                                                <span>Podział</span>
+                                                                                <ChevronRight size={11} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[10px] text-ui-secondary">
+                                                                        {item.sourceLabel}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="font-bold text-ui-black whitespace-nowrap text-right shrink-0">
+                                                                {formatCurrency(item.value)}{" "}
+                                                                <span className="text-[10px] text-ui-secondary block font-medium">
+                                                                    {item.sharePercent}%
+                                                                </span>
+                                                            </div>
                                                         </div>
+
+                                                        {/* Rozwinięcie szczegółów w trybie drill-down */}
+                                                        {drillDownCategory && item.items && item.items.length > 0 && (
+                                                            <div className="mt-1.5 pt-1.5 border-t border-amber-200/60">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setExpandedSubcatKey(isExpanded ? null : item.key)}
+                                                                    className="text-[11px] font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
+                                                                >
+                                                                    <ChevronDown size={12} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                                                    {isExpanded ? "Ukryj surowce" : `Pokaż surowce (${item.items.length})`}
+                                                                </button>
+
+                                                                {isExpanded && (
+                                                                    <div className="mt-2 space-y-1 pl-3 border-l-2 border-amber-300">
+                                                                        {item.items.map((ingItem: any, iIdx: number) => (
+                                                                            <div key={iIdx} className="flex items-center justify-between text-[11px] text-ui-secondary py-0.5">
+                                                                                <span className="font-medium text-ui-black truncate pr-2">
+                                                                                    {ingItem.name}
+                                                                                </span>
+                                                                                <div className="text-right shrink-0 font-bold text-ui-black">
+                                                                                    {formatCurrency(ingItem.gross)}
+                                                                                    <span className="text-[10px] font-normal text-ui-secondary block">
+                                                                                        {ingItem.quantity} {ingItem.unit}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div className="font-bold text-ui-black whitespace-nowrap text-right">
-                                                        {formatCurrency(item.value)}{" "}
-                                                        <span className="text-[10px] text-ui-secondary block font-medium">
-                                                            {item.sharePercent}%
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 ) : (
@@ -808,14 +970,18 @@ export default function KosztyTab() {
                             </div>
 
                             <div className="mt-4 pt-3 border-t border-ui-accent/40 flex items-center justify-between text-xs font-bold text-ui-secondary">
-                                <span>Razem w wybranym filtrze:</span>
+                                <span>
+                                    {drillDownCategory ? `Razem ${drillDownCategory}:` : "Razem w wybranym filtrze:"}
+                                </span>
                                 <span className="text-base font-black text-ui-black">
                                     {formatCurrency(
-                                        pieFilter === "ALL"
-                                            ? liveGrandEnterpriseTotal
-                                            : pieFilter === "INVOICES"
-                                                ? invoicesGross
-                                                : liveOpTotal
+                                        drillDownCategory
+                                            ? (foodBreakdown?.grossTotal || 0)
+                                            : pieFilter === "ALL"
+                                                ? liveGrandEnterpriseTotal
+                                                : pieFilter === "INVOICES"
+                                                    ? invoicesGross
+                                                    : liveOpTotal
                                     )}
                                 </span>
                             </div>
@@ -862,29 +1028,101 @@ export default function KosztyTab() {
                                             const shareOfAll = liveGrandEnterpriseTotal > 0
                                                 ? Math.round((cat.gross / liveGrandEnterpriseTotal) * 1000) / 10
                                                 : 0;
+                                            const isFood = cat.name.toLowerCase().includes("spożywcz");
 
                                             return (
-                                                <tr key={idx} className="hover:bg-ui-accent/5 transition-colors">
-                                                    <td className="p-3.5 font-bold text-ui-black flex items-center gap-2">
-                                                        <Boxes size={14} className="text-ui-secondary" />
-                                                        {cat.name}
-                                                    </td>
-                                                    <td className="p-3.5 text-right text-ui-secondary font-semibold">
-                                                        {cat.itemsCount || cat.count}
-                                                    </td>
-                                                    <td className="p-3.5 text-right font-semibold text-ui-secondary">
-                                                        {formatCurrency(cat.net)}
-                                                    </td>
-                                                    <td className="p-3.5 text-right font-bold text-ui-black">
-                                                        {formatCurrency(cat.gross)}
-                                                    </td>
-                                                    <td className="p-3.5 text-right font-semibold text-emerald-700">
-                                                        {cat.sharePercent}%
-                                                    </td>
-                                                    <td className="p-3.5 text-right font-black text-ui-primary bg-ui-accent/5">
-                                                        {shareOfAll}%
-                                                    </td>
-                                                </tr>
+                                                <React.Fragment key={idx}>
+                                                    <tr className="hover:bg-ui-accent/5 transition-colors">
+                                                        <td className="p-3.5 font-bold text-ui-black">
+                                                            <div className="flex items-center gap-2">
+                                                                <Boxes size={14} className="text-ui-secondary" />
+                                                                <span>{cat.name}</span>
+                                                                {isFood && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setIsTableFoodExpanded(!isTableFoodExpanded);
+                                                                            setDrillDownCategory("Produkty spożywcze");
+                                                                        }}
+                                                                        className="ml-2 text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                                                                    >
+                                                                        <Sparkles size={11} />
+                                                                        {isTableFoodExpanded ? "Zwiń podział" : "Pokaż podział (Mąka, Nabiał...)"}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3.5 text-right text-ui-secondary font-semibold">
+                                                            {cat.itemsCount || cat.count}
+                                                        </td>
+                                                        <td className="p-3.5 text-right font-semibold text-ui-secondary">
+                                                            {formatCurrency(cat.net)}
+                                                        </td>
+                                                        <td className="p-3.5 text-right font-bold text-ui-black">
+                                                            {formatCurrency(cat.gross)}
+                                                        </td>
+                                                        <td className="p-3.5 text-right font-semibold text-emerald-700">
+                                                            {cat.sharePercent}%
+                                                        </td>
+                                                        <td className="p-3.5 text-right font-black text-ui-primary bg-ui-accent/5">
+                                                            {shareOfAll}%
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* Rozwinięcie podkategorii spożywczych w tabeli */}
+                                                    {isFood && isTableFoodExpanded && foodBreakdown?.subcategories && (
+                                                        <tr>
+                                                            <td colSpan={6} className="bg-amber-50/40 p-4 border-y border-amber-200">
+                                                                <div className="rounded-xl border border-amber-300/80 bg-white overflow-hidden shadow-xs">
+                                                                    <div className="p-3 bg-amber-100/60 border-b border-amber-200 flex items-center justify-between">
+                                                                        <div className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                                                                            <ShoppingBag size={14} className="text-amber-800" />
+                                                                            Szczegółowy podział surowców spożywczych ({costData?.monthName})
+                                                                        </div>
+                                                                        <span className="text-xs font-black text-amber-900">
+                                                                            Razem spożywcze: {formatCurrency(foodBreakdown.grossTotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <table className="w-full text-xs">
+                                                                        <thead>
+                                                                            <tr className="bg-amber-50/50 text-amber-900/80 font-bold border-b border-amber-200/60">
+                                                                                <th className="p-2.5 pl-4 text-left">Podkategoria surowca</th>
+                                                                                <th className="p-2.5 text-right">Liczba pozycji</th>
+                                                                                <th className="p-2.5 text-right">Kwota Netto</th>
+                                                                                <th className="p-2.5 text-right">Kwota Brutto</th>
+                                                                                <th className="p-2.5 pr-4 text-right">Udział w surowcach</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-amber-100">
+                                                                            {foodBreakdown.subcategories.map((subcat: FoodSubcategoryItem) => (
+                                                                                <tr key={subcat.key} className="hover:bg-amber-50/40 font-medium">
+                                                                                    <td className="p-2.5 pl-4 font-bold text-ui-black flex items-center gap-2">
+                                                                                        <span
+                                                                                            className="w-2 h-2 rounded-full"
+                                                                                            style={{ backgroundColor: FOOD_COLORS[subcat.key] || "#d97706" }}
+                                                                                        />
+                                                                                        {subcat.name}
+                                                                                    </td>
+                                                                                    <td className="p-2.5 text-right text-ui-secondary">
+                                                                                        {subcat.count}
+                                                                                    </td>
+                                                                                    <td className="p-2.5 text-right text-ui-secondary">
+                                                                                        {formatCurrency(subcat.net)}
+                                                                                    </td>
+                                                                                    <td className="p-2.5 text-right font-bold text-ui-black">
+                                                                                        {formatCurrency(subcat.gross)}
+                                                                                    </td>
+                                                                                    <td className="p-2.5 pr-4 text-right font-bold text-amber-900">
+                                                                                        {subcat.sharePercent}%
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
                                             );
                                         })}
                                     </tbody>

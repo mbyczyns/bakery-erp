@@ -44,7 +44,7 @@ export default function SkladnikiPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newIngredientName, setNewIngredientName] = useState("");
     const [newIngredientUnit, setNewIngredientUnit] = useState("kg");
-    const [newIngredientType, setNewIngredientType] = useState<IngredientType>("OTHER");
+    const [newIngredientType, setNewIngredientType] = useState<IngredientType | "">("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Stan edycji składnika
@@ -87,6 +87,11 @@ export default function SkladnikiPage() {
             return;
         }
 
+        if (!newIngredientType) {
+            alert("Wybierz typ / kategorię składnika");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const res = await fetch("/api/skladniki", {
@@ -102,7 +107,7 @@ export default function SkladnikiPage() {
             if (res.ok) {
                 setNewIngredientName("");
                 setNewIngredientUnit("kg");
-                setNewIngredientType("OTHER");
+                setNewIngredientType("");
                 setIsAddModalOpen(false);
                 await fetchData();
             } else {
@@ -361,8 +366,10 @@ export default function SkladnikiPage() {
                                         <select
                                             value={newIngredientType}
                                             onChange={(e) => setNewIngredientType(e.target.value as IngredientType)}
+                                            required
                                             className="w-full h-[42px] appearance-none bg-ui-white border border-ui-accent rounded-xl pl-4 pr-10 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer transition-all font-medium"
                                         >
+                                            <option value="" disabled>-- Wybierz typ / kategorię --</option>
                                             <option value="FLOUR">Mąka</option>
                                             <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>

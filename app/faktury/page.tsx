@@ -870,7 +870,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
             initialState[pos.productId] = {
                 categoryId: pos.categoryId || defaultCategoryId,
                 ingredientId: pos.ingredientId || undefined,
-                multiplier: pos.multiplier ? String(pos.multiplier) : "1",
+                multiplier: pos.multiplier ? String(pos.multiplier) : "",
             };
         });
         return initialState;
@@ -882,12 +882,12 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
         setMappingState((prev) => {
             const next = { ...prev };
             (doc.positions || []).forEach((pos) => {
-                const current = prev[pos.productId] || { categoryId: defaultCategoryId, multiplier: "1" };
+                const current = prev[pos.productId] || { categoryId: defaultCategoryId, multiplier: "" };
                 next[pos.productId] = {
                     ...current,
                     categoryId: catToApply,
                     ingredientId: catToApply === foodCategory?.id ? current.ingredientId : undefined,
-                    multiplier: "1",
+                    multiplier: current.multiplier || "",
                 };
             });
             return next;
@@ -903,7 +903,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                 ingredientId: categoryId === foodCategory?.id
                     ? prev[productId]?.ingredientId
                     : undefined,
-                multiplier: "1",
+                multiplier: prev[productId]?.multiplier || "",
             },
         }));
     };
@@ -914,7 +914,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
             [productId]: {
                 ...prev[productId],
                 ingredientId: ingredientId || undefined,
-                multiplier: "1",
+                multiplier: prev[productId]?.multiplier || "",
             },
         }));
     };
@@ -940,6 +940,26 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 
         if (missingMappings) {
             alert("Uwaga!\nNie przypisano surowca do wszystkich pozycji spożywczych.");
+            return;
+        }
+
+        const missingMultipliers: string[] = [];
+        doc.positions.forEach(pos => {
+            const mapping = mappingState[pos.productId];
+            if (!mapping) return;
+            const isFood = mapping.categoryId === foodCategory?.id;
+            if (isFood && mapping.ingredientId) {
+                const selectedIng = ingredients.find(i => i.id === mapping.ingredientId);
+                const needsMult = selectedIng && selectedIng.unit !== pos.unit;
+                const multVal = parseFloat((mapping.multiplier || "").replace(',', '.'));
+                if (needsMult && (isNaN(multVal) || multVal <= 0)) {
+                    missingMultipliers.push(pos.name);
+                }
+            }
+        });
+
+        if (missingMultipliers.length > 0) {
+            alert(`Wprowadź poprawny przelicznik jednostek dla pozycji:\n- ${missingMultipliers.join("\n- ")}`);
             return;
         }
 
@@ -1261,10 +1281,11 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                     <label className="block text-xs font-bold text-ui-secondary mb-1">Typ</label>
                                     <div className="relative">
                                         <select
-                                            defaultValue="OTHER"
+                                            defaultValue=""
                                             id="manual-new-ing-type"
                                             className="w-full bg-ui-accent/10 rounded-lg px-3 py-2 text-sm font-semibold border border-transparent focus:border-ui-primary focus:outline-none transition-all appearance-none"
                                         >
+                                            <option value="" disabled>-- Wybierz typ --</option>
                                             <option value="FLOUR">Mąka</option>
                                             <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
@@ -1306,6 +1327,10 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                 onClick={() => {
                                     const unitSelect = document.getElementById("manual-new-ing-unit") as HTMLSelectElement;
                                     const typeSelect = document.getElementById("manual-new-ing-type") as HTMLSelectElement;
+                                    if (!typeSelect.value) {
+                                        alert("Wybierz typ / kategorię surowca");
+                                        return;
+                                    }
                                     handleCreateIngredient(newIngredientConfig.initialName, unitSelect.value, typeSelect.value);
                                 }}
                                 className="flex-1 py-2 rounded-xl bg-ui-primary text-white font-bold hover:bg-ui-primary/90 text-xs transition-colors shadow-sm cursor-pointer"
@@ -1756,13 +1781,16 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-bold text-ui-secondary mb-1">Typ</label>
+                                    <label className="block text-xs font-bold text-ui-secondary mb-1">
+                                        Typ <span className="text-rose-500">*</span>
+                                    </label>
                                     <div className="relative">
                                         <select
-                                            defaultValue="OTHER"
+                                            defaultValue=""
                                             id="manual-new-ing-type"
                                             className="w-full bg-ui-accent/10 rounded-lg px-3 py-2 text-sm font-semibold border border-transparent focus:border-ui-primary focus:outline-none transition-all appearance-none"
                                         >
+                                            <option value="" disabled>-- Wybierz typ --</option>
                                             <option value="FLOUR">Mąka</option>
                                             <option value="FRUIT">Owoce/Warzywa/Bakalie</option>
                                             <option value="DAIRY">Nabiał</option>
@@ -1804,6 +1832,10 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                                 onClick={() => {
                                     const unitSelect = document.getElementById("manual-new-ing-unit") as HTMLSelectElement;
                                     const typeSelect = document.getElementById("manual-new-ing-type") as HTMLSelectElement;
+                                    if (!typeSelect.value) {
+                                        alert("Wybierz typ / kategorię składnika!");
+                                        return;
+                                    }
                                     handleCreateIngredient(newIngredientConfig.initialName, unitSelect.value, typeSelect.value);
                                 }}
                                 className="flex-1 py-2 rounded-xl bg-ui-primary text-white font-bold hover:bg-ui-primary/90 text-xs transition-colors shadow-sm cursor-pointer"
