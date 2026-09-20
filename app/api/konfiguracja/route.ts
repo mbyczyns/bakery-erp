@@ -183,6 +183,9 @@ export async function POST(request: NextRequest) {
                 }
             }
 
+            // Doliczamy koszt opakowania
+            totalFoodCost += Number((bp as any).packagingCost || 0);
+
             await prisma.bakeryProduct.update({
                 where: { id: bp.id },
                 data: { productionCost: totalFoodCost },

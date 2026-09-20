@@ -217,6 +217,7 @@ model BakeryProduct {
   type           BakeryProductType  @default(BREAD)
   productionCost Decimal            @default(0.00)
   sellingPrice   Decimal            @default(0.00)
+  packagingCost  Decimal            @default(0.00)
   ingredients    RecipeIngredient[]
   productions    DailyProduction[]
 

@@ -68,9 +68,11 @@ interface RecipeData {
         type: "BREAD" | "ROLL" | "SWEET" | "SAVORY";
         productionCost: number;
         sellingPrice: number;
+        packagingCost?: number;
         createdAt: string;
     };
     detailedIngredients: DetailedIngredient[];
+    packagingCost?: number;
     totalFoodCost: number;
     productionStats: {
         totalProduced: number;
@@ -86,8 +88,8 @@ interface RecipeData {
 const CATEGORY_NAMES: Record<string, string> = {
     BREAD: "Chleb",
     ROLL: "Bułka",
-    SWEET: "Słodkie wypieki",
-    SAVORY: "Słone wypieki",
+    SWEET: "Wypieki słodkie",
+    SAVORY: "Wypieki słone",
 };
 
 export default function PrzepisSzczegolyPage({
@@ -121,6 +123,7 @@ export default function PrzepisSzczegolyPage({
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editName, setEditName] = useState("");
     const [editType, setEditType] = useState<"BREAD" | "ROLL" | "SWEET" | "SAVORY">("BREAD");
+    const [editPackagingCost, setEditPackagingCost] = useState("0");
     const [editBatchSize, setEditBatchSize] = useState("1");
     const [editItems, setEditItems] = useState<
         Array<{
@@ -185,6 +188,7 @@ export default function PrzepisSzczegolyPage({
         if (!data) return;
         setEditName(data.recipe.name);
         setEditType(data.recipe.type);
+        setEditPackagingCost(String(data.recipe.packagingCost ?? data.packagingCost ?? 0));
         setEditBatchSize("1");
 
         // Mapujemy aktualne składniki
@@ -272,6 +276,8 @@ export default function PrzepisSzczegolyPage({
             return;
         }
 
+        const packagingCostNum = parseFloat(editPackagingCost.replace(",", ".").trim()) || 0;
+
         setIsSavingEdit(true);
         try {
             const formattedIngredients = editItems.map((item) => {
@@ -291,6 +297,7 @@ export default function PrzepisSzczegolyPage({
                 body: JSON.stringify({
                     name: editName.trim(),
                     type: editType,
+                    packagingCost: packagingCostNum,
                     ingredients: formattedIngredients,
                 }),
             });
@@ -479,7 +486,7 @@ export default function PrzepisSzczegolyPage({
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="bg-ui-accent/10 border border-ui-accent/60 rounded-xl px-4 py-2 text-right">
                         <div className="text-[11px] uppercase tracking-wider font-bold text-ui-secondary">
-                            Koszt surowcowy (Foodcost)
+                            Koszt produkcji
                         </div>
                         <div className="text-xl font-black text-ui-primary">
                             {totalFoodCost.toFixed(2)} zł <span className="text-xs font-semibold text-ui-secondary">/ szt.</span>
@@ -488,7 +495,7 @@ export default function PrzepisSzczegolyPage({
 
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 text-right">
                         <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-800">
-                            Cena w cenniku (Brutto)
+                            Cena sprzedaży (brutto)
                         </div>
                         <div className="text-xl font-black text-emerald-950">
                             {currentSellingPrice > 0 ? (
@@ -526,10 +533,10 @@ export default function PrzepisSzczegolyPage({
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
                         <span className="text-xs font-bold uppercase tracking-wider">Aktualna marża</span>
-                        <Percent size={18} className={currentMargin >= 50 ? "text-ui-secondary" : "text-ui-secondary"} />
+                        <Percent size={18} className="text-ui-secondary" />
                     </div>
                     <div>
-                        <div className={`text-2xl font-black ${currentMargin >= 50 ? "text-ui-secondary" : currentMargin > 0 ? "text-ui-secondary" : "text-ui-secondary"}`}>
+                        <div className={`text-2xl font-black text-ui-primary`}>
                             {currentSellingPrice > 0 ? `${currentMargin.toFixed(1)}%` : "—"}
                         </div>
                         <p className="text-[11px] text-ui-secondary mt-1">
@@ -611,6 +618,27 @@ export default function PrzepisSzczegolyPage({
                                             </tr>
                                         );
                                     })}
+
+                                    {/* Koszt opakowania */}
+                                    {Number(recipe.packagingCost ?? data.packagingCost ?? 0) > 0 && (
+                                        <tr className="hover:bg-amber-50/40 bg-amber-50/20 transition-colors">
+                                            <td className="py-3.5 px-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <PackageCheck size={14} className="text-ui-secondary" />
+                                                    <span className="font-bold text-ui-black text-xs">
+                                                        Opakowanie
+                                                    </span>
+
+                                                </div>
+                                            </td>
+                                            <td className="py-3.5 px-3 text-right font-medium text-ui-secondary">
+                                                {previewBatchSize} szt.
+                                            </td>
+                                            <td className="py-3.5 px-3 text-right font-semibold text-amber-950">
+                                                {Number(recipe.packagingCost ?? data.packagingCost ?? 0).toFixed(2)} zł / szt.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                                 <tfoot>
                                     <tr className="border-t-2 border-ui-accent font-bold text-xs bg-ui-secondary/5">
@@ -960,18 +988,15 @@ export default function PrzepisSzczegolyPage({
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Modalu */}
-                        <div className="px-6 py-4 border-b border-ui-accent flex items-center justify-between bg-amber-50/70">
+                        <div className="px-6 py-4 border-b border-ui-accent flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-amber-100 rounded-xl text-amber-900 shadow-sm">
+                                <div className="p-2.5 bg-ui-secondary/20 rounded-xl text-ui-secondary shadow-sm">
                                     <Edit3 size={20} />
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-ui-black leading-tight">
-                                        Edycja przepisu: {recipe.name}
+                                        {recipe.name}
                                     </h2>
-                                    <p className="text-xs text-ui-secondary">
-                                        Zmień nazwę, kategorię lub zmodyfikuj listę składników receptury
-                                    </p>
                                 </div>
                             </div>
                             <button
@@ -997,19 +1022,19 @@ export default function PrzepisSzczegolyPage({
                                         placeholder="np. Chleb Żytni 500g"
                                         value={editName}
                                         onChange={(e) => setEditName(e.target.value)}
-                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black placeholder:text-ui-secondary/50 focus:outline-none focus:border-amber-600 transition-all shadow-sm font-semibold"
+                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black placeholder:text-ui-secondary/50 focus:outline-none focus:border-ui-accent transition-all shadow-sm font-semibold"
                                     />
                                 </div>
 
                                 {/* Kategoria */}
-                                <div className="md:col-span-4">
+                                <div className="md:col-span-3">
                                     <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
                                         Kategoria
                                     </label>
                                     <select
                                         value={editType}
                                         onChange={(e) => setEditType(e.target.value as any)}
-                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all shadow-sm font-semibold"
+                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black focus:outline-none focus:border-ui-accent cursor-pointer transition-all shadow-sm font-semibold"
                                     >
                                         <option value="BREAD">Chleb</option>
                                         <option value="ROLL">Bułka</option>
@@ -1018,10 +1043,30 @@ export default function PrzepisSzczegolyPage({
                                     </select>
                                 </div>
 
+                                {/* Koszt opakowania */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5 truncate" title="Koszt opakowania (zł / szt.)">
+                                        Opakowanie
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={editPackagingCost}
+                                            onChange={(e) => setEditPackagingCost(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-11 py-2 text-sm font-semibold text-ui-black focus:outline-none focus:border-ui-accent transition-all shadow-sm"
+                                        />
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-ui-secondary bg-ui-accent/15 px-1.5 py-0.5 rounded pointer-events-none font-bold">
+                                            zł
+                                        </span>
+                                    </div>
+                                </div>
+
                                 {/* Wielkość partii do kalkulacji */}
-                                <div className="md:col-span-3">
+                                <div className="md:col-span-2">
                                     <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
-                                        Partia przeliczeniowa
+                                        Partia
                                     </label>
                                     <div className="relative">
                                         <input
@@ -1029,9 +1074,9 @@ export default function PrzepisSzczegolyPage({
                                             inputMode="decimal"
                                             value={editBatchSize}
                                             onChange={(e) => setEditBatchSize(e.target.value)}
-                                            className="w-full h-11 bg-amber-50/50 border border-amber-300 rounded-xl pl-3 pr-12 text-sm font-black text-amber-950 focus:outline-none focus:border-amber-600 shadow-sm"
+                                            className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-11 py-2 text-sm font-semibold text-ui-black focus:outline-none focus:border-ui-accent transition-all shadow-sm"
                                         />
-                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-900 pointer-events-none">
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-ui-secondary bg-ui-accent/15 px-1.5 py-0.5 rounded pointer-events-none font-bold">
                                             szt.
                                         </span>
                                     </div>
@@ -1047,10 +1092,10 @@ export default function PrzepisSzczegolyPage({
                                     <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ui-secondary" />
                                     <input
                                         type="text"
-                                        placeholder="Wpisz nazwę składnika (np. Mąka pszenna, Zaczyn...)"
+                                        placeholder="Szukaj ..."
                                         value={editSearchInput}
                                         onChange={(e) => setEditSearchInput(e.target.value)}
-                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 text-sm text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
+                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 text-sm text-ui-black focus:outline-none focus:border-ui-accent transition-all shadow-sm"
                                     />
 
                                     {editSearchInput.trim() && (
@@ -1221,23 +1266,24 @@ export default function PrzepisSzczegolyPage({
 
                             {/* Szacowany przeliczony foodcost */}
                             {editItems.length > 0 && (
-                                <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4 flex items-center justify-between">
+                                <div className="bg-ui-accent/10 border border-ui-accent rounded-xl p-4 flex items-center justify-between">
                                     <div>
-                                        <span className="text-xs font-bold text-amber-950 uppercase tracking-wider block">
-                                            Szacowany koszt surowcowy (Foodcost)
+                                        <span className="text-xs font-bold text-ui-primary uppercase tracking-wider block">
+                                            Szacowany foodcost
                                         </span>
                                         <span className="text-[11px] text-ui-secondary">
-                                            Wyliczony na 1 gotową sztukę wyrobu
+                                            Wyliczony na 1 gotową sztukę wyrobu (surowce + opakowanie)
                                         </span>
                                     </div>
                                     <div className="text-2xl font-black text-amber-950">
                                         {(() => {
                                             const batchNum = parseFloat(editBatchSize.replace(",", ".").trim()) || 1;
-                                            const totalCost = editItems.reduce((sum, item) => {
+                                            const totalIngredientsCost = editItems.reduce((sum, item) => {
                                                 const cleanAmt = parseFloat(item.batchAmount.replace(",", ".").trim()) || 0;
                                                 return sum + cleanAmt * item.unitPrice;
                                             }, 0);
-                                            const perPiece = batchNum > 0 ? totalCost / batchNum : 0;
+                                            const packCost = parseFloat(editPackagingCost.replace(",", ".").trim()) || 0;
+                                            const perPiece = (batchNum > 0 ? totalIngredientsCost / batchNum : 0) + packCost;
                                             return `${perPiece.toFixed(2)} zł`;
                                         })()}
                                     </div>
@@ -1257,7 +1303,7 @@ export default function PrzepisSzczegolyPage({
                                 <button
                                     type="submit"
                                     disabled={isSavingEdit}
-                                    className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
                                 >
                                     {isSavingEdit ? (
                                         <>

@@ -171,11 +171,7 @@ export default function SkladnikDetailPage({
                                 <span className="text-xs font-semibold text-ui-primary bg-white/80 px-2.5 py-1 rounded-lg border border-ui-accent/50">
                                     Jednostka: <strong>{data.unit}</strong>
                                 </span>
-                                {data.stats?.avgDailyLast30Days > 0 && (
-                                    <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                        Śr. dzienne (30 dni): <strong>{data.stats.avgDailyLast30Days} {data.unit}</strong>
-                                    </span>
-                                )}
+
                             </div>
                         </div>
 
@@ -237,7 +233,7 @@ export default function SkladnikDetailPage({
                         </h3>
                         {data.deliveriesHistory && data.deliveriesHistory.length > 0 && (
                             <span className="text-[11px] font-semibold text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-full">
-                                {data.deliveriesHistory.length} {data.deliveriesHistory.length === 1 ? "wpis" : "wpisów"}
+                                {data.deliveriesHistory.length} {data.deliveriesHistory.length === 1 ? "faktura" : "faktury"}
                             </span>
                         )}
                     </div>
@@ -337,11 +333,11 @@ export default function SkladnikDetailPage({
                     <div>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Scale size={16} /> Zużycie / Zakupy
+                                <Scale size={16} /> Zakupy / Zużycie
                             </h3>
                             <button
                                 onClick={() => setIsConsumptionModalOpen(true)}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
                             >
                                 <BarChart3 size={14} />
                                 Szczegóły
@@ -357,26 +353,40 @@ export default function SkladnikDetailPage({
 
                                     <Tooltip
                                         cursor={{ fill: 'rgba(229, 231, 235, 0.4)' }}
-                                        contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB', fontWeight: 'bold', fontSize: '12px' }}
-                                        formatter={(value: number, name: string) => {
-                                            if (name === "consumed") return [`${value} ${data.unit}`, "Zużyto"];
-                                            if (name === "purchased") return [`${value} ${data.unit}`, "Zakupiono"];
-                                            return [value, name];
+                                        content={({ active, payload, label }) => {
+                                            if (active && payload && payload.length) {
+                                                const dataPoint = payload[0]?.payload;
+                                                return (
+                                                    <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-lg text-xs">
+                                                        <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-1.5">
+                                                            {label}
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-4 text-[#3B82F6] font-bold mb-1">
+                                                            <span>Zakupiono:</span>
+                                                            <span>{dataPoint?.purchased ?? 0} {data.unit}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-4 text-[#059669] font-bold">
+                                                            <span>Zużyto:</span>
+                                                            <span>{dataPoint?.consumed ?? 0} {data.unit}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
                                         }}
                                     />
 
                                     <Legend
                                         wrapperStyle={{ paddingTop: '10px', fontSize: '12px', fontWeight: '500' }}
                                         iconType="circle"
-                                        formatter={(value) => {
-                                            if (value === "consumed") return "Zużyto";
-                                            if (value === "purchased") return "Zakupiono";
-                                            return value;
-                                        }}
+                                        payload={[
+                                            { value: 'Zakupiono', type: 'circle', id: 'purchased', color: '#3B82F6' },
+                                            { value: 'Zużyto', type: 'circle', id: 'consumed', color: '#059669' }
+                                        ]}
                                     />
 
-                                    <Bar dataKey="consumed" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                    <Bar dataKey="purchased" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Bar dataKey="purchased" name="Zakupiono" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Bar dataKey="consumed" name="Zużyto" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

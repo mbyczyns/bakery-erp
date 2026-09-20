@@ -31,8 +31,21 @@ import {
     Sparkles,
     Trash2,
     Edit3,
+    RotateCcw,
+    TrendingUp,
+    BarChart3,
+    CalendarDays,
     X,
 } from "lucide-react";
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from "recharts";
 
 // Helper do formatowania daty: YYYY-MM-DD -> DD-MM-YYYY
 function formatDate(dateStr?: string | Date | null): string {
@@ -142,7 +155,8 @@ export default function ContractorDetailPage() {
         Record<string, { selected: boolean; quantity: string; unit: string; note: string }>
     >({});
     const [copiedToClipboard, setCopiedToClipboard] = useState(false);
-    const [orderNotes, setOrderNotes] = useState();
+    const [orderNotes, setOrderNotes] = useState<string>("");
+    const [customShoppingListText, setCustomShoppingListText] = useState<string>("");
 
     // -------------------------------------------------------------
     // STAN EDYCJI WŁASNEJ NAZWY KONTRAHENTA
@@ -324,6 +338,80 @@ export default function ContractorDetailPage() {
         );
     }, [data, invoiceSearch]);
 
+    // Agregacja wydatków w poszczególnych miesiącach dla wykresu kolumnowego
+    const monthlySpendingData = useMemo(() => {
+        if (!data || !data.invoices || data.invoices.length === 0) return [];
+
+        const monthNamesShort = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+        const monthNamesFull = [
+            "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+            "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+        ];
+
+        // Map: "YYYY-MM" -> { gross: number, net: number, count: number, year: number, monthIdx: number }
+        const monthlyMap = new Map<string, { gross: number; net: number; count: number; year: number; monthIdx: number }>();
+
+        data.invoices.forEach((inv) => {
+            if (!inv.issuedDate) return;
+            const dateParts = inv.issuedDate.split("-");
+            if (dateParts.length < 2) return;
+            const year = parseInt(dateParts[0], 10);
+            const monthIdx = parseInt(dateParts[1], 10) - 1; // 0-11
+            if (isNaN(year) || isNaN(monthIdx) || monthIdx < 0 || monthIdx > 11) return;
+
+            const key = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
+            const gross = Number(inv.grossAmount || 0);
+            const net = Number(inv.netAmount || 0);
+
+            if (!monthlyMap.has(key)) {
+                monthlyMap.set(key, { gross, net, count: 1, year, monthIdx });
+            } else {
+                const item = monthlyMap.get(key)!;
+                item.gross += gross;
+                item.net += net;
+                item.count += 1;
+            }
+        });
+
+        if (monthlyMap.size === 0) return [];
+
+        // Sortowanie chronologiczne kluczy YYYY-MM
+        const keys = Array.from(monthlyMap.keys()).sort();
+        const firstKey = keys[0];
+        const lastKey = keys[keys.length - 1];
+
+        const [startYear, startMonth] = firstKey.split("-").map(Number);
+        const [endYear, endMonth] = lastKey.split("-").map(Number);
+
+        const result = [];
+        let curYear = startYear;
+        let curMonth = startMonth;
+
+        while (curYear < endYear || (curYear === endYear && curMonth <= endMonth)) {
+            const key = `${curYear}-${String(curMonth).padStart(2, "0")}`;
+            const monthIdx = curMonth - 1;
+            const entry = monthlyMap.get(key);
+            const shortYear = String(curYear).slice(2);
+
+            result.push({
+                key,
+                month: `${monthNamesShort[monthIdx]} ${shortYear}`,
+                fullMonth: `${monthNamesFull[monthIdx]} ${curYear}`,
+                gross: entry ? Math.round(entry.gross * 100) / 100 : 0,
+                net: entry ? Math.round(entry.net * 100) / 100 : 0,
+                count: entry ? entry.count : 0,
+            });
+
+            curMonth++;
+            if (curMonth > 12) {
+                curMonth = 1;
+                curYear++;
+            }
+        }
+
+        return result;
+    }, [data]);
+
     // Generowanie sformatowanego tekstu listy zakupów
     const generatedShoppingListText = useMemo(() => {
         if (!data) return "";
@@ -368,10 +456,15 @@ export default function ContractorDetailPage() {
         return `${header}\n${itemsText}${footer}`;
     }, [data, selectedItems, orderNotes]);
 
+    // Automatyczna synchronizacja wygenerowanej treści z edytowalnym polem tekstowym
+    useEffect(() => {
+        setCustomShoppingListText(generatedShoppingListText);
+    }, [generatedShoppingListText]);
+
     // Kopiowanie do schowka
     const handleCopyList = () => {
-        if (!generatedShoppingListText) return;
-        navigator.clipboard.writeText(generatedShoppingListText);
+        if (!customShoppingListText) return;
+        navigator.clipboard.writeText(customShoppingListText);
         setCopiedToClipboard(true);
         setTimeout(() => setCopiedToClipboard(false), 2000);
     };
@@ -501,22 +594,6 @@ export default function ContractorDetailPage() {
                             )}
                         </div>
                     </div>
-
-                    {/* Szybki przycisk przejścia do listy zakupów */}
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setActiveTab("SHOPPING_LIST")}
-                            className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm disabled:opacity-50 cursor-pointer"
-                        >
-                            <ShoppingCart size={17} />
-                            Generuj listę zakupów
-                            {selectedCount > 0 && (
-                                <span className="bg-white text-ui-accent font-extrabold px-1.5 py-0.2 rounded-full text-[11px]">
-                                    {selectedCount}
-                                </span>
-                            )}
-                        </button>
-                    </div>
                 </div>
 
                 {/* Notatka wewnętrzna jeśli istnieje */}
@@ -533,7 +610,7 @@ export default function ContractorDetailPage() {
             {/* ========================================================= */}
             {/* KARTY STATYSTYK FINANSOWYCH (PODSUMOWANIE WYDATKÓW)       */}
             {/* ========================================================= */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {/* 1. Łączne wydatki brutto */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
@@ -560,11 +637,131 @@ export default function ContractorDetailPage() {
                         <div className="text-2xl font-black text-ui-black">
                             {stats.invoicesCount} <span className="text-xs font-semibold text-ui-secondary">dokumentów</span>
                         </div>
+                        <p className="text-[11px] text-ui-secondary mt-1">
+                            VAT: <b>{stats.totalVat.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b>
+                        </p>
                     </div>
                 </div>
 
-                {/* 3. Ostatnie zakupy */}
+                {/* 3. Średnia wartość faktury */}
+                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Średnia faktura</span>
+                        <BarChart3 size={18} className="text-ui-primary" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-ui-black">
+                            {stats.averageInvoiceGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-ui-secondary">zł</span>
+                        </div>
+                        <p className="text-[11px] text-ui-secondary mt-1">
+                            Średnia wartość brutto
+                        </p>
+                    </div>
+                </div>
 
+                {/* 4. Ostatni zakup */}
+                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Ostatni zakup</span>
+                        <Calendar size={18} className="text-ui-primary" />
+                    </div>
+                    <div>
+                        <div className="text-xl font-black text-ui-black">
+                            {stats.lastPurchaseDate ? formatDate(stats.lastPurchaseDate) : "Brak zakupów"}
+                        </div>
+                        <p className="text-[11px] text-ui-secondary mt-1">
+                            Data ostatniej faktury
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* WYKRES KOLUMNOWY: WYDATKI MIESIĘCZNE U DOSTAWCY           */}
+            {/* ========================================================= */}
+            <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm mb-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
+                            <TrendingUp size={16} className="text-ui-primary" /> Wydatki miesięczne
+                        </h3>
+
+                    </div>
+                    {monthlySpendingData.length > 0 && (
+                        <div className="text-xs font-semibold text-ui-primary bg-ui-accent/15 px-3 py-1.5 rounded-xl self-start sm:self-auto flex items-center gap-1.5">
+                            <Receipt size={13} className="text-ui-secondary" />
+                            <span>Okres: <b className="text-ui-black font-bold">{monthlySpendingData[0].month} – {monthlySpendingData[monthlySpendingData.length - 1].month}</b></span>
+                        </div>
+                    )}
+                </div>
+
+                {monthlySpendingData.length === 0 ? (
+                    <div className="h-44 flex flex-col items-center justify-center text-ui-secondary text-xs gap-2 border border-dashed border-ui-accent/60 rounded-xl bg-ui-accent/5">
+                        <CalendarDays size={26} className="opacity-40" />
+                        <span className="font-semibold">Brak zarejestrowanych faktur dla tego dostawcy</span>
+                    </div>
+                ) : (
+                    <div className="h-[260px] w-full pt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={monthlySpendingData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                <XAxis
+                                    dataKey="month"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                                    dy={8}
+                                />
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                                    tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k zł` : `${val} zł`}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(229, 231, 235, 0.4)' }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const item = payload[0]?.payload;
+                                            return (
+                                                <div className="bg-ui-white border border-ui-accent rounded-xl p-3.5 shadow-xl text-xs min-w-[190px]">
+                                                    <div className="font-black text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2 flex items-center justify-between">
+                                                        <span>{item.fullMonth}</span>
+                                                        <span className="text-[10px] text-ui-secondary font-semibold font-mono">
+                                                            {item.count} {item.count === 1 ? "faktura" : item.count < 5 ? "faktury" : "faktur"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <span className="text-ui-secondary">Wydatki brutto:</span>
+                                                            <span className="font-black text-ui-primary text-sm">
+                                                                {item.gross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-3 text-[11px]">
+                                                            <span className="text-ui-secondary">Wydatki netto:</span>
+                                                            <span className="font-semibold text-ui-black">
+                                                                {item.net.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar
+                                    dataKey="gross"
+                                    name="Wydatki brutto"
+                                    fill="#0c8ac9"
+                                    radius={[5, 5, 0, 0]}
+                                    maxBarSize={48}
+                                />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
             </div>
 
             {/* ========================================================= */}
@@ -758,8 +955,8 @@ export default function ContractorDetailPage() {
                                                     <FileText size={18} />
                                                 </div>
                                                 <div>
-                                                    <div className="font-extrabold text-sm text-ui-black flex flex-wrap items-center gap-2">
-                                                        <span>Faktura nr {inv.invoiceNumber}</span>
+                                                    <div className="font-bold text-sm text-ui-black flex flex-wrap items-center gap-2">
+                                                        <span>{inv.invoiceNumber}</span>
                                                         {inv.isSales ? (
                                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider">
                                                                 Sprzedaż
@@ -774,7 +971,7 @@ export default function ContractorDetailPage() {
                                                         </span>
                                                     </div>
                                                     <div className="text-[11px] text-ui-secondary flex items-center gap-3 mt-0.5">
-                                                        <span>Wystawiono: <b>{formatDate(inv.issuedDate)}</b></span>
+                                                        <span>{formatDate(inv.issuedDate)}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -973,35 +1170,55 @@ export default function ContractorDetailPage() {
                     {/* Prawa kolumna: Podgląd gotowego tekstu do skopiowania */}
                     <div className="lg:col-span-5 bg-ui-accent/10 border border-ui-accent/40 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
                         <div>
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center justify-between mb-3 gap-2">
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-sm font-bold text-ui-primary tracking-wider">
-                                        Gotowa lista do skopiowania
+                                        Treść zamówienia
                                     </h3>
+                                    <span className="text-[10px] text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-md font-medium">
+                                        Edytowalna
+                                    </span>
                                 </div>
-                                <span className="text-xs font-bold bg-ui-accent/20 text-ui-primary px-2 py-0.5 rounded-full">
-                                    {selectedCount} pozycji
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    {customShoppingListText !== generatedShoppingListText && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomShoppingListText(generatedShoppingListText)}
+                                            title="Przywróć domyślnie wygenerowaną treść zamówienia"
+                                            className="text-[11px] text-ui-secondary hover:text-ui-black flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+                                        >
+                                            <RotateCcw size={12} />
+                                            Przywróć
+                                        </button>
+                                    )}
+                                    <span className="text-xs font-bold bg-ui-accent/20 text-ui-primary px-2 py-0.5 rounded-full">
+                                        {selectedCount} pozycji
+                                    </span>
+                                </div>
                             </div>
 
                             <div className="relative">
                                 <textarea
-                                    readOnly
                                     rows={14}
-                                    value={generatedShoppingListText}
-                                    className="w-full bg-ui-white border border-ui-accent/40 rounded-lg p-3.5 text-xs text-ui-black font-mono leading-relaxed focus:outline-none shadow-inner resize-none"
+                                    value={customShoppingListText}
+                                    onChange={(e) => setCustomShoppingListText(e.target.value)}
+                                    placeholder="Wybierz produkty z listy po lewej lub wpisz treść zamówienia ręcznie..."
+                                    className="w-full bg-ui-white border border-ui-accent/60 rounded-xl p-3.5 text-xs text-ui-black font-mono leading-relaxed focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary/30 shadow-inner resize-y transition-all"
                                 />
                             </div>
+                            <p className="text-[11px] text-ui-secondary mt-1.5 leading-normal">
+                                Możesz bezpośrednio w tym polu modyfikować treść, dopisywać własne produkty lub zmieniać treść wiadomości przed skopiowaniem.
+                            </p>
                         </div>
 
                         {/* Przyciski akcji: Kopiuj / Wyślij */}
                         <div className="mt-4 flex flex-col sm:flex-row items-center gap-2.5">
                             <button
                                 onClick={handleCopyList}
-                                disabled={selectedCount === 0}
+                                disabled={!customShoppingListText.trim()}
                                 className={`flex-1 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer ${copiedToClipboard
                                     ? "bg-ui-accent text-white"
-                                    : "bg-ui-primary hover:bg-ui-primary/60 text-white "
+                                    : "bg-ui-primary hover:bg-ui-primary/80 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                     }`}
                             >
                                 {copiedToClipboard ? (
@@ -1021,7 +1238,7 @@ export default function ContractorDetailPage() {
                                 <a
                                     href={`mailto:${contractor.email}?subject=${encodeURIComponent(
                                         `Zamówienie - Piekarnia MWS (${new Date().toLocaleDateString("pl-PL")})`
-                                    )}&body=${encodeURIComponent(generatedShoppingListText)}`}
+                                    )}&body=${encodeURIComponent(customShoppingListText)}`}
                                     className="px-4 py-3 rounded-xl border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary font-bold text-xs transition-colors cursor-pointer flex items-center gap-2 shrink-0"
                                     title="Otwórz w programie pocztowym"
                                 >

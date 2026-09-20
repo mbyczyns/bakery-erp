@@ -56,6 +56,7 @@ interface Recipe {
     type: ProductType;
     productionCost: number | string;
     sellingPrice: number | string;
+    packagingCost?: number | string;
     ingredients: RecipeIngredientItem[];
 }
 
@@ -92,6 +93,7 @@ export default function PrzepisyPage() {
     const [newName, setNewName] = useState("");
     const [newProductType, setNewProductType] = useState<ProductType>("BREAD");
     const [newSellingPrice, setNewSellingPrice] = useState<string>("0");
+    const [newPackagingCost, setNewPackagingCost] = useState<string>("0");
     const [newSemiUnit, setNewSemiUnit] = useState<string>("kg");
     const [batchSize, setBatchSize] = useState<string>("10");
 
@@ -300,6 +302,8 @@ export default function PrzepisyPage() {
                     };
                 });
 
+                const cleanPackagingCost = parseFloat(newPackagingCost.replace(",", ".").trim()) || 0;
+
                 const res = await fetch("/api/przepisy", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -307,6 +311,7 @@ export default function PrzepisyPage() {
                         name: newName.trim(),
                         type: newProductType,
                         sellingPrice: 0,
+                        packagingCost: cleanPackagingCost,
                         ingredients: singleUnitIngredients,
                     }),
                 });
@@ -347,6 +352,7 @@ export default function PrzepisyPage() {
             // Reset formularza
             setNewName("");
             setNewSellingPrice("0");
+            setNewPackagingCost("0");
             setBatchSize("10");
             setFormItems([]);
             setEditingSemiFinishedId(null);
@@ -394,6 +400,7 @@ export default function PrzepisyPage() {
                             setCreationKind("PRODUCT");
                             setNewProductType(activeTab === "SEMI_FINISHED" ? "BREAD" : activeTab);
                             setBatchSize("10");
+                            setNewPackagingCost("0");
                             setNewName("");
                             setFormItems([]);
                             setIsAddModalOpen(true);
@@ -412,8 +419,8 @@ export default function PrzepisyPage() {
                     [
                         { id: "BREAD", label: "Chleby" },
                         { id: "ROLL", label: "Bułki" },
-                        { id: "SWEET", label: "Słodkie wypieki" },
-                        { id: "SAVORY", label: "Słone wypieki" },
+                        { id: "SWEET", label: "Wypieki słodkie" },
+                        { id: "SAVORY", label: "Wypieki słone" },
                         { id: "SEMI_FINISHED", label: "Półprodukty" },
                     ] as { id: MainTab; label: string; icon?: any }[]
                 ).map((tab) => {
@@ -563,7 +570,7 @@ export default function PrzepisyPage() {
                                             }}
                                             className="flex items-center gap-1 mx-auto text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
                                         >
-                                            Foodcost & Marża
+                                            Foodcost
                                             <ChevronRight size={14} />
                                         </button>
                                     </td>
@@ -584,10 +591,10 @@ export default function PrzepisyPage() {
                         className="bg-ui-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[85vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-5 border-b border-ui-accent bg-amber-50/50 flex items-center justify-between">
+                        <div className="p-5 border-b border-ui-accent  flex items-center justify-between">
                             <div>
                                 <h2 className="text-xl font-bold text-ui-black">{selectedRecipe.name}</h2>
-                                <p className="text-xs text-ui-secondary mt-0.5">
+                                <p className="text-xs text-ui-primary mt-0.5">
                                     Cena sprzedaży: <b>{Number(selectedRecipe.sellingPrice || 0).toFixed(2)} zł</b>
                                 </p>
                             </div>
@@ -660,16 +667,11 @@ export default function PrzepisyPage() {
                         </div>
 
                         {/* Stopka z linkiem do pełnej karty receptury i kalkulatora */}
-                        <div className="p-4 border-t border-ui-accent bg-amber-50/30 flex items-center justify-between">
-                            <button
-                                onClick={() => setSelectedRecipe(null)}
-                                className="px-4 py-2 rounded-xl border border-ui-accent text-ui-secondary hover:text-ui-primary font-semibold text-xs transition-colors cursor-pointer"
-                            >
-                                Zamknij
-                            </button>
+                        <div className="p-4 border-t border-ui-accent  flex items-end justify-end">
+
                             <button
                                 onClick={() => router.push(`/przepisy/${selectedRecipe.id}`)}
-                                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+                                className=" flex gap-1  text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
                             >
                                 Pełny foodcost, marża i historia
                                 <ChevronRight size={15} />
@@ -868,7 +870,7 @@ export default function PrzepisyPage() {
                             {/* Dane podstawowe */}
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                                 {/* Nazwa wyrobu / półproduktu */}
-                                <div className="md:col-span-6">
+                                <div className={creationKind === "PRODUCT" ? "md:col-span-4" : "md:col-span-6"}>
                                     <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
                                         Nazwa {creationKind === "PRODUCT" ? "wyrobu" : "półproduktu"}
                                     </label>
@@ -886,28 +888,49 @@ export default function PrzepisyPage() {
                                     />
                                 </div>
 
-                                {/* Kategoria dla wyrobu LUB Jednostka dla półproduktu */}
+                                {/* Kategoria dla wyrobu + Koszt opakowania LUB Jednostka dla półproduktu */}
                                 {creationKind === "PRODUCT" ? (
-                                    <div className="md:col-span-3">
-                                        <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
-                                            Kategoria
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={newProductType}
-                                                onChange={(e) => setNewProductType(e.target.value as ProductType)}
-                                                className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm"
-                                            >
-                                                <option value="BREAD">Chleb</option>
-                                                <option value="ROLL">Bułka</option>
-                                                <option value="SWEET">Słodkie</option>
-                                                <option value="SAVORY">Słone</option>
-                                            </select>
-                                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
-                                                <ChevronDown size={16} />
+                                    <>
+                                        <div className="md:col-span-3">
+                                            <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
+                                                Kategoria
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={newProductType}
+                                                    onChange={(e) => setNewProductType(e.target.value as ProductType)}
+                                                    className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm"
+                                                >
+                                                    <option value="BREAD">Chleb</option>
+                                                    <option value="ROLL">Bułka</option>
+                                                    <option value="SWEET">Słodkie</option>
+                                                    <option value="SAVORY">Słone</option>
+                                                </select>
+                                                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                                    <ChevronDown size={16} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5 truncate" title="Koszt opakowania (zł / szt.)">
+                                                Koszt opakowania
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    value={newPackagingCost}
+                                                    onChange={(e) => setNewPackagingCost(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-11 py-2 text-sm font-semibold text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
+                                                />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-ui-secondary bg-ui-accent/15 px-1.5 py-0.5 rounded pointer-events-none font-bold">
+                                                    zł
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="md:col-span-3">
                                         <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">

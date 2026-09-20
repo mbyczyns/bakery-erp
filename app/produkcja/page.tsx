@@ -194,8 +194,8 @@ interface PlanApiResponse {
 const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
     BREAD: { label: "Chleby", icon: Wheat },
     ROLL: { label: "Bułki", icon: Layers },
-    SWEET: { label: "Słodkie Wypieki", icon: Croissant },
-    SAVORY: { label: "Słone Wypieki", icon: Pizza },
+    SWEET: { label: "Wypieki słodkie", icon: Croissant },
+    SAVORY: { label: "Wypieki słone", icon: Pizza },
 };
 
 const POLISH_MONTHS = [

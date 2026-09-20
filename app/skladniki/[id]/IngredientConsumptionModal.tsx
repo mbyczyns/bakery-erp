@@ -386,9 +386,9 @@ export default function IngredientConsumptionModal({
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ---------------- NAGŁÓWEK MODALU ---------------- */}
-                <div className="px-6 py-5 border-b border-ui-accent/30 bg-gradient-to-r from-emerald-50/50 via-white to-sky-50/40 flex items-center justify-between">
+                <div className="px-6 py-5 border-b border-ui-accent/30 flex items-center justify-between">
                     <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
+                        <div className="p-2.5 bg-ui-secondary/20 rounded-xl text-ui-secondary shadow-sm">
                             <Scale size={24} />
                         </div>
                         <div>
@@ -422,44 +422,40 @@ export default function IngredientConsumptionModal({
                     <div className="flex items-center gap-1.5 p-1 bg-ui-accent/10 rounded-2xl border border-ui-accent/30">
                         <button
                             onClick={() => setView("DAILY")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                view === "DAILY"
-                                    ? "bg-white text-emerald-700 shadow-sm border border-emerald-100"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                            }`}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "DAILY"
+                                ? "bg-ui-primary text-ui-white shadow-sm"
+                                : "text-ui-secondary hover:text-ui-primary"
+                                }`}
                         >
                             <Calendar size={14} />
                             Dzienne
                         </button>
                         <button
                             onClick={() => setView("WEEKLY")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                view === "WEEKLY"
-                                    ? "bg-white text-emerald-700 shadow-sm border border-emerald-100"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                            }`}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "WEEKLY"
+                                ? "bg-ui-primary text-ui-white shadow-sm"
+                                : "text-ui-secondary hover:text-ui-primary"
+                                }`}
                         >
                             <BarChart3 size={14} />
                             Tygodniowe
                         </button>
                         <button
                             onClick={() => setView("MONTHLY")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                view === "MONTHLY"
-                                    ? "bg-white text-emerald-700 shadow-sm border border-emerald-100"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                            }`}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "MONTHLY"
+                                ? "bg-ui-primary text-ui-white shadow-sm"
+                                : "text-ui-secondary hover:text-ui-primary"
+                                }`}
                         >
                             <CalendarDays size={14} />
                             Miesięczne
                         </button>
                         <button
                             onClick={() => setView("PRODUCTS")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                view === "PRODUCTS"
-                                    ? "bg-white text-emerald-700 shadow-sm border border-emerald-100"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                            }`}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "PRODUCTS"
+                                ? "bg-ui-primary text-ui-white shadow-sm"
+                                : "text-ui-secondary hover:text-ui-primary"
+                                }`}
                         >
                             <Wheat size={14} />
                             Wyroby ({productRanking.length})
@@ -480,11 +476,10 @@ export default function IngredientConsumptionModal({
                                     <button
                                         key={p.id}
                                         onClick={() => setPeriodFilter(p.id)}
-                                        className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                                            periodFilter === p.id
-                                                ? "bg-emerald-600 text-white shadow-xs"
-                                                : "text-ui-secondary hover:bg-ui-accent/10"
-                                        }`}
+                                        className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${periodFilter === p.id
+                                            ? "bg-ui-primary text-white shadow-xs"
+                                            : "text-ui-secondary hover:bg-ui-accent/10"
+                                            }`}
                                     >
                                         {p.label}
                                     </button>
@@ -503,11 +498,10 @@ export default function IngredientConsumptionModal({
                                     <button
                                         key={p.id}
                                         onClick={() => setPeriodFilter(p.id)}
-                                        className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                                            periodFilter === p.id
-                                                ? "bg-emerald-600 text-white shadow-xs"
-                                                : "text-ui-secondary hover:bg-ui-accent/10"
-                                        }`}
+                                        className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${periodFilter === p.id
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "text-ui-secondary hover:bg-ui-accent/10"
+                                            }`}
                                     >
                                         {p.label}
                                     </button>
@@ -525,11 +519,10 @@ export default function IngredientConsumptionModal({
                                     <button
                                         key={p.id}
                                         onClick={() => setPeriodFilter(p.id)}
-                                        className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                                            periodFilter === p.id
-                                                ? "bg-emerald-600 text-white shadow-xs"
-                                                : "text-ui-secondary hover:bg-ui-accent/10"
-                                        }`}
+                                        className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${periodFilter === p.id
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "text-ui-secondary hover:bg-ui-accent/10"
+                                            }`}
                                     >
                                         {p.label}
                                     </button>
@@ -561,7 +554,7 @@ export default function IngredientConsumptionModal({
                 {/* ---------------- ZAWARTOŚĆ GŁÓWNA ---------------- */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {/* KARTY KPI PODSUMOWANIA */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <div className="grid grid-cols-2 lg:grid-cols-2 gap-3.5">
                         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/40 border border-emerald-200/80 rounded-2xl p-4 shadow-xs">
                             <div className="text-[11px] uppercase font-bold text-emerald-800 tracking-wider flex items-center gap-1.5">
                                 <Package size={14} className="text-emerald-600" />
@@ -581,7 +574,7 @@ export default function IngredientConsumptionModal({
 
                         <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
                             <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                <TrendingUp size={14} className="text-blue-600" />
+                                <TrendingUp size={14} className="text-ui-primary" />
                                 {view === "DAILY" && "Średnia dzienna"}
                                 {view === "WEEKLY" && "Średnia tygodniowa"}
                                 {view === "MONTHLY" && "Średnia miesięczna"}
@@ -603,40 +596,8 @@ export default function IngredientConsumptionModal({
                             </div>
                         </div>
 
-                        <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
-                            <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                <Award size={14} className="text-amber-500" />
-                                {view === "PRODUCTS" ? "Bezpośrednie vs Półprod." : "Szczyt (Peak)"}
-                            </div>
-                            <div className="mt-2 text-xl font-black text-ui-black truncate">
-                                {view === "PRODUCTS" ? (
-                                    `${productRanking.filter((p) => p.isDirect).length} bezp. / ${
-                                        productRanking.filter((p) => p.isSemiFinished).length
-                                    } półp.`
-                                ) : (
-                                    <>
-                                        {statsSummary.peakValue.toLocaleString("pl-PL")}{" "}
-                                        <span className="text-xs font-semibold text-ui-secondary">{unit}</span>
-                                    </>
-                                )}
-                            </div>
-                            <div className="text-[10px] text-ui-secondary mt-1 font-medium truncate">
-                                {view === "PRODUCTS" ? "Typy powiązań w recepturach" : statsSummary.peakLabel}
-                            </div>
-                        </div>
 
-                        <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
-                            <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                <Wheat size={14} className="text-amber-700" />
-                                Główny wyrób
-                            </div>
-                            <div className="mt-2 text-lg font-black text-ui-black truncate" title={statsSummary.topProductName}>
-                                {statsSummary.topProductName}
-                            </div>
-                            <div className="text-[10px] text-ui-secondary mt-1 font-medium">
-                                {statsSummary.topProductShare}% udziału ({statsSummary.topProductAmount} {unit})
-                            </div>
-                        </div>
+
                     </div>
 
                     {/* ---------------- WYKRES RECHARTS (WIDOKI CZASOWE) ---------------- */}
@@ -682,20 +643,20 @@ export default function IngredientConsumptionModal({
                                                                     ? `${dataPoint.dayOfWeek}, ${formatDate(dataPoint.fullDate || "")}`
                                                                     : label}
                                                             </div>
-                                                            <div className="flex items-center justify-between text-emerald-700 font-bold mb-1">
-                                                                <span>Zużyto:</span>
-                                                                <span>
-                                                                    {dataPoint.consumed} {unit}
-                                                                </span>
-                                                            </div>
                                                             {dataPoint.purchased > 0 && (
-                                                                <div className="flex items-center justify-between text-blue-600 font-bold mb-1">
+                                                                <div className="flex items-center justify-between text-ui-primary font-bold mb-1">
                                                                     <span>Zakupiono:</span>
                                                                     <span>
                                                                         {dataPoint.purchased} {unit}
                                                                     </span>
                                                                 </div>
                                                             )}
+                                                            <div className="flex items-center justify-between text-emerald-700 font-bold mb-1">
+                                                                <span>Zużyto:</span>
+                                                                <span>
+                                                                    {dataPoint.consumed} {unit}
+                                                                </span>
+                                                            </div>
                                                             {dataPoint.products && dataPoint.products.length > 0 && (
                                                                 <div className="mt-2 pt-2 border-t border-ui-accent/30 space-y-1">
                                                                     <div className="text-[10px] text-ui-secondary font-bold uppercase">
@@ -729,13 +690,13 @@ export default function IngredientConsumptionModal({
                                             <Legend
                                                 wrapperStyle={{ paddingTop: "8px", fontSize: "11px", fontWeight: "600" }}
                                                 iconType="circle"
-                                                formatter={(val) => (val === "consumed" ? "Zużyto" : "Zakupiono")}
+                                                formatter={(val) => (val === "purchased" ? "Zakupiono" : "Zużyto")}
                                             />
                                         )}
-                                        <Bar dataKey="consumed" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={36} />
                                         {view === "MONTHLY" && (
                                             <Bar dataKey="purchased" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={36} />
                                         )}
+                                        <Bar dataKey="consumed" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={36} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -774,9 +735,8 @@ export default function IngredientConsumptionModal({
                                                     <React.Fragment key={d.date}>
                                                         <tr
                                                             onClick={() => toggleRow(d.date)}
-                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${
-                                                                isExpanded ? "bg-emerald-50/30" : ""
-                                                            }`}
+                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${isExpanded ? "bg-emerald-50/30" : ""
+                                                                }`}
                                                         >
                                                             <td className="p-3.5 font-bold text-ui-black">
                                                                 {formatDate(d.date)}
@@ -793,7 +753,7 @@ export default function IngredientConsumptionModal({
                                                                     {d.products.length} {d.products.length === 1 ? "wyrób" : "wyrobów"}
                                                                 </span>
                                                             </td>
-                                                            <td className="p-3.5 text-right font-semibold text-blue-600">
+                                                            <td className="p-3.5 text-right font-semibold text-ui-primary">
                                                                 {d.totalPurchased > 0 ? `${d.totalPurchased.toFixed(2)} ${unit}` : "-"}
                                                             </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
@@ -891,9 +851,8 @@ export default function IngredientConsumptionModal({
                                                     <React.Fragment key={w.key}>
                                                         <tr
                                                             onClick={() => toggleRow(w.key)}
-                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${
-                                                                isExpanded ? "bg-emerald-50/30" : ""
-                                                            }`}
+                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${isExpanded ? "bg-emerald-50/30" : ""
+                                                                }`}
                                                         >
                                                             <td className="p-3.5">
                                                                 <div className="font-bold text-ui-black">{w.label}</div>
@@ -906,13 +865,13 @@ export default function IngredientConsumptionModal({
                                                                     {w.daysWithProduction} / 7 dni
                                                                 </span>
                                                             </td>
-                                                            <td className="p-3.5 text-right font-black text-emerald-700 text-sm">
+                                                            <td className="p-3.5 text-right font-black text-ui-primary text-sm">
                                                                 {w.totalConsumed.toFixed(2)} {unit}
                                                             </td>
                                                             <td className="p-3.5 text-right font-bold text-ui-primary">
                                                                 {w.avgDailyConsumed.toFixed(2)} {unit}
                                                             </td>
-                                                            <td className="p-3.5 text-right font-semibold text-blue-600">
+                                                            <td className="p-3.5 text-right font-semibold text-ui-primary">
                                                                 {w.totalPurchased > 0 ? `${w.totalPurchased.toFixed(2)} ${unit}` : "-"}
                                                             </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
@@ -990,7 +949,6 @@ export default function IngredientConsumptionModal({
                                             <th className="p-3.5 text-right">Zużycie ({unit})</th>
                                             <th className="p-3.5 text-right">Zakupy ({unit})</th>
                                             <th className="p-3.5 text-right">Bilans (Zakup - Zużycie)</th>
-                                            <th className="p-3.5 text-right">Szacowany koszt</th>
                                             <th className="p-3.5 text-center w-10">Szczegóły</th>
                                         </tr>
                                     </thead>
@@ -1003,9 +961,8 @@ export default function IngredientConsumptionModal({
                                                     <React.Fragment key={m.key}>
                                                         <tr
                                                             onClick={() => toggleRow(m.key)}
-                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${
-                                                                isExpanded ? "bg-emerald-50/30" : ""
-                                                            }`}
+                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${isExpanded ? "bg-emerald-50/30" : ""
+                                                                }`}
                                                         >
                                                             <td className="p-3.5 font-bold text-ui-black text-sm">
                                                                 {m.label}
@@ -1015,25 +972,21 @@ export default function IngredientConsumptionModal({
                                                                     {m.daysWithProduction} dni
                                                                 </span>
                                                             </td>
-                                                            <td className="p-3.5 text-right font-black text-emerald-700 text-sm">
+                                                            <td className="p-3.5 text-right font-black text-ui-primary text-sm">
                                                                 {m.totalConsumed.toFixed(2)} {unit}
                                                             </td>
-                                                            <td className="p-3.5 text-right font-bold text-blue-600">
+                                                            <td className="p-3.5 text-right font-bold text-ui-primary">
                                                                 {m.totalPurchased.toFixed(2)} {unit}
                                                             </td>
                                                             <td className="p-3.5 text-right font-bold">
                                                                 <span
-                                                                    className={`px-2 py-0.5 rounded-lg text-[11px] ${
-                                                                        balance >= 0
-                                                                            ? "bg-blue-50 text-blue-800 border border-blue-200"
-                                                                            : "bg-amber-50 text-amber-800 border border-amber-200"
-                                                                    }`}
+                                                                    className={`px-2 py-0.5 rounded-lg text-[11px] ${balance >= 0
+                                                                        ? "bg-ui-primary/10 text-ui-primary border border-ui-accent"
+                                                                        : "bg-ui-error/15 text-ui-error border border-ui-accent"
+                                                                        }`}
                                                                 >
                                                                     {balance >= 0 ? `+${balance.toFixed(2)}` : balance.toFixed(2)} {unit}
                                                                 </span>
-                                                            </td>
-                                                            <td className="p-3.5 text-right font-black text-ui-black">
-                                                                {m.estimatedCost.toFixed(2)} zł
                                                             </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
                                                                 {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -1154,19 +1107,7 @@ export default function IngredientConsumptionModal({
                     )}
                 </div>
 
-                {/* ---------------- STOPKA MODALU ---------------- */}
-                <div className="px-6 py-4 border-t border-ui-accent/30 bg-ui-white/90 flex items-center justify-between">
-                    <div className="text-xs text-ui-secondary font-medium flex items-center gap-2">
-                        <Sparkles size={14} className="text-emerald-600" />
-                        Dane aktualizowane w czasie rzeczywistym na podstawie dziennych raportów produkcji
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="px-5 py-2 rounded-xl bg-ui-primary text-white text-xs font-bold hover:bg-emerald-800 transition-colors shadow-sm cursor-pointer"
-                    >
-                        Zamknij okno
-                    </button>
-                </div>
+
             </div>
         </div>
     );

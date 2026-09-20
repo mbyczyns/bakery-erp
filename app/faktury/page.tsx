@@ -20,6 +20,7 @@ import {
     ArrowRightLeft,
     AlertCircle,
     CheckCircle,
+    RotateCcw,
     Sparkles
 } from "lucide-react";
 
@@ -459,6 +460,37 @@ export default function FakturyPage() {
         }
     };
 
+    const [restoringDocId, setRestoringDocId] = useState<string | null>(null);
+
+    // Przywracanie odrzuconej faktury z powrotem do weryfikacji
+    const handleRestoreInvoice = async (invoiceId: string) => {
+        if (!confirm("Czy na pewno chcesz przywrócić tę fakturę do weryfikacji?")) {
+            return;
+        }
+
+        setRestoringDocId(invoiceId);
+        try {
+            const res = await fetch(`/api/faktury/${invoiceId}/restore`, {
+                method: "POST",
+            });
+
+            if (res.ok) {
+                await fetchInvoices();
+                if (selectedDoc && selectedDoc.id === invoiceId) {
+                    setSelectedDoc(null);
+                }
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.error || "Wystąpił błąd podczas przywracania faktury.");
+            }
+        } catch (error) {
+            console.error("Błąd przywracania faktury:", error);
+            alert("Błąd połączenia z serwerem podczas przywracania faktury.");
+        } finally {
+            setRestoringDocId(null);
+        }
+    };
+
     // Zliczanie dokumentów kosztowych (bez flagi isSales)
     const costDocuments = documents.filter(d => !d.isSales);
     const waitingCount = costDocuments.filter((d) => d.status === "WAITING").length;
@@ -702,20 +734,41 @@ export default function FakturyPage() {
                                                     </div>
                                                 ) : (
                                                     // KOSZTOWE ODRZUCONE
-                                                    <button
-                                                        onClick={() => loadInvoiceDetails(doc, "VIEW")}
-                                                        disabled={isThisLoading}
-                                                        className="border border-ui-accent hover:bg-ui-accent/20 text-black text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto disabled:opacity-60"
-                                                    >
-                                                        {isThisLoading ? (
-                                                            <Loader2 size={14} className="animate-spin" />
-                                                        ) : (
-                                                            <>
-                                                                <Eye size={14} />
-                                                                Podgląd
-                                                            </>
-                                                        )}
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => loadInvoiceDetails(doc, "VIEW")}
+                                                            disabled={isThisLoading || restoringDocId === doc.id}
+                                                            className="border border-ui-accent hover:bg-ui-accent/20 text-black text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-60"
+                                                            title="Podgląd faktury"
+                                                        >
+                                                            {isThisLoading ? (
+                                                                <Loader2 size={14} className="animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <Eye size={14} />
+
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleRestoreInvoice(doc.id)}
+                                                            disabled={isThisLoading || restoringDocId === doc.id}
+                                                            className="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 shadow-2xs"
+                                                            title="Przywróć fakturę do weryfikacji"
+                                                        >
+                                                            {restoringDocId === doc.id ? (
+                                                                <>
+                                                                    <Loader2 size={14} className="animate-spin" />
+                                                                    Przywracam...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <RotateCcw size={13} />
+
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -760,14 +813,14 @@ export default function FakturyPage() {
             {/* Uniwersalny View Modal - obsługuje poprawnie zarówno kosztowe jak i sprzedażowe */}
             {selectedDoc && (
                 <div
-                    className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in"
                     onClick={() => setSelectedDoc(null)}
                 >
                     <div
-                        className="bg-ui-white w-full max-w-3xl rounded-2xl shadow-xl border border-ui-accent flex flex-col my-8 relative"
+                        className="bg-ui-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl border border-ui-accent flex flex-col relative overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="border-b border-ui-accent p-5 flex items-start justify-between bg-ui-white rounded-t-2xl">
+                        <div className="border-b border-ui-accent p-5 flex items-start justify-between bg-ui-white rounded-t-2xl shrink-0">
                             <div>
                                 <h2 className="text-xl font-bold text-ui-primary flex items-center gap-2">
                                     {selectedDoc.docNumber}
@@ -782,7 +835,7 @@ export default function FakturyPage() {
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-6 text-sm flex-1 bg-ui-white rounded-b-2xl">
+                        <div className="p-6 space-y-6 text-sm flex-1 bg-ui-white rounded-b-2xl overflow-y-auto min-h-0">
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-ui-accent/10 p-4 rounded-xl border border-ui-accent/40">
                                 <div>
                                     <span className="text-xs text-ui-secondary font-bold block">Data wystawienia:</span>
@@ -828,6 +881,29 @@ export default function FakturyPage() {
                                 </div>
                             </div>
                         </div>
+
+                        {selectedDoc.status === "REJECTED" && (
+                            <div className="px-6 py-4 border-t border-ui-accent flex justify-end items-center bg-ui-white rounded-b-2xl shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => handleRestoreInvoice(selectedDoc.id)}
+                                    disabled={restoringDocId === selectedDoc.id}
+                                    className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                    {restoringDocId === selectedDoc.id ? (
+                                        <>
+                                            <Loader2 size={15} className="animate-spin" />
+                                            Przywracam...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RotateCcw size={15} />
+                                            Przywróć do weryfikacji
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -1043,10 +1119,10 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
     const newItemsCount = (doc.positions || []).filter(pos => !pos.categoryId).length;
 
     return (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-ui-white w-full max-w-5xl rounded-2xl shadow-2xl border border-ui-accent flex flex-col my-8 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/50 backdrop-blur-xs animate-fade-in">
+            <div className="bg-ui-white w-full max-w-5xl max-h-[92vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden">
 
-                <div className="px-6 py-6 border-b border-ui-accent flex flex-col sm:flex-row items-start sm:items-center justify-between bg-ui-white rounded-t-2xl gap-4">
+                <div className="px-6 py-5 border-b border-ui-accent flex flex-col sm:flex-row items-start sm:items-center justify-between bg-ui-white rounded-t-2xl gap-4 shrink-0">
                     <div className="flex items-start gap-4">
                         <div className="bg-ui-accent/20 p-3 rounded-2xl text-ui-primary hidden sm:block mt-1">
                             <FileText size={28} />
@@ -1083,7 +1159,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                     </div>
                 </div>
 
-                <div className="p-6 space-y-4 flex-1">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto min-h-0">
                     {/* Szybkie przypisanie wybranej kategorii do wszystkich pozycji faktury */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-ui-accent/10 border border-ui-accent rounded-xl p-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-ui-primary">
@@ -1225,7 +1301,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                     </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-ui-accent flex flex-col sm:flex-row justify-between items-center gap-3 bg-ui-white rounded-b-2xl">
+                <div className="px-6 py-4 border-t border-ui-accent flex flex-col sm:flex-row justify-between items-center gap-3 bg-ui-white rounded-b-2xl shrink-0">
                     {doc.status === "WAITING" ? (
                         <button
                             type="button"
@@ -1263,7 +1339,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 
             {/* Sub-modal: Dodawanie nowego surowca */}
             {newIngredientConfig.isOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
                     <div className="bg-ui-white w-full max-w-sm rounded-2xl shadow-2xl border border-ui-accent p-6">
                         <h3 className="text-lg font-bold text-ui-black mb-4">Dodaj nowy surowiec</h3>
                         <div className="space-y-4">
@@ -1532,10 +1608,10 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
     };
 
     return (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-ui-white w-full max-w-6xl rounded-2xl shadow-2xl border border-ui-accent flex flex-col my-8 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/50 backdrop-blur-xs animate-fade-in">
+            <div className="bg-ui-white w-full max-w-6xl max-h-[92vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden">
 
-                <div className="px-6 py-6 border-b border-ui-accent bg-ui-white rounded-t-2xl">
+                <div className="px-6 py-5 border-b border-ui-accent bg-ui-white rounded-t-2xl shrink-0">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <div className="bg-ui-accent/20 p-2.5 rounded-xl text-ui-primary">
@@ -1579,7 +1655,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                     </div>
                 </div>
 
-                <div className="p-6 space-y-4 flex-1">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto min-h-0">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Pozycje Kosztowe</h3>
                         <div className="text-right">
@@ -1745,7 +1821,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                     </button>
                 </div>
 
-                <div className="px-6 py-4 border-t border-ui-accent flex flex-col sm:flex-row justify-end items-center gap-3 bg-ui-white rounded-b-2xl">
+                <div className="px-6 py-4 border-t border-ui-accent flex flex-col sm:flex-row justify-end items-center gap-3 bg-ui-white rounded-b-2xl shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
@@ -1766,7 +1842,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
             </div>
 
             {newIngredientConfig.isOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
                     <div className="bg-ui-white w-full max-w-sm rounded-2xl shadow-2xl border border-ui-accent p-6">
                         <h3 className="text-lg font-bold text-ui-black mb-4">Dodaj nowy surowiec</h3>
                         <div className="space-y-4">

@@ -18,6 +18,7 @@ export async function POST(
             return NextResponse.json({ error: "Nie znaleziono faktury" }, { status: 404 });
         }
 
+        // Przywracamy status do weryfikacji (WAITING)
         const restoredInvoice = await prisma.invoice.update({
             where: { id: invoiceId },
             data: { status: InvoiceStatus.WAITING },

@@ -121,6 +121,9 @@ export async function PATCH(
                     }
                 }
 
+                // Doliczamy koszt opakowania
+                newFoodCost += Number((bp as any).packagingCost || 0);
+
                 await tx.bakeryProduct.update({
                     where: { id: bp.id },
                     data: { productionCost: newFoodCost },

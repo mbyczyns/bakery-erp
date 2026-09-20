@@ -146,8 +146,8 @@ interface ProductRankingItem {
 const CATEGORY_MAP: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
     BREAD: { label: "Chleby", color: "#0c8ac9", icon: Wheat },
     ROLL: { label: "Bułki", color: "#38bdf8", icon: Layers },
-    SWEET: { label: "Słodkie Wypieki", color: "#f59e0b", icon: Croissant },
-    SAVORY: { label: "Słone Wypieki", color: "#10b981", icon: Pizza },
+    SWEET: { label: "Wypieki słodkie", color: "#f59e0b", icon: Croissant },
+    SAVORY: { label: "Wypieki słone", color: "#10b981", icon: Pizza },
 };
 
 function formatCurrency(amount: number): string {
@@ -1188,11 +1188,10 @@ export default function PrzychodyTab() {
                                         <th className="p-3.5">Nazwa wyrobu</th>
                                         <th className="p-3.5">Kategoria</th>
                                         <th className="p-3.5 text-right">Cena jedn.</th>
-                                        <th className="p-3.5 text-center">Sprzedano (szt.)</th>
-                                        <th className="p-3.5 text-center">Wyprodukowano (szt.)</th>
+                                        <th className="p-3.5 text-center">Sprzedaż (szt.)</th>
+                                        <th className="p-3.5 text-center">Produkcja (szt.)</th>
                                         <th className="p-3.5 text-center">Wyprzedanie (%)</th>
                                         <th className="p-3.5 text-right">Łączny przychód</th>
-                                        <th className="p-3.5 text-center w-36">Udział w pieczywie</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-ui-accent/30 font-medium">
@@ -1212,13 +1211,13 @@ export default function PrzychodyTab() {
                                                             {catInfo?.label || p.productType}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3.5 text-right font-semibold text-ui-secondary">
+                                                    <td className="p-3.5 text-right font-semibold text-ui-black">
                                                         {p.sellingPrice.toFixed(2)} zł
                                                     </td>
-                                                    <td className="p-3.5 text-center font-bold text-ui-black">
+                                                    <td className="p-3.5 text-center font-semibold text-ui-black">
                                                         {p.totalSold.toLocaleString("pl-PL")}
                                                     </td>
-                                                    <td className="p-3.5 text-center text-ui-secondary">
+                                                    <td className="p-3.5 text-center font-semibold text-ui-black">
                                                         {p.totalProduced.toLocaleString("pl-PL")}
                                                     </td>
                                                     <td className="p-3.5 text-center">
@@ -1229,19 +1228,7 @@ export default function PrzychodyTab() {
                                                     <td className="p-3.5 text-right font-black text-ui-black text-sm">
                                                         {formatCurrency(p.totalRevenue)}
                                                     </td>
-                                                    <td className="p-3.5 text-center">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1 bg-ui-accent/20 h-2 rounded-full overflow-hidden">
-                                                                <div
-                                                                    className="bg-ui-primary h-full rounded-full"
-                                                                    style={{ width: `${Math.min(Math.max(p.sharePercent, 2), 100)}%` }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-[11px] font-bold text-ui-primary min-w-[32px] text-right">
-                                                                {p.sharePercent}%
-                                                            </span>
-                                                        </div>
-                                                    </td>
+
                                                 </tr>
                                             );
                                         })

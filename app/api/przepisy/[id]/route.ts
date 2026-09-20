@@ -40,7 +40,7 @@ export async function GET(
             return NextResponse.json({ error: "Nie znaleziono przepisu" }, { status: 404 });
         }
 
-        // Obliczamy dokładny koszt surowcowy (foodcost) na 1 sztukę wyrobu
+        // Obliczamy dokładny koszt surowcowy (foodcost) na 1 sztukę wyrobu (składniki + koszt opakowania)
         let calculatedFoodCost = 0;
         const detailedIngredients = recipe.ingredients.map((item) => {
             const amountNum = Number(item.amount || 0);
@@ -71,6 +71,10 @@ export async function GET(
             };
         });
 
+        // Doliczamy koszt opakowania do całkowitego foodcostu wyrobu
+        const packagingCost = Number((recipe as any).packagingCost || 0);
+        calculatedFoodCost += packagingCost;
+
         // Jeśli koszt w bazie różni się od wyliczonego, możemy go zsynchronizować w tle
         if (Number(recipe.productionCost) !== Number(calculatedFoodCost.toFixed(2))) {
             await prisma.bakeryProduct.update({
@@ -89,9 +93,11 @@ export async function GET(
         return NextResponse.json({
             recipe: {
                 ...recipe,
+                packagingCost,
                 productionCost: calculatedFoodCost,
             },
             detailedIngredients,
+            packagingCost,
             totalFoodCost: calculatedFoodCost,
             productionStats: {
                 totalProduced,
@@ -127,11 +133,14 @@ export async function PATCH(
     try {
         const { id } = await context.params;
         const body = await request.json();
-        const { sellingPrice, name, type } = body;
+        const { sellingPrice, packagingCost, name, type } = body;
 
         const updateData: any = {};
         if (sellingPrice !== undefined) {
             updateData.sellingPrice = Number(sellingPrice);
+        }
+        if (packagingCost !== undefined) {
+            updateData.packagingCost = Number(packagingCost);
         }
         if (name !== undefined) {
             updateData.name = name.trim();
@@ -155,7 +164,7 @@ export async function PATCH(
     }
 }
 
-// PUT: Pełna edycja przepisu (nazwa, kategoria, składniki)
+// PUT: Pełna edycja przepisu (nazwa, kategoria, koszt opakowania, składniki)
 export async function PUT(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
@@ -167,7 +176,7 @@ export async function PUT(
         }
 
         const body = await request.json();
-        const { name, type, sellingPrice, ingredients } = body;
+        const { name, type, sellingPrice, packagingCost, ingredients } = body;
 
         if (!name || !name.trim()) {
             return NextResponse.json({ error: "Nazwa wyrobu jest wymagana" }, { status: 400 });
@@ -193,6 +202,7 @@ export async function PUT(
                     name: name.trim(),
                     type: type || "BREAD",
                     ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
+                    ...(packagingCost !== undefined && { packagingCost: Number(packagingCost) }),
                     ingredients: {
                         create: ingredients.map((ing: any) => ({
                             amount: Number(ing.amount),

@@ -389,7 +389,7 @@ function AddContractorModal({ isOpen, isSaving, onClose, onSave }: AddContractor
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold text-ui-black">Nowy kontrahent</h2>
-                            <p className="text-xs text-ui-black/50">Uzupełnij dane identyfikacyjne firmy i dane teleadresowe.</p>
+
                         </div>
                     </div>
                     <button

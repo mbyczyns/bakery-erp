@@ -83,14 +83,12 @@ export default function KonfiguracjaPage() {
                 {/* SEKCJA 1: Stawka wody i surowce specjalne */}
                 <div className="bg-ui-white rounded-2xl p-4 sm:p-6 shadow-xs border border-ui-accent hover:border-ui-secondary transition-all duration-300">
                     <div className="flex items-center gap-3 mb-4 sm:mb-6 border-b border-ui-accent/30 pb-3">
-                        <div className="bg-blue-50 p-2 rounded-lg text-blue-700">
+                        <div className="bg-blue-50 p-2 rounded-lg text-ui-secondary">
                             <Droplet size={20} />
                         </div>
                         <div>
-                            <h2 className="text-lg sm:text-xl font-bold text-ui-black">Cena wody i surowce specjalne</h2>
-                            <p className="text-xs text-ui-secondary">
-                                Stawka za litr wody wykorzystywana przy kalkulacji foodcostu pozycji „Woda” oraz „Dolewka wody”
-                            </p>
+                            <h2 className="text-lg sm:text-xl font-bold text-ui-black">Koszt wody</h2>
+
                         </div>
                     </div>
 
@@ -136,7 +134,7 @@ export default function KonfiguracjaPage() {
                             <button
                                 type="submit"
                                 disabled={isSavingWater || isLoadingWater}
-                                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs transition-colors duration-200 cursor-pointer"
                             >
                                 {isSavingWater ? (
                                     <>

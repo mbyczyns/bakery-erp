@@ -664,8 +664,8 @@ export async function GET(
             const found = monthlyHistory.find((mh) => mh.year === m.year && mh.monthIndex === m.monthIndex);
             return {
                 month: m.label,
-                consumed: found ? found.totalConsumed : 0,
                 purchased: found ? found.totalPurchased : 0,
+                consumed: found ? found.totalConsumed : 0,
             };
         });
 
