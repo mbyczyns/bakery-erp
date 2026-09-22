@@ -510,6 +510,129 @@ export default function ProdukcjaPage() {
         }
     };
 
+    // Lista wszystkich produktów w kolejności wyświetlania w formularzu raportu
+    const formOrderedProducts = useMemo(() => {
+        const list: BakeryProduct[] = [];
+        Object.keys(CATEGORY_MAP).forEach((catKey) => {
+            const prods = allProducts.filter((p) => p.type === catKey);
+            list.push(...prods);
+        });
+        const knownIds = new Set(list.map((p) => p.id));
+        allProducts.forEach((p) => {
+            if (!knownIds.has(p.id)) {
+                list.push(p);
+            }
+        });
+        return list;
+    }, [allProducts]);
+
+    // Obsługa nawigacji strzałkami (góra, dół, lewo, prawo) oraz Enter w tabeli raportu
+    const handleGridKeyDown = (
+        e: React.KeyboardEvent<HTMLInputElement>,
+        rowIndex: number,
+        colIndex: number
+    ) => {
+        const totalRows = formOrderedProducts.length;
+        if (totalRows === 0) return;
+
+        if (e.key === "ArrowDown" || e.key === "Enter") {
+            e.preventDefault();
+            const nextRow = (rowIndex + 1) % totalRows;
+            const target = document.querySelector<HTMLInputElement>(
+                `input[data-row="${nextRow}"][data-col="${colIndex}"]`
+            );
+            if (target) {
+                target.focus();
+                target.select();
+            }
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const prevRow = (rowIndex - 1 + totalRows) % totalRows;
+            const target = document.querySelector<HTMLInputElement>(
+                `input[data-row="${prevRow}"][data-col="${colIndex}"]`
+            );
+            if (target) {
+                target.focus();
+                target.select();
+            }
+        } else if (e.key === "ArrowRight") {
+            if (colIndex === 0) {
+                e.preventDefault();
+                const target = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex}"][data-col="1"]`
+                );
+                if (target) {
+                    target.focus();
+                    target.select();
+                }
+            } else if (colIndex === 1) {
+                const soldOutInput = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex}"][data-col="2"]`
+                );
+                if (soldOutInput) {
+                    e.preventDefault();
+                    soldOutInput.focus();
+                    soldOutInput.select();
+                } else if (rowIndex < totalRows - 1) {
+                    e.preventDefault();
+                    const target = document.querySelector<HTMLInputElement>(
+                        `input[data-row="${rowIndex + 1}"][data-col="0"]`
+                    );
+                    if (target) {
+                        target.focus();
+                        target.select();
+                    }
+                }
+            } else if (colIndex === 2 && rowIndex < totalRows - 1) {
+                e.preventDefault();
+                const target = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex + 1}"][data-col="0"]`
+                );
+                if (target) {
+                    target.focus();
+                    target.select();
+                }
+            }
+        } else if (e.key === "ArrowLeft") {
+            if (colIndex === 2) {
+                e.preventDefault();
+                const target = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex}"][data-col="1"]`
+                );
+                if (target) {
+                    target.focus();
+                    target.select();
+                }
+            } else if (colIndex === 1) {
+                e.preventDefault();
+                const target = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex}"][data-col="0"]`
+                );
+                if (target) {
+                    target.focus();
+                    target.select();
+                }
+            } else if (colIndex === 0 && rowIndex > 0) {
+                e.preventDefault();
+                const prevSoldOut = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex - 1}"][data-col="2"]`
+                );
+                if (prevSoldOut) {
+                    prevSoldOut.focus();
+                    prevSoldOut.select();
+                } else {
+                    const target = document.querySelector<HTMLInputElement>(
+                        `input[data-row="${rowIndex - 1}"][data-col="1"]`
+                    );
+                    if (target) {
+                        target.focus();
+                        target.select();
+                    }
+                }
+            }
+        }
+    };
+
     // -------------------------------------------------------------
     // OBSŁUGA SUGEROWANEGO PLANU PRODUKCJI
     // -------------------------------------------------------------
@@ -1600,13 +1723,13 @@ export default function ProdukcjaPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
+                                        type="text"
+                                        inputMode="decimal"
                                         placeholder="0.00"
                                         value={formFiscalIncome}
-                                        onChange={(e) => setFormFiscalIncome(e.target.value)}
-                                        className="w-36 text-right px-3 py-2 bg-white border border-emerald-300 rounded-xl font-black text-emerald-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={(e) => setFormFiscalIncome(e.target.value.replace(/[^0-9.,]/g, ''))}
+                                        className="w-36 text-right px-3 py-2 bg-white border border-emerald-300 rounded-xl font-black text-emerald-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-2xs"
                                     />
                                     <span className="text-xs font-bold text-emerald-900">zł</span>
                                 </div>
@@ -1618,8 +1741,9 @@ export default function ProdukcjaPage() {
                                     <Loader2 size={24} className="animate-spin mx-auto text-ui-primary mb-2" />
                                     Ładowanie listy produktów...
                                 </div>
-                            ) : (
-                                Object.entries(CATEGORY_MAP).map(([catKey, catInfo]) => {
+                            ) : (() => {
+                                let globalRowIndex = 0;
+                                return Object.entries(CATEGORY_MAP).map(([catKey, catInfo]) => {
                                     const prods = allProducts.filter((p) => p.type === catKey);
                                     if (prods.length === 0) return null;
                                     const Icon = catInfo.icon;
@@ -1631,6 +1755,7 @@ export default function ProdukcjaPage() {
                                                     <Icon size={16} className="text-ui-primary" />
                                                     {catInfo.label} ({prods.length})
                                                 </div>
+
                                             </div>
                                             <table className="w-full text-left text-xs border-collapse">
                                                 <thead>
@@ -1645,6 +1770,7 @@ export default function ProdukcjaPage() {
                                                 </thead>
                                                 <tbody className="divide-y divide-ui-accent/30 font-medium">
                                                     {prods.map((prod) => {
+                                                        const currentRowIndex = globalRowIndex++;
                                                         const it = formItems[prod.id] || {
                                                             bakeryProductId: prod.id,
                                                             producedAmount: "",
@@ -1663,24 +1789,30 @@ export default function ProdukcjaPage() {
                                                                 <td className="p-2.5 text-right text-ui-secondary">{Number(prod.sellingPrice).toFixed(2)} zł</td>
                                                                 <td className="p-2.5 text-center">
                                                                     <input
-                                                                        type="number"
-                                                                        step="0.5"
-                                                                        min="0"
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        data-row={currentRowIndex}
+                                                                        data-col="0"
                                                                         placeholder="0"
                                                                         value={it.producedAmount}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value)}
-                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-ui-accent bg-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-ui-secondary"
+                                                                        onFocus={(e) => e.target.select()}
+                                                                        onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 0)}
+                                                                        onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
+                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-ui-accent bg-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-ui-secondary shadow-2xs"
                                                                     />
                                                                 </td>
                                                                 <td className="p-2.5 text-center">
                                                                     <input
-                                                                        type="number"
-                                                                        step="0.5"
-                                                                        min="0"
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        data-row={currentRowIndex}
+                                                                        data-col="1"
                                                                         placeholder="0"
                                                                         value={it.leftoverAmount}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value)}
-                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-amber-300 bg-amber-50/60 font-bold text-xs text-amber-950 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                                        onFocus={(e) => e.target.select()}
+                                                                        onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 1)}
+                                                                        onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
+                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-amber-300 bg-amber-50/60 font-bold text-xs text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
                                                                     />
                                                                 </td>
                                                                 <td className="p-2.5 text-center">
@@ -1698,9 +1830,12 @@ export default function ProdukcjaPage() {
                                                                             <Clock size={13} className="text-ui-primary shrink-0" />
                                                                             <input
                                                                                 type="time"
+                                                                                data-row={currentRowIndex}
+                                                                                data-col="2"
                                                                                 value={it.soldOutTime}
+                                                                                onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 2)}
                                                                                 onChange={(e) => handleFormItemChange(prod.id, "soldOutTime", e.target.value)}
-                                                                                className="px-2 py-0.5 rounded-lg border border-ui-primary bg-ui-primary/10 text-xs font-bold text-ui-primary focus:outline-none focus:ring-1 focus:ring-ui-primary"
+                                                                                className="px-2 py-0.5 rounded-lg border border-ui-primary bg-ui-primary/10 text-xs font-bold text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary"
                                                                             />
                                                                         </div>
                                                                     ) : (
@@ -1714,8 +1849,8 @@ export default function ProdukcjaPage() {
                                             </table>
                                         </div>
                                     );
-                                })
-                            )}
+                                });
+                            })()}
                         </div>
 
                         {/* Stopka Formularza */}

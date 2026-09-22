@@ -341,7 +341,7 @@ export async function syncKsefInvoices(force: boolean = false): Promise<KsefSync
 
             for (const c of allContractors) {
                 if (c.address === 'Pobrano z KSeF') {
-                    await prisma.contractor.update({ where: { id: c.id }, data: { address: '' } }).catch(() => {});
+                    await prisma.contractor.update({ where: { id: c.id }, data: { address: '' } }).catch(() => { });
                 }
 
                 const nNip = cleanNip(c.nip);
@@ -408,11 +408,11 @@ export async function syncKsefInvoices(force: boolean = false): Promise<KsefSync
         }
 
         lastSyncTimestamp = Date.now();
-        console.log(`[KSeF Sync] Sukces. Zsynchronizowano ${importedCount} faktur.`);
+        console.log(`[KSeF Sync] Sukces`);
 
         return {
             success: true,
-            message: `Zsynchronizowano pomyślnie. Zapisano i przetworzono ${importedCount} faktur.`,
+            message: `Zsynchronizowano pomyślnie`,
             importedCount,
         };
     } catch (error: any) {

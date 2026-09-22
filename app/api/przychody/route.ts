@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
+import { getCustomNamesMap } from "@/lib/contractor-names";
 
 const prisma = new PrismaClient();
 
@@ -66,6 +67,7 @@ function getISOWeekInfo(date: Date) {
 export async function GET(request: NextRequest) {
     try {
         const extras = getExtras();
+        const customNamesMap = getCustomNamesMap();
 
         // 1. Pobierz wszystkie wyroby piekarnicze
         const products = await prisma.bakeryProduct.findMany({
@@ -127,7 +129,91 @@ export async function GET(request: NextRequest) {
             }
         });
 
-        // 4. Budujemy mapę dzienną ze wszystkimi datami
+        // 4. Pobierz FAKTURY SPRZEDAŻOWE (isSales: true)
+        const salesInvoicesDb = await prisma.invoice.findMany({
+            where: {
+                isSales: true,
+                status: { not: "REJECTED" },
+            },
+            include: {
+                contractor: true,
+                positions: true,
+            },
+            orderBy: {
+                issuedDate: "desc",
+            },
+        });
+
+        // Formatowanie faktur sprzedażowych
+        interface SalesInvoiceFormatted {
+            id: string;
+            invoiceNumber: string;
+            ksefNumber: string;
+            contractorId: string;
+            contractorName: string;
+            issuedDate: string;
+            dueDate: string;
+            status: string;
+            grossAmount: number;
+            netAmount: number;
+            vatAmount: number;
+            positionsCount: number;
+            positions: Array<{
+                id: string;
+                name: string;
+                quantity: number;
+                unit: string;
+                netPrice: number;
+                netAmount: number;
+                grossAmount: number;
+            }>;
+        }
+
+        const formattedSalesInvoices: SalesInvoiceFormatted[] = salesInvoicesDb.map((inv) => {
+            const contractorName =
+                customNamesMap[inv.contractorId] ||
+                (inv.contractor as any)?.customName ||
+                inv.contractor?.name ||
+                "Nieznany kontrahent";
+
+            const positions = (inv.positions || []).map((pos) => ({
+                id: pos.id,
+                name: pos.name,
+                quantity: Number(pos.quantity || 0),
+                unit: pos.unit || "szt",
+                netPrice: Number(pos.netPrice || 0),
+                netAmount: Number(pos.netAmount || 0),
+                grossAmount: Number(pos.grossAmount || 0),
+            }));
+
+            return {
+                id: inv.id,
+                invoiceNumber: inv.invoiceNumber,
+                ksefNumber: inv.ksefNumber,
+                contractorId: inv.contractorId,
+                contractorName,
+                issuedDate: inv.issuedDate ? new Date(inv.issuedDate).toISOString().split("T")[0] : "",
+                dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().split("T")[0] : "",
+                status: inv.status,
+                grossAmount: Math.round(Number(inv.grossAmount || 0) * 100) / 100,
+                netAmount: Math.round(Number(inv.netAmount || 0) * 100) / 100,
+                vatAmount: Math.round(Number(inv.vatAmount || 0) * 100) / 100,
+                positionsCount: positions.length,
+                positions,
+            };
+        });
+
+        // Mapa faktur sprzedażowych wg miesiąca: "YYYY-MM" -> SalesInvoiceFormatted[]
+        const salesInvoicesByMonthMap = new Map<string, SalesInvoiceFormatted[]>();
+        formattedSalesInvoices.forEach((inv) => {
+            if (!inv.issuedDate) return;
+            const ymKey = inv.issuedDate.slice(0, 7); // "YYYY-MM"
+            const list = salesInvoicesByMonthMap.get(ymKey) || [];
+            list.push(inv);
+            salesInvoicesByMonthMap.set(ymKey, list);
+        });
+
+        // 5. Budujemy mapę dzienną (Dni zawierają WYŁĄCZNIE utarg detaliczny ze sklepu)
         interface DayProductDetail {
             productId: string;
             productName: string;
@@ -146,9 +232,10 @@ export async function GET(request: NextRequest) {
             rawDate: Date;
             bakerySalesIncome: number;
             fiscalIncome: number;
-            totalIncome: number;
             otherIncome: number;
+            totalIncome: number;
             bakerySharePercent: number;
+            otherSharePercent: number;
             totalProduced: number;
             totalSold: number;
             sellThroughRate: number;
@@ -179,9 +266,10 @@ export async function GET(request: NextRequest) {
                     rawDate: new Date(dateStr),
                     bakerySalesIncome: 0,
                     fiscalIncome: fiscal,
-                    totalIncome: fiscal,
-                    otherIncome: fiscal,
+                    otherIncome: 0,
+                    totalIncome: 0,
                     bakerySharePercent: 0,
+                    otherSharePercent: 0,
                     totalProduced: 0,
                     totalSold: 0,
                     sellThroughRate: 0,
@@ -241,17 +329,25 @@ export async function GET(request: NextRequest) {
             }
         });
 
-        // Przeliczenie ostatecznych wartości dziennych
+        // Przeliczenie ostatecznych wartości dziennych (Utarg dzienny ze sprzedaży w piekarni)
         const allDailyData = Array.from(dailyMap.values()).map((d) => {
             d.bakerySalesIncome = Math.round(d.bakerySalesIncome * 100) / 100;
             d.fiscalIncome = Math.round(d.fiscalIncome * 100) / 100;
 
-            // Utarg całkowity to kwota z kasy (fiscalIncome), chyba że sprzedaż pieczywa przewyższa wpis fiskalny
-            const effectiveTotalIncome = Math.max(d.fiscalIncome, d.bakerySalesIncome);
-            const otherIncome = Math.max(0, d.fiscalIncome - d.bakerySalesIncome);
-            const bakeryShare = effectiveTotalIncome > 0
-                ? Math.round((d.bakerySalesIncome / effectiveTotalIncome) * 1000) / 10
+            // Utarg detaliczny / sklepik (kasa fiskalna lub wyliczenie ze sprzedanego pieczywa)
+            const retailIncome = Math.max(d.fiscalIncome, d.bakerySalesIncome);
+            const otherRetailIncome = Math.max(0, d.fiscalIncome - d.bakerySalesIncome);
+
+            // Całkowity utarg danego dnia = utarg detaliczny (nie mieszamy tu faktur miesięcznych)
+            const totalDayIncome = Math.round(retailIncome * 100) / 100;
+
+            const bakeryShare = totalDayIncome > 0
+                ? Math.round((d.bakerySalesIncome / totalDayIncome) * 1000) / 10
                 : 0;
+            const otherShare = totalDayIncome > 0
+                ? Math.round((otherRetailIncome / totalDayIncome) * 1000) / 10
+                : 0;
+
             const sellThrough = d.totalProduced > 0
                 ? Math.round((d.totalSold / d.totalProduced) * 1000) / 10
                 : 0;
@@ -267,9 +363,10 @@ export async function GET(request: NextRequest) {
                 rawDate: d.rawDate,
                 bakerySalesIncome: d.bakerySalesIncome,
                 fiscalIncome: d.fiscalIncome,
-                totalIncome: Math.round(effectiveTotalIncome * 100) / 100,
-                otherIncome: Math.round(otherIncome * 100) / 100,
+                otherIncome: Math.round(otherRetailIncome * 100) / 100,
+                totalIncome: totalDayIncome,
                 bakerySharePercent: bakeryShare,
+                otherSharePercent: otherShare,
                 totalProduced: d.totalProduced,
                 totalSold: d.totalSold,
                 sellThroughRate: sellThrough,
@@ -286,7 +383,7 @@ export async function GET(request: NextRequest) {
 
         allDailyData.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
 
-        // 5. Agregacja tygodniowa (ISO weeks)
+        // 6. Agregacja tygodniowa (ISO weeks - retail store operations)
         const weeklyMap = new Map<
             string,
             {
@@ -352,6 +449,10 @@ export async function GET(request: NextRequest) {
             const bakeryShare = w.totalIncome > 0
                 ? Math.round((w.bakerySalesIncome / w.totalIncome) * 1000) / 10
                 : 0;
+            const otherShare = w.totalIncome > 0
+                ? Math.round((w.otherIncome / w.totalIncome) * 1000) / 10
+                : 0;
+
             const avgDaily = w.daysWithReport > 0
                 ? Math.round((w.totalIncome / w.daysWithReport) * 100) / 100
                 : Math.round((w.totalIncome / 7) * 100) / 100;
@@ -372,6 +473,7 @@ export async function GET(request: NextRequest) {
                 bakerySalesIncome: Math.round(w.bakerySalesIncome * 100) / 100,
                 otherIncome: Math.round(w.otherIncome * 100) / 100,
                 bakerySharePercent: bakeryShare,
+                otherSharePercent: otherShare,
                 avgDailyIncome: avgDaily,
                 totalProduced: w.totalProduced,
                 totalSold: w.totalSold,
@@ -388,7 +490,7 @@ export async function GET(request: NextRequest) {
 
         weeklyDataList.sort((a, b) => b.mondayDate.getTime() - a.mondayDate.getTime());
 
-        // 6. Agregacja miesięczna
+        // 7. Agregacja miesięczna (TUTAJ WŁICZANE SĄ FAKTURY SPRZEDAŻOWE ZA CAŁY MIESIĄC)
         const monthlyMap = new Map<
             string,
             {
@@ -398,9 +500,14 @@ export async function GET(request: NextRequest) {
                 label: string;
                 shortLabel: string;
                 monthDate: Date;
-                totalIncome: number;
+                retailIncome: number;
                 bakerySalesIncome: number;
                 otherIncome: number;
+                salesInvoicesGross: number;
+                salesInvoicesNet: number;
+                salesInvoicesCount: number;
+                salesInvoices: SalesInvoiceFormatted[];
+                totalIncome: number;
                 totalProduced: number;
                 totalSold: number;
                 daysWithReport: number;
@@ -414,6 +521,7 @@ export async function GET(request: NextRequest) {
             }
         >();
 
+        // Agregacja dni do miesięcy
         allDailyData.forEach((d) => {
             const ymKey = `${d.rawDate.getFullYear()}-${String(d.rawDate.getMonth() + 1).padStart(2, "0")}`;
             let m = monthlyMap.get(ymKey);
@@ -428,9 +536,14 @@ export async function GET(request: NextRequest) {
                     label: `${POLISH_MONTHS_FULL[mIdx]} ${y}`,
                     shortLabel: `${MONTH_SHORT_NAMES[mIdx]} ${String(y).slice(-2)}`,
                     monthDate: new Date(y, mIdx, 1),
-                    totalIncome: 0,
+                    retailIncome: 0,
                     bakerySalesIncome: 0,
                     otherIncome: 0,
+                    salesInvoicesGross: 0,
+                    salesInvoicesNet: 0,
+                    salesInvoicesCount: 0,
+                    salesInvoices: [],
+                    totalIncome: 0,
                     totalProduced: 0,
                     totalSold: 0,
                     daysWithReport: 0,
@@ -445,7 +558,7 @@ export async function GET(request: NextRequest) {
                 monthlyMap.set(ymKey, m);
             }
 
-            m.totalIncome += d.totalIncome;
+            m.retailIncome += d.totalIncome;
             m.bakerySalesIncome += d.bakerySalesIncome;
             m.otherIncome += d.otherIncome;
             m.totalProduced += d.totalProduced;
@@ -458,12 +571,71 @@ export async function GET(request: NextRequest) {
             m.categoryBreakdown.SAVORY += d.categoryBreakdown.SAVORY;
         });
 
+        // Dołącz faktury sprzedażowe do odpowiednich miesięcy
+        salesInvoicesByMonthMap.forEach((invoicesList, ymKey) => {
+            let m = monthlyMap.get(ymKey);
+            if (!m) {
+                const [yStr, mStr] = ymKey.split("-");
+                const y = parseInt(yStr, 10);
+                const mIdx = parseInt(mStr, 10) - 1;
+                const lastDayOfM = new Date(y, mIdx + 1, 0).getDate();
+                m = {
+                    key: ymKey,
+                    year: y,
+                    monthIndex: mIdx,
+                    label: `${POLISH_MONTHS_FULL[mIdx]} ${y}`,
+                    shortLabel: `${MONTH_SHORT_NAMES[mIdx]} ${String(y).slice(-2)}`,
+                    monthDate: new Date(y, mIdx, 1),
+                    retailIncome: 0,
+                    bakerySalesIncome: 0,
+                    otherIncome: 0,
+                    salesInvoicesGross: 0,
+                    salesInvoicesNet: 0,
+                    salesInvoicesCount: 0,
+                    salesInvoices: [],
+                    totalIncome: 0,
+                    totalProduced: 0,
+                    totalSold: 0,
+                    daysWithReport: 0,
+                    daysInMonth: lastDayOfM,
+                    categoryBreakdown: {
+                        BREAD: 0,
+                        ROLL: 0,
+                        SWEET: 0,
+                        SAVORY: 0,
+                    },
+                };
+                monthlyMap.set(ymKey, m);
+            }
+
+            m.salesInvoices = invoicesList;
+            m.salesInvoicesCount = invoicesList.length;
+            m.salesInvoicesGross = invoicesList.reduce((acc, i) => acc + i.grossAmount, 0);
+            m.salesInvoicesNet = invoicesList.reduce((acc, i) => acc + i.netAmount, 0);
+        });
+
         const monthlyDataList = Array.from(monthlyMap.values()).map((m) => {
-            const bakeryShare = m.totalIncome > 0
-                ? Math.round((m.bakerySalesIncome / m.totalIncome) * 1000) / 10
+            m.retailIncome = Math.round(m.retailIncome * 100) / 100;
+            m.bakerySalesIncome = Math.round(m.bakerySalesIncome * 100) / 100;
+            m.otherIncome = Math.round(m.otherIncome * 100) / 100;
+            m.salesInvoicesGross = Math.round(m.salesInvoicesGross * 100) / 100;
+            m.salesInvoicesNet = Math.round(m.salesInvoicesNet * 100) / 100;
+
+            // Łączny przychód miesiąca = Utarg ze sklepu (detal) + Faktury sprzedażowe
+            const totalMonthIncome = Math.round((m.retailIncome + m.salesInvoicesGross) * 100) / 100;
+
+            const bakeryShare = totalMonthIncome > 0
+                ? Math.round((m.bakerySalesIncome / totalMonthIncome) * 1000) / 10
                 : 0;
-            const avgDaily = m.daysWithReport > 0
-                ? Math.round((m.totalIncome / m.daysWithReport) * 100) / 100
+            const otherShare = totalMonthIncome > 0
+                ? Math.round((m.otherIncome / totalMonthIncome) * 1000) / 10
+                : 0;
+            const invoicesShare = totalMonthIncome > 0
+                ? Math.round((m.salesInvoicesGross / totalMonthIncome) * 1000) / 10
+                : 0;
+
+            const avgDailyRetail = m.daysWithReport > 0
+                ? Math.round((m.retailIncome / m.daysWithReport) * 100) / 100
                 : 0;
             const sellThrough = m.totalProduced > 0
                 ? Math.round((m.totalSold / m.totalProduced) * 1000) / 10
@@ -476,11 +648,18 @@ export async function GET(request: NextRequest) {
                 label: m.label,
                 shortLabel: m.shortLabel,
                 monthDate: m.monthDate,
-                totalIncome: Math.round(m.totalIncome * 100) / 100,
-                bakerySalesIncome: Math.round(m.bakerySalesIncome * 100) / 100,
-                otherIncome: Math.round(m.otherIncome * 100) / 100,
+                retailIncome: m.retailIncome,
+                bakerySalesIncome: m.bakerySalesIncome,
+                otherIncome: m.otherIncome,
+                salesInvoicesGross: m.salesInvoicesGross,
+                salesInvoicesNet: m.salesInvoicesNet,
+                salesInvoicesCount: m.salesInvoicesCount,
+                salesInvoices: m.salesInvoices,
+                totalIncome: totalMonthIncome,
                 bakerySharePercent: bakeryShare,
-                avgDailyIncome: avgDaily,
+                otherSharePercent: otherShare,
+                salesInvoicesSharePercent: invoicesShare,
+                avgDailyIncome: avgDailyRetail,
                 totalProduced: m.totalProduced,
                 totalSold: m.totalSold,
                 sellThroughRate: sellThrough,
@@ -497,7 +676,7 @@ export async function GET(request: NextRequest) {
 
         monthlyDataList.sort((a, b) => b.monthDate.getTime() - a.monthDate.getTime());
 
-        // 7. Ranking wyrobów (Całkowity przychód wg wyrobu)
+        // 8. Ranking wyrobów (Całkowity przychód wg wyrobu)
         const productRankingMap = new Map<
             string,
             {
@@ -548,7 +727,58 @@ export async function GET(request: NextRequest) {
             }))
             .sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-        // 8. Podsumowanie kategorii wyrobów
+        // 9. Podsumowanie kontrahentów z faktur sprzedażowych (B2B)
+        const contractorSalesMap = new Map<
+            string,
+            {
+                contractorId: string;
+                contractorName: string;
+                totalGross: number;
+                totalNet: number;
+                invoicesCount: number;
+                lastInvoiceDate: string;
+            }
+        >();
+
+        let grandTotalSalesInvoicesGross = 0;
+        let grandTotalSalesInvoicesNet = 0;
+
+        formattedSalesInvoices.forEach((inv) => {
+            grandTotalSalesInvoicesGross += inv.grossAmount;
+            grandTotalSalesInvoicesNet += inv.netAmount;
+
+            let c = contractorSalesMap.get(inv.contractorId);
+            if (!c) {
+                c = {
+                    contractorId: inv.contractorId,
+                    contractorName: inv.contractorName,
+                    totalGross: 0,
+                    totalNet: 0,
+                    invoicesCount: 0,
+                    lastInvoiceDate: inv.issuedDate,
+                };
+                contractorSalesMap.set(inv.contractorId, c);
+            }
+            c.totalGross += inv.grossAmount;
+            c.totalNet += inv.netAmount;
+            c.invoicesCount += 1;
+            if (inv.issuedDate > c.lastInvoiceDate) {
+                c.lastInvoiceDate = inv.issuedDate;
+            }
+        });
+
+        const contractorSalesRanking = Array.from(contractorSalesMap.values())
+            .map((c) => ({
+                ...c,
+                totalGross: Math.round(c.totalGross * 100) / 100,
+                totalNet: Math.round(c.totalNet * 100) / 100,
+                sharePercent: grandTotalSalesInvoicesGross > 0
+                    ? Math.round((c.totalGross / grandTotalSalesInvoicesGross) * 1000) / 10
+                    : 0,
+            }))
+            .sort((a, b) => b.totalGross - a.totalGross);
+
+        // 10. Podsumowanie kategorii wyrobów
         const categoryTotals = {
             BREAD: productRanking.filter((p) => p.productType === "BREAD").reduce((acc, p) => acc + p.totalRevenue, 0),
             ROLL: productRanking.filter((p) => p.productType === "ROLL").reduce((acc, p) => acc + p.totalRevenue, 0),
@@ -556,15 +786,23 @@ export async function GET(request: NextRequest) {
             SAVORY: productRanking.filter((p) => p.productType === "SAVORY").reduce((acc, p) => acc + p.totalRevenue, 0),
         };
 
-        // 9. Ogólne KPI i statystyki
-        const grandTotalIncome = allDailyData.reduce((acc, d) => acc + d.totalIncome, 0);
+        // 11. Ogólne KPI i statystyki
+        const grandTotalRetailIncome = allDailyData.reduce((acc, d) => acc + d.totalIncome, 0);
         const grandTotalOtherIncome = allDailyData.reduce((acc, d) => acc + d.otherIncome, 0);
         const grandTotalSold = allDailyData.reduce((acc, d) => acc + d.totalSold, 0);
         const grandTotalProduced = allDailyData.reduce((acc, d) => acc + d.totalProduced, 0);
         const daysWithReportCount = allDailyData.filter((d) => d.hasReport).length;
+        const grandTotalIncome = Math.round((grandTotalRetailIncome + grandTotalSalesInvoicesGross) * 100) / 100;
 
         // Szczytowy dzień (Peak)
-        let peakDay: { date: string; dayOfWeek: string; amount: number; bakeryAmount: number; otherAmount: number } | null = null;
+        let peakDay: {
+            date: string;
+            dayOfWeek: string;
+            amount: number;
+            bakeryAmount: number;
+            otherAmount: number;
+        } | null = null;
+
         allDailyData.forEach((d) => {
             if (!peakDay || d.totalIncome > peakDay.amount) {
                 if (d.totalIncome > 0) {
@@ -580,17 +818,24 @@ export async function GET(request: NextRequest) {
         });
 
         const overallStats = {
-            grandTotalIncome: Math.round(grandTotalIncome * 100) / 100,
+            grandTotalIncome,
+            grandTotalRetailIncome: Math.round(grandTotalRetailIncome * 100) / 100,
             grandTotalBakeryIncome: Math.round(grandTotalBakeryIncome * 100) / 100,
             grandTotalOtherIncome: Math.round(grandTotalOtherIncome * 100) / 100,
+            grandTotalSalesInvoicesGross: Math.round(grandTotalSalesInvoicesGross * 100) / 100,
+            grandTotalSalesInvoicesNet: Math.round(grandTotalSalesInvoicesNet * 100) / 100,
+            grandTotalSalesInvoicesCount: formattedSalesInvoices.length,
             bakerySharePercent: grandTotalIncome > 0
                 ? Math.round((grandTotalBakeryIncome / grandTotalIncome) * 1000) / 10
                 : 0,
             otherSharePercent: grandTotalIncome > 0
                 ? Math.round((grandTotalOtherIncome / grandTotalIncome) * 1000) / 10
                 : 0,
+            salesInvoicesSharePercent: grandTotalIncome > 0
+                ? Math.round((grandTotalSalesInvoicesGross / grandTotalIncome) * 1000) / 10
+                : 0,
             avgDailyIncome: daysWithReportCount > 0
-                ? Math.round((grandTotalIncome / daysWithReportCount) * 100) / 100
+                ? Math.round((grandTotalRetailIncome / daysWithReportCount) * 100) / 100
                 : 0,
             grandTotalSold,
             grandTotalProduced,
@@ -613,6 +858,8 @@ export async function GET(request: NextRequest) {
             weeklyData: weeklyDataList,
             monthlyData: monthlyDataList,
             productRanking,
+            salesInvoices: formattedSalesInvoices,
+            contractorSalesRanking,
             stats: overallStats,
         });
     } catch (error: any) {
