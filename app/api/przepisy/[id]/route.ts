@@ -18,11 +18,13 @@ export async function GET(
             where: { id },
             include: {
                 ingredients: {
+                    orderBy: { order: "asc" },
                     include: {
                         ingredient: true,
                         semiFinished: {
                             include: {
                                 ingredients: {
+                                    orderBy: { order: "asc" },
                                     include: { ingredient: true },
                                 },
                             },
@@ -204,9 +206,10 @@ export async function PUT(
                     ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
                     ...(packagingCost !== undefined && { packagingCost: Number(packagingCost) }),
                     ingredients: {
-                        create: ingredients.map((ing: any) => ({
+                        create: ingredients.map((ing: any, index: number) => ({
                             amount: Number(ing.amount),
                             ingredientUnit: ing.ingredientUnit || ing.unit || "kg",
+                            order: ing.order !== undefined ? Number(ing.order) : index,
                             ingredientId: ing.ingredientId || null,
                             semiFinishedId: ing.semiFinishedId || null,
                         })),

@@ -936,7 +936,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
     const foodCategory = categories.find((c) => c.name.toLowerCase() === "produkty spożywcze");
     const defaultCategoryId = foodCategory?.id || categories[0]?.id || "";
 
-    const [bulkCategoryId, setBulkCategoryId] = useState(defaultCategoryId);
+    const [bulkCategoryId, setBulkCategoryId] = useState("");
 
     const [mappingState, setMappingState] = useState<
         Record<string, { categoryId: string; ingredientId?: string; multiplier: string }>
@@ -1163,34 +1163,28 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                     {/* Szybkie przypisanie wybranej kategorii do wszystkich pozycji faktury */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-ui-accent/10 border border-ui-accent rounded-xl p-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-ui-primary">
-
-                            <span>Oznacz wszystkie:</span>
+                            <span>Oznacz wszystkie pozycje kategorią:</span>
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <div className="relative">
-                                <select
-                                    value={bulkCategoryId}
-                                    onChange={(e) => setBulkCategoryId(e.target.value)}
-                                    className="h-9 bg-white border border-ui-accent rounded-xl pl-3 pr-8 text-xs font-semibold text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer appearance-none shadow-2xs"
-                                >
-                                    {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>
-                                            {cat.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
-                                    <ChevronDown size={14} />
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => handleApplyCategoryToAll(bulkCategoryId)}
-                                className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        <div className="relative w-full sm:w-auto">
+                            <select
+                                value={bulkCategoryId}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setBulkCategoryId(val);
+                                    if (val) handleApplyCategoryToAll(val);
+                                }}
+                                className="h-9 w-full sm:min-w-[220px] bg-white border border-ui-accent rounded-xl pl-3 pr-8 text-xs font-semibold text-ui-primary focus:outline-none focus:border-ui-secondary cursor-pointer appearance-none shadow-2xs"
                             >
-                                <CheckCircle2 size={14} />
-                                Przypisz wszystkim
-                            </button>
+                                <option value="" disabled>Wybierz kategorię dla wszystkich...</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                <ChevronDown size={14} />
+                            </div>
                         </div>
                     </div>
 

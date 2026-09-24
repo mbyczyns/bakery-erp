@@ -50,6 +50,8 @@ interface DayProductItem {
     productType: string;
     sellingPrice: number;
     producedAmount: number;
+    carriedOverAmount?: number;
+    totalAssortment?: number;
     soldAmount: number;
     salesIncome: number;
     soldOutTime?: string;
@@ -58,6 +60,8 @@ interface DayProductItem {
 interface DaySummary {
     date: string;
     totalProduced: number;
+    totalCarriedOver?: number;
+    totalAssortment?: number;
     totalSold: number;
     bakerySalesIncome: number;
     fiscalIncome: number;
@@ -68,6 +72,8 @@ interface DaySummary {
 
 interface MonthStats {
     monthProduced: number;
+    monthCarriedOver?: number;
+    monthAssortment?: number;
     monthSold: number;
     monthBakeryIncome: number;
     monthFiscalIncome: number;
@@ -78,6 +84,7 @@ interface MonthStats {
 interface ProductionDetailItem {
     bakeryProductId: string;
     producedAmount: string;
+    carriedOverAmount: string;
     leftoverAmount: string;
     soldAmount: string;
     soldOutTime: string;
@@ -89,6 +96,8 @@ interface AggregatedProduct {
     productType: string;
     sellingPrice: number;
     producedAmount: number;
+    carriedOverAmount?: number;
+    totalAssortment?: number;
     soldAmount: number;
     salesIncome: number;
     sellThroughRate: number;
@@ -100,6 +109,8 @@ interface WeekSummary {
     startDate: string;
     endDate: string;
     totalProduced: number;
+    totalCarriedOver?: number;
+    totalAssortment?: number;
     totalSold: number;
     bakerySalesIncome: number;
     fiscalIncome: number;
@@ -262,6 +273,9 @@ export default function ProdukcjaPage() {
     const [isLoadingFormData, setIsLoadingFormData] = useState(false);
     const [isSavingForm, setIsSavingForm] = useState(false);
     const [formSaveSuccess, setFormSaveSuccess] = useState(false);
+    const [isCopyingPrevious, setIsCopyingPrevious] = useState(false);
+    const [isTransferringLeftovers, setIsTransferringLeftovers] = useState(false);
+    const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "info" | "error"; text: string } | null>(null);
 
     // -------------------------------------------------------------
     // MODAL SUGEROWANEGO PLANU PRODUKCJI
@@ -360,6 +374,7 @@ export default function ProdukcjaPage() {
         setIsFormModalOpen(true);
         setIsLoadingFormData(true);
         setFormSaveSuccess(false);
+        setFeedbackMessage(null);
 
         try {
             const res = await fetch(`/api/produkcja?date=${dateToUse}`);
@@ -376,8 +391,14 @@ export default function ProdukcjaPage() {
                     );
 
                     let initProduced = "";
-                    if (existingProd && Number(existingProd.producedAmount) > 0) {
-                        initProduced = String(existingProd.producedAmount);
+                    let initCarriedOver = "";
+                    if (existingProd) {
+                        if (Number(existingProd.producedAmount) > 0) {
+                            initProduced = String(existingProd.producedAmount);
+                        }
+                        if (Number(existingProd.carriedOverAmount) > 0) {
+                            initCarriedOver = String(existingProd.carriedOverAmount);
+                        }
                     } else if (prefillProducedMap && prefillProducedMap[prod.id] !== undefined) {
                         initProduced = String(prefillProducedMap[prod.id]);
                     }
@@ -386,16 +407,19 @@ export default function ProdukcjaPage() {
                     let initLeftover = "";
                     if (existingProd) {
                         const pVal = Number(existingProd.producedAmount) || 0;
+                        const cVal = Number(existingProd.carriedOverAmount) || 0;
+                        const totalAssort = pVal + cVal;
                         const sVal = Number(existingProd.soldAmount) || 0;
-                        if (sVal > 0 || pVal > 0) {
+                        if (sVal > 0 || totalAssort > 0) {
                             initSold = String(sVal);
-                            initLeftover = String(Math.max(0, Math.round((pVal - sVal) * 100) / 100));
+                            initLeftover = String(Math.max(0, Math.round((totalAssort - sVal) * 100) / 100));
                         }
                     }
 
                     itemsMap[prod.id] = {
                         bakeryProductId: prod.id,
                         producedAmount: initProduced,
+                        carriedOverAmount: initCarriedOver,
                         leftoverAmount: initLeftover,
                         soldAmount: initSold,
                         soldOutTime: data.soldOutTimes?.[prod.id] || existingProd?.soldOutTime || "",
@@ -419,6 +443,7 @@ export default function ProdukcjaPage() {
             const current = prev[productId] || {
                 bakeryProductId: productId,
                 producedAmount: "",
+                carriedOverAmount: "",
                 leftoverAmount: "",
                 soldAmount: "",
                 soldOutTime: "",
@@ -432,34 +457,36 @@ export default function ProdukcjaPage() {
                 return isNaN(parsed) ? null : parsed;
             };
 
+            const prod = parseNum(field === "producedAmount" ? value : current.producedAmount) || 0;
+            const carriedOver = parseNum(field === "carriedOverAmount" ? value : current.carriedOverAmount) || 0;
+            const totalAssort = prod + carriedOver;
+            const hasAssortment = (field === "producedAmount" ? value : current.producedAmount) !== "" || (field === "carriedOverAmount" ? value : current.carriedOverAmount) !== "";
+
             if (field === "leftoverAmount") {
-                const prod = parseNum(current.producedAmount);
                 const left = parseNum(value);
-                if (prod !== null && left !== null) {
-                    const sold = Math.max(0, Math.round((prod - left) * 100) / 100);
+                if (hasAssortment && left !== null) {
+                    const sold = Math.max(0, Math.round((totalAssort - left) * 100) / 100);
                     updated.soldAmount = String(sold);
-                } else if (left === null && prod !== null && current.soldAmount === "") {
+                } else if (left === null && hasAssortment && current.soldAmount === "") {
                     updated.soldAmount = "";
                 }
-            } else if (field === "producedAmount") {
-                const prod = parseNum(value);
+            } else if (field === "producedAmount" || field === "carriedOverAmount") {
                 const left = parseNum(current.leftoverAmount);
                 const sold = parseNum(current.soldAmount);
 
-                if (prod !== null) {
+                if (hasAssortment) {
                     if (left !== null) {
-                        const newSold = Math.max(0, Math.round((prod - left) * 100) / 100);
+                        const newSold = Math.max(0, Math.round((totalAssort - left) * 100) / 100);
                         updated.soldAmount = String(newSold);
                     } else if (sold !== null) {
-                        const newLeft = Math.max(0, Math.round((prod - sold) * 100) / 100);
+                        const newLeft = Math.max(0, Math.round((totalAssort - sold) * 100) / 100);
                         updated.leftoverAmount = String(newLeft);
                     }
                 }
             } else if (field === "soldAmount") {
-                const prod = parseNum(current.producedAmount);
                 const sold = parseNum(value);
-                if (prod !== null && sold !== null) {
-                    const left = Math.max(0, Math.round((prod - sold) * 100) / 100);
+                if (hasAssortment && sold !== null) {
+                    const left = Math.max(0, Math.round((totalAssort - sold) * 100) / 100);
                     updated.leftoverAmount = String(left);
                 }
             }
@@ -471,29 +498,36 @@ export default function ProdukcjaPage() {
         });
     };
 
-    const handleSaveReportForm = async () => {
-        setIsSavingForm(true);
-        setFormSaveSuccess(false);
-
+    const handleSaveReportFormInternal = async () => {
         const itemsPayload = Object.values(formItems).map((it) => ({
             bakeryProductId: it.bakeryProductId,
-            producedAmount: parseFloat(String(it.producedAmount).replace(",", ".")) || 0,
-            soldAmount: parseFloat(String(it.soldAmount).replace(",", ".")) || 0,
+            producedAmount: parseFloat(String(it.producedAmount || "0").replace(",", ".")) || 0,
+            carriedOverAmount: parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0,
+            soldAmount: parseFloat(String(it.soldAmount || "0").replace(",", ".")) || 0,
             soldOutTime: it.soldOutTime || null,
         }));
 
         const fiscalVal = parseFloat(formFiscalIncome.replace(",", ".")) || 0;
 
+        const res = await fetch("/api/produkcja", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                date: formDate,
+                items: itemsPayload,
+                fiscalIncome: fiscalVal,
+            }),
+        });
+        return res;
+    };
+
+    const handleSaveReportForm = async () => {
+        setIsSavingForm(true);
+        setFormSaveSuccess(false);
+        setFeedbackMessage(null);
+
         try {
-            const res = await fetch("/api/produkcja", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    date: formDate,
-                    items: itemsPayload,
-                    fiscalIncome: fiscalVal,
-                }),
-            });
+            const res = await handleSaveReportFormInternal();
 
             if (res.ok) {
                 setFormSaveSuccess(true);
@@ -507,6 +541,147 @@ export default function ProdukcjaPage() {
             console.error("Błąd podczas zapisu raportu:", error);
         } finally {
             setIsSavingForm(false);
+        }
+    };
+
+    const handleCopyPreviousDayProduction = async () => {
+        setIsCopyingPrevious(true);
+        setFeedbackMessage(null);
+
+        const d = new Date(formDate);
+        d.setDate(d.getDate() - 1);
+        const prevDateStr = d.toISOString().split("T")[0];
+
+        try {
+            const res = await fetch(`/api/produkcja?date=${prevDateStr}`);
+            if (res.ok) {
+                const data = await res.json();
+                const productions = data.productions || [];
+                let copiedCount = 0;
+
+                setFormItems((prev) => {
+                    const updated = { ...prev };
+                    allProducts.forEach((prod) => {
+                        const prevProd = productions.find((p: any) => p.bakeryProductId === prod.id);
+                        const prevProduced = prevProd ? Number(prevProd.producedAmount) : 0;
+
+                        if (prevProduced > 0) {
+                            copiedCount++;
+                            const current = updated[prod.id] || {
+                                bakeryProductId: prod.id,
+                                producedAmount: "",
+                                carriedOverAmount: "",
+                                leftoverAmount: "",
+                                soldAmount: "",
+                                soldOutTime: "",
+                            };
+                            const carriedOver = parseFloat(String(current.carriedOverAmount || "0").replace(",", ".")) || 0;
+                            const totalAssort = prevProduced + carriedOver;
+                            const leftVal = current.leftoverAmount !== "" ? parseFloat(String(current.leftoverAmount).replace(",", ".")) : null;
+
+                            let newSold = current.soldAmount;
+                            if (leftVal !== null && !isNaN(leftVal)) {
+                                newSold = String(Math.max(0, Math.round((totalAssort - leftVal) * 100) / 100));
+                            }
+
+                            updated[prod.id] = {
+                                ...current,
+                                producedAmount: String(prevProduced),
+                                soldAmount: newSold,
+                            };
+                        }
+                    });
+                    return updated;
+                });
+
+                if (copiedCount > 0) {
+                    setFeedbackMessage({
+                        type: "success",
+                        text: `Skopiowano wielkości wyprodukowane z wczoraj (${formatDate(prevDateStr)}) — ${copiedCount} pozycji.`,
+                    });
+                } else {
+                    setFeedbackMessage({
+                        type: "info",
+                        text: `Brak zapisanej produkcji w poprzednim dniu (${formatDate(prevDateStr)}).`,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Błąd kopiowania produkcji z wczoraj:", error);
+            setFeedbackMessage({
+                type: "error",
+                text: "Nie udało się pobrać danych z poprzedniego dnia.",
+            });
+        } finally {
+            setIsCopyingPrevious(false);
+        }
+    };
+
+    const handleTransferLeftoversToNextDay = async () => {
+        setIsTransferringLeftovers(true);
+        setFeedbackMessage(null);
+
+        const itemsToTransfer = Object.values(formItems)
+            .filter((it) => {
+                const val = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
+                return val > 0;
+            })
+            .map((it) => ({
+                bakeryProductId: it.bakeryProductId,
+                leftoverAmount: it.leftoverAmount,
+            }));
+
+        if (itemsToTransfer.length === 0) {
+            setFeedbackMessage({
+                type: "info",
+                text: "Brak niesprzedanych wyrobów (ilości 'Zostało' są równe 0).",
+            });
+            setIsTransferringLeftovers(false);
+            return;
+        }
+
+        const d = new Date(formDate);
+        d.setDate(d.getDate() + 1);
+        const nextDateStr = d.toISOString().split("T")[0];
+
+        try {
+            await handleSaveReportFormInternal();
+
+            const res = await fetch("/api/produkcja", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "transfer_leftovers",
+                    targetDate: nextDateStr,
+                    items: itemsToTransfer,
+                }),
+            });
+
+            if (res.ok) {
+                const sumLeftovers = itemsToTransfer.reduce(
+                    (sum, it) => sum + (parseFloat(String(it.leftoverAmount).replace(",", ".")) || 0),
+                    0
+                );
+                setFeedbackMessage({
+                    type: "success",
+                    text: `Pomyślnie przeniesiono ${sumLeftovers.toLocaleString("pl-PL")} szt. niesprzedanych wyrobów na dzień ${formatDate(nextDateStr)}! Zostaną doliczone do asortymentu w nowym dniu.`,
+                });
+                fetchSummary(currentMonth);
+            } else {
+                const errData = await res.json();
+                setFeedbackMessage({
+                    type: "error",
+                    text: errData.error || "Nie udało się przenieść niesprzedanych wyrobów.",
+                });
+            }
+        } catch (err: any) {
+            console.error("Błąd przenoszenia niesprzedanych wyrobów:", err);
+            setFeedbackMessage({
+                type: "error",
+                text: "Wystąpił błąd podczas przenoszenia na serwer.",
+            });
+        } finally {
+            setIsTransferringLeftovers(false);
         }
     };
 
@@ -566,8 +741,17 @@ export default function ProdukcjaPage() {
                     target.select();
                 }
             } else if (colIndex === 1) {
-                const soldOutInput = document.querySelector<HTMLInputElement>(
+                e.preventDefault();
+                const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex}"][data-col="2"]`
+                );
+                if (target) {
+                    target.focus();
+                    target.select();
+                }
+            } else if (colIndex === 2) {
+                const soldOutInput = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex}"][data-col="3"]`
                 );
                 if (soldOutInput) {
                     e.preventDefault();
@@ -583,7 +767,7 @@ export default function ProdukcjaPage() {
                         target.select();
                     }
                 }
-            } else if (colIndex === 2 && rowIndex < totalRows - 1) {
+            } else if (colIndex === 3 && rowIndex < totalRows - 1) {
                 e.preventDefault();
                 const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex + 1}"][data-col="0"]`
@@ -594,7 +778,16 @@ export default function ProdukcjaPage() {
                 }
             }
         } else if (e.key === "ArrowLeft") {
-            if (colIndex === 2) {
+            if (colIndex === 3) {
+                e.preventDefault();
+                const target = document.querySelector<HTMLInputElement>(
+                    `input[data-row="${rowIndex}"][data-col="2"]`
+                );
+                if (target) {
+                    target.focus();
+                    target.select();
+                }
+            } else if (colIndex === 2) {
                 e.preventDefault();
                 const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex}"][data-col="1"]`
@@ -615,14 +808,14 @@ export default function ProdukcjaPage() {
             } else if (colIndex === 0 && rowIndex > 0) {
                 e.preventDefault();
                 const prevSoldOut = document.querySelector<HTMLInputElement>(
-                    `input[data-row="${rowIndex - 1}"][data-col="2"]`
+                    `input[data-row="${rowIndex - 1}"][data-col="3"]`
                 );
                 if (prevSoldOut) {
                     prevSoldOut.focus();
                     prevSoldOut.select();
                 } else {
                     const target = document.querySelector<HTMLInputElement>(
-                        `input[data-row="${rowIndex - 1}"][data-col="1"]`
+                        `input[data-row="${rowIndex - 1}"][data-col="2"]`
                     );
                     if (target) {
                         target.focus();
@@ -747,21 +940,29 @@ export default function ProdukcjaPage() {
                         productType: p.productType,
                         sellingPrice: p.sellingPrice,
                         producedAmount: 0,
+                        carriedOverAmount: 0,
+                        totalAssortment: 0,
                         soldAmount: 0,
                         salesIncome: 0,
                         sellThroughRate: 0,
                     };
                     existing.producedAmount += p.producedAmount;
+                    existing.carriedOverAmount = (existing.carriedOverAmount || 0) + (p.carriedOverAmount || 0);
+                    existing.totalAssortment = (existing.totalAssortment || 0) + (p.totalAssortment || (p.producedAmount + (p.carriedOverAmount || 0)));
                     existing.soldAmount += p.soldAmount;
                     existing.salesIncome += p.salesIncome;
                     prodAggMap.set(p.productId, existing);
                 });
             });
 
-            const productsList = Array.from(prodAggMap.values()).map((p) => ({
-                ...p,
-                sellThroughRate: p.producedAmount > 0 ? Math.round((p.soldAmount / p.producedAmount) * 1000) / 10 : 0,
-            })).sort((a, b) => b.soldAmount - a.soldAmount);
+            const productsList = Array.from(prodAggMap.values()).map((p) => {
+                const totalAssort = p.totalAssortment || (p.producedAmount + (p.carriedOverAmount || 0));
+                return {
+                    ...p,
+                    totalAssortment: totalAssort,
+                    sellThroughRate: totalAssort > 0 ? Math.round((p.soldAmount / totalAssort) * 1000) / 10 : (p.producedAmount > 0 ? Math.round((p.soldAmount / p.producedAmount) * 1000) / 10 : 0),
+                };
+            }).sort((a, b) => b.soldAmount - a.soldAmount);
 
             return {
                 ...week,
@@ -1119,7 +1320,16 @@ export default function ProdukcjaPage() {
                                                             </td>
 
                                                             <td className="py-3.5 px-3.5 text-right font-medium text-ui-black text-sm">
-                                                                {day.totalProduced > 0 ? `${day.totalProduced.toLocaleString("pl-PL")} szt.` : "—"}
+                                                                {day.totalProduced > 0 || (day.totalCarriedOver || 0) > 0 ? (
+                                                                    <div>
+                                                                        <div className="font-bold text-ui-black text-sm">{day.totalProduced.toLocaleString("pl-PL")} szt.</div>
+                                                                        {(day.totalCarriedOver || 0) > 0 && (
+                                                                            <div className="text-[10px] text-sky-800 font-bold">
+                                                                                (+{(day.totalCarriedOver || 0).toLocaleString("pl-PL")} z wczoraj = {(day.totalAssortment || (day.totalProduced + (day.totalCarriedOver || 0))).toLocaleString("pl-PL")} szt.)
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : "—"}
                                                             </td>
 
                                                             <td className="py-3.5 px-3.5 text-right font-bold text-ui-black text-sm">
@@ -1127,7 +1337,7 @@ export default function ProdukcjaPage() {
                                                             </td>
 
                                                             <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                                {day.totalProduced > 0 ? (
+                                                                {(day.totalAssortment || day.totalProduced) > 0 ? (
                                                                     <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                                                                         {efficiency.toFixed(0)}%
                                                                     </span>
@@ -1208,7 +1418,9 @@ export default function ProdukcjaPage() {
                                                                                         <tr className="bg-ui-accent/10 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
                                                                                             <th className="p-2.5">Nazwa wyrobu</th>
                                                                                             <th className="p-2.5 text-right">Cena jedn.</th>
+                                                                                            <th className="p-2.5 text-right">Z wczoraj</th>
                                                                                             <th className="p-2.5 text-right">Wyprodukowano</th>
+                                                                                            <th className="p-2.5 text-right">Łączny asortyment</th>
                                                                                             <th className="p-2.5 text-right">Sprzedano</th>
                                                                                             <th className="p-2.5 text-right">Niesprzedane</th>
                                                                                             <th className="p-2.5 text-center">Wyprzedano o</th>
@@ -1217,12 +1429,22 @@ export default function ProdukcjaPage() {
                                                                                     </thead>
                                                                                     <tbody className="divide-y divide-ui-accent/30">
                                                                                         {day.products.map((p) => {
-                                                                                            const unsold = Math.max(0, Math.round((p.producedAmount - p.soldAmount) * 100) / 100);
+                                                                                            const carriedOver = p.carriedOverAmount || 0;
+                                                                                            const produced = p.producedAmount || 0;
+                                                                                            const totalAssort = p.totalAssortment || (produced + carriedOver);
+                                                                                            const unsold = Math.max(0, Math.round((totalAssort - p.soldAmount) * 100) / 100);
+
                                                                                             return (
                                                                                                 <tr key={p.productId} className="hover:bg-ui-accent/5">
                                                                                                     <td className="p-2.5 font-bold text-ui-black">{p.productName}</td>
                                                                                                     <td className="p-2.5 text-right text-ui-secondary">{p.sellingPrice.toFixed(2)} zł</td>
-                                                                                                    <td className="p-2.5 text-right font-semibold text-ui-black">{p.producedAmount.toLocaleString("pl-PL")} szt.</td>
+                                                                                                    <td className="p-2.5 text-right font-medium text-sky-900">
+                                                                                                        {carriedOver > 0 ? `${carriedOver.toLocaleString("pl-PL")} szt.` : "—"}
+                                                                                                    </td>
+                                                                                                    <td className="p-2.5 text-right font-semibold text-ui-black">{produced.toLocaleString("pl-PL")} szt.</td>
+                                                                                                    <td className="p-2.5 text-right font-bold text-ui-black">
+                                                                                                        {totalAssort > 0 ? `${totalAssort.toLocaleString("pl-PL")} szt.` : "—"}
+                                                                                                    </td>
                                                                                                     <td className="p-2.5 text-right font-black text-emerald-900">{p.soldAmount.toLocaleString("pl-PL")} szt.</td>
                                                                                                     <td className="p-2.5 text-right font-medium text-rose-700">
                                                                                                         {unsold > 0 ? `-${unsold.toLocaleString("pl-PL")} szt.` : "0"}
@@ -1688,28 +1910,73 @@ export default function ProdukcjaPage() {
                     onClick={() => setIsFormModalOpen(false)}
                 >
                     <div
-                        className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[90vh] flex flex-col"
+                        className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[90vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Formularza */}
-                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between gap-4">
                             <div>
                                 <h2 className="text-xl font-bold text-ui-black flex items-center gap-2">
                                     <Edit3 size={20} className="text-ui-primary" />
                                     Raport dzienny: {formatDate(formDate)}
                                 </h2>
-
                             </div>
-                            <button
-                                onClick={() => setIsFormModalOpen(false)}
-                                className="p-1.5 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCopyPreviousDayProduction}
+                                    disabled={isCopyingPrevious || isLoadingFormData}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ui-accent bg-white hover:bg-ui-accent/15 text-ui-black text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                    title="Kopiuj ilości wyprodukowane z poprzedniego dnia"
+                                >
+                                    {isCopyingPrevious ? (
+                                        <Loader2 size={13} className="animate-spin text-ui-primary" />
+                                    ) : (
+                                        <Copy size={13} className="text-ui-primary" />
+                                    )}
+                                    <span>Kopiuj produkcję z wczoraj</span>
+                                </button>
+                                <button
+                                    onClick={() => setIsFormModalOpen(false)}
+                                    className="p-1.5 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Zawartość Formularza */}
                         <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                            {/* Baner informacyjny */}
+                            {feedbackMessage && (
+                                <div
+                                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs font-semibold ${
+                                        feedbackMessage.type === "success"
+                                            ? "bg-emerald-50 text-emerald-950 border-emerald-300"
+                                            : feedbackMessage.type === "info"
+                                            ? "bg-sky-50 text-sky-950 border-sky-300"
+                                            : "bg-rose-50 text-rose-950 border-rose-300"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {feedbackMessage.type === "success" ? (
+                                            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                                        ) : feedbackMessage.type === "info" ? (
+                                            <AlertCircle size={16} className="text-sky-600 shrink-0" />
+                                        ) : (
+                                            <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                                        )}
+                                        <span>{feedbackMessage.text}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setFeedbackMessage(null)}
+                                        className="text-ui-secondary hover:text-ui-black cursor-pointer"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Panel Utargu Fiskalnego */}
                             <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
@@ -1718,7 +1985,6 @@ export default function ProdukcjaPage() {
                                     </div>
                                     <div>
                                         <div className="font-bold text-sm text-emerald-950">Łączny utarg z kasy fiskalnej</div>
-
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1755,15 +2021,16 @@ export default function ProdukcjaPage() {
                                                     <Icon size={16} className="text-ui-primary" />
                                                     {catInfo.label} ({prods.length})
                                                 </div>
-
                                             </div>
                                             <table className="w-full text-left text-xs border-collapse">
                                                 <thead>
                                                     <tr className="bg-ui-accent/5 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
                                                         <th className="p-2.5">Wyrób</th>
-                                                        <th className="p-2.5 text-right w-20">Cena</th>
+                                                        <th className="p-2.5 text-right w-16">Cena</th>
+                                                        <th className="p-2.5 text-center w-24">Z wczoraj</th>
                                                         <th className="p-2.5 text-center w-28">Wyprodukowano</th>
-                                                        <th className="p-2.5 text-center w-28">Zostało (szt.)</th>
+                                                        <th className="p-2.5 text-center w-28">Łączny asortyment</th>
+                                                        <th className="p-2.5 text-center w-24">Zostało (szt.)</th>
                                                         <th className="p-2.5 text-center w-24">Sprzedano</th>
                                                         <th className="p-2.5 text-left w-36">Godzina wyprzedania</th>
                                                     </tr>
@@ -1774,14 +2041,17 @@ export default function ProdukcjaPage() {
                                                         const it = formItems[prod.id] || {
                                                             bakeryProductId: prod.id,
                                                             producedAmount: "",
+                                                            carriedOverAmount: "",
                                                             leftoverAmount: "",
                                                             soldAmount: "",
                                                             soldOutTime: "",
                                                         };
                                                         const prodAmt = parseFloat(String(it.producedAmount).replace(",", ".")) || 0;
+                                                        const carriedOverAmt = parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0;
+                                                        const totalAssortment = prodAmt + carriedOverAmt;
                                                         const leftAmt = parseFloat(String(it.leftoverAmount).replace(",", ".")) || 0;
                                                         const soldAmt = parseFloat(String(it.soldAmount).replace(",", ".")) || 0;
-                                                        const isSoldOut = prodAmt > 0 && (it.leftoverAmount === "0" || leftAmt === 0);
+                                                        const isSoldOut = totalAssortment > 0 && (it.leftoverAmount === "0" || leftAmt === 0);
 
                                                         return (
                                                             <tr key={prod.id} className="hover:bg-ui-accent/5">
@@ -1794,11 +2064,11 @@ export default function ProdukcjaPage() {
                                                                         data-row={currentRowIndex}
                                                                         data-col="0"
                                                                         placeholder="0"
-                                                                        value={it.producedAmount}
+                                                                        value={it.carriedOverAmount}
                                                                         onFocus={(e) => e.target.select()}
                                                                         onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 0)}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
-                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-ui-accent bg-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-ui-secondary shadow-2xs"
+                                                                        onChange={(e) => handleFormItemChange(prod.id, "carriedOverAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
+                                                                        className="w-16 text-center px-2 py-1 rounded-lg border border-sky-300 bg-sky-50/60 font-bold text-xs text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
                                                                     />
                                                                 </td>
                                                                 <td className="p-2.5 text-center">
@@ -1808,15 +2078,38 @@ export default function ProdukcjaPage() {
                                                                         data-row={currentRowIndex}
                                                                         data-col="1"
                                                                         placeholder="0"
-                                                                        value={it.leftoverAmount}
+                                                                        value={it.producedAmount}
                                                                         onFocus={(e) => e.target.select()}
                                                                         onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 1)}
+                                                                        onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
+                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-ui-accent bg-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-ui-secondary shadow-2xs"
+                                                                    />
+                                                                </td>
+                                                                <td className="p-2.5 text-center">
+                                                                    {totalAssortment > 0 ? (
+                                                                        <span className="inline-block px-2 py-0.5 rounded-lg bg-ui-accent/20 text-ui-black font-extrabold text-xs">
+                                                                            {totalAssortment.toLocaleString("pl-PL")} szt.
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-ui-secondary/40 text-xs">—</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-2.5 text-center">
+                                                                    <input
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        data-row={currentRowIndex}
+                                                                        data-col="2"
+                                                                        placeholder="0"
+                                                                        value={it.leftoverAmount}
+                                                                        onFocus={(e) => e.target.select()}
+                                                                        onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 2)}
                                                                         onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
                                                                         className="w-20 text-center px-2 py-1 rounded-lg border border-amber-300 bg-amber-50/60 font-bold text-xs text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
                                                                     />
                                                                 </td>
                                                                 <td className="p-2.5 text-center">
-                                                                    {prodAmt > 0 ? (
+                                                                    {totalAssortment > 0 ? (
                                                                         <span className="inline-block px-2.5 py-1 rounded-lg bg-ui-secondary/5 text-ui-secondary font-black text-xs border border-ui-secondary/20">
                                                                             {soldAmt.toLocaleString("pl-PL")} szt.
                                                                         </span>
@@ -1831,9 +2124,9 @@ export default function ProdukcjaPage() {
                                                                             <input
                                                                                 type="time"
                                                                                 data-row={currentRowIndex}
-                                                                                data-col="2"
+                                                                                data-col="3"
                                                                                 value={it.soldOutTime}
-                                                                                onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 2)}
+                                                                                onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 3)}
                                                                                 onChange={(e) => handleFormItemChange(prod.id, "soldOutTime", e.target.value)}
                                                                                 className="px-2 py-0.5 rounded-lg border border-ui-primary bg-ui-primary/10 text-xs font-bold text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary"
                                                                             />
@@ -1854,36 +2147,68 @@ export default function ProdukcjaPage() {
                         </div>
 
                         {/* Stopka Formularza */}
-                        <div className="p-4 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                        <div className="p-4 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between gap-3">
                             <button
                                 onClick={() => setIsFormModalOpen(false)}
                                 className="px-4 py-2 rounded-xl border border-ui-accent text-ui-secondary hover:text-ui-primary font-semibold text-xs transition-colors cursor-pointer"
                             >
                                 Anuluj
                             </button>
-                            <button
-                                onClick={handleSaveReportForm}
-                                disabled={isSavingForm || isLoadingFormData}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer ${formSaveSuccess ? "bg-emerald-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                    }`}
-                            >
-                                {isSavingForm ? (
-                                    <>
-                                        <Loader2 size={14} className="animate-spin" />
-                                        Zapisywanie...
-                                    </>
-                                ) : formSaveSuccess ? (
-                                    <>
-                                        <Check size={14} />
-                                        Zapisano pomyślnie!
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 size={14} />
-                                        Zapisz raport dzienny
-                                    </>
-                                )}
-                            </button>
+                            <div className="flex items-center gap-2.5">
+                                {(() => {
+                                    const sumLeftovers = Object.values(formItems).reduce((sum, it) => {
+                                        const val = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
+                                        return sum + val;
+                                    }, 0);
+
+                                    if (sumLeftovers <= 0) return null;
+
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={handleTransferLeftoversToNextDay}
+                                            disabled={isTransferringLeftovers || isSavingForm}
+                                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-amber-950 transition-all shadow-2xs cursor-pointer"
+                                            title="Zapisuje raport i przenosi niesprzedane wyroby na następny dzień jako stan początkowy"
+                                        >
+                                            {isTransferringLeftovers ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Przenoszenie...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ArrowRight size={14} />
+                                                    Przenieś na nast. dzień ({sumLeftovers.toLocaleString("pl-PL")} szt.)
+                                                </>
+                                            )}
+                                        </button>
+                                    );
+                                })()}
+                                <button
+                                    onClick={handleSaveReportForm}
+                                    disabled={isSavingForm || isLoadingFormData}
+                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer ${formSaveSuccess ? "bg-emerald-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        }`}
+                                >
+                                    {isSavingForm ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            Zapisywanie...
+                                        </>
+                                    ) : formSaveSuccess ? (
+                                        <>
+                                            <Check size={14} />
+                                            Zapisano pomyślnie!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 size={14} />
+                                            Zapisz raport dzienny
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

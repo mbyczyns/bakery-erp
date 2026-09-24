@@ -104,6 +104,8 @@ export async function GET(request: NextRequest) {
                 {
                     date: string;
                     totalProduced: number;
+                    totalCarriedOver: number;
+                    totalAssortment: number;
                     totalSold: number;
                     bakerySalesIncome: number;
                     fiscalIncome: number;
@@ -115,6 +117,8 @@ export async function GET(request: NextRequest) {
                         productType: string;
                         sellingPrice: number;
                         producedAmount: number;
+                        carriedOverAmount: number;
+                        totalAssortment: number;
                         soldAmount: number;
                         salesIncome: number;
                         soldOutTime?: string;
@@ -132,6 +136,8 @@ export async function GET(request: NextRequest) {
                 daysMap[dateKey] = {
                     date: dateKey,
                     totalProduced: 0,
+                    totalCarriedOver: 0,
+                    totalAssortment: 0,
                     totalSold: 0,
                     bakerySalesIncome: 0,
                     fiscalIncome: fiscalFromDb > 0 ? fiscalFromDb : fiscalFromExtras,
@@ -148,6 +154,8 @@ export async function GET(request: NextRequest) {
                 productType: string;
                 sellingPrice: number;
                 producedAmount: number;
+                carriedOverAmount: number;
+                totalAssortment: number;
                 soldAmount: number;
                 salesIncome: number;
             }>();
@@ -159,6 +167,8 @@ export async function GET(request: NextRequest) {
                     productType: p.type,
                     sellingPrice: Number(p.sellingPrice || 0),
                     producedAmount: 0,
+                    carriedOverAmount: 0,
+                    totalAssortment: 0,
                     soldAmount: 0,
                     salesIncome: 0,
                 });
@@ -171,6 +181,8 @@ export async function GET(request: NextRequest) {
                     daysMap[dStr] = {
                         date: dStr,
                         totalProduced: 0,
+                        totalCarriedOver: 0,
+                        totalAssortment: 0,
                         totalSold: 0,
                         bakerySalesIncome: 0,
                         fiscalIncome: dbIncomeMap.get(dStr) || extras[dStr]?.fiscalIncome || 0,
@@ -183,13 +195,17 @@ export async function GET(request: NextRequest) {
                 const product = productMap.get(prod.bakeryProductId) || prod.bakeryProduct;
                 const price = Number(product?.sellingPrice || 0);
                 const produced = Number(prod.producedAmount || 0);
+                const carriedOver = Number((prod as any).carriedOverAmount || 0);
+                const totalAssortment = produced + carriedOver;
                 const sold = Number(prod.soldAmount || 0);
                 const income = Math.round(sold * price * 100) / 100;
                 const soldOutTime = extras[dStr]?.soldOutTimes?.[prod.bakeryProductId] || prod.soldOutTime || "";
 
-                if (produced > 0 || sold > 0) {
+                if (produced > 0 || carriedOver > 0 || sold > 0) {
                     daysMap[dStr].hasReport = true;
                     daysMap[dStr].totalProduced += produced;
+                    daysMap[dStr].totalCarriedOver += carriedOver;
+                    daysMap[dStr].totalAssortment += totalAssortment;
                     daysMap[dStr].totalSold += sold;
                     daysMap[dStr].bakerySalesIncome += income;
                     daysMap[dStr].productsCount += 1;
@@ -200,6 +216,8 @@ export async function GET(request: NextRequest) {
                         productType: product?.type || "BREAD",
                         sellingPrice: price,
                         producedAmount: produced,
+                        carriedOverAmount: carriedOver,
+                        totalAssortment: totalAssortment,
                         soldAmount: sold,
                         salesIncome: income,
                         soldOutTime: soldOutTime || undefined,
@@ -209,6 +227,8 @@ export async function GET(request: NextRequest) {
                     const mProd = monthlyProductMap.get(prod.bakeryProductId);
                     if (mProd) {
                         mProd.producedAmount += produced;
+                        mProd.carriedOverAmount += carriedOver;
+                        mProd.totalAssortment += totalAssortment;
                         mProd.soldAmount += sold;
                         mProd.salesIncome += income;
                     }
@@ -224,6 +244,8 @@ export async function GET(request: NextRequest) {
 
             // Obliczenie KPI miesiąca
             let monthProduced = 0;
+            let monthCarriedOver = 0;
+            let monthAssortment = 0;
             let monthSold = 0;
             let monthBakeryIncome = 0;
             let monthFiscalIncome = 0;
@@ -233,6 +255,8 @@ export async function GET(request: NextRequest) {
 
             Object.values(daysMap).forEach((dayItem) => {
                 monthProduced += dayItem.totalProduced;
+                monthCarriedOver += dayItem.totalCarriedOver;
+                monthAssortment += dayItem.totalAssortment;
                 monthSold += dayItem.totalSold;
                 monthBakeryIncome += dayItem.bakerySalesIncome;
                 monthFiscalIncome += dayItem.fiscalIncome;
@@ -249,7 +273,7 @@ export async function GET(request: NextRequest) {
 
             const monthlyProducts = Array.from(monthlyProductMap.values()).map((p) => ({
                 ...p,
-                sellThroughRate: p.producedAmount > 0 ? Math.round((p.soldAmount / p.producedAmount) * 1000) / 10 : 0,
+                sellThroughRate: p.totalAssortment > 0 ? Math.round((p.soldAmount / p.totalAssortment) * 1000) / 10 : (p.producedAmount > 0 ? Math.round((p.soldAmount / p.producedAmount) * 1000) / 10 : 0),
             })).sort((a, b) => b.soldAmount - a.soldAmount);
 
             return NextResponse.json({
@@ -259,6 +283,8 @@ export async function GET(request: NextRequest) {
                 monthlyProducts,
                 stats: {
                     monthProduced,
+                    monthCarriedOver,
+                    monthAssortment,
                     monthSold,
                     monthBakeryIncome,
                     monthFiscalIncome,
@@ -316,10 +342,64 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST: Zapis/Aktualizacja raportu w bazie
+// POST: Zapis/Aktualizacja raportu w bazie lub przeniesienie niesprzedanych wyrobów
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
+        const user = await getUserFromRequest(request);
+
+        // -------------------------------------------------------------
+        // OBSŁUGA PRZENIESIENIA NIESPRZEDANYCH WYROBÓW NA NASTĘPNY DZIEŃ
+        // -------------------------------------------------------------
+        if (body.action === "transfer_leftovers") {
+            const { targetDate: targetDateStr, items } = body;
+            if (!targetDateStr || !Array.isArray(items)) {
+                return NextResponse.json({ error: "Brak docelowej daty lub pozycji do przeniesienia" }, { status: 400 });
+            }
+
+            const targetDate = new Date(`${targetDateStr}T00:00:00.000Z`);
+
+            const transferOps = items
+                .map((item: any) => {
+                    const carriedOver = Math.max(0, parseFloat(String(item.leftoverAmount || item.carriedOverAmount || "0").replace(",", ".")) || 0);
+                    if (carriedOver <= 0) return null;
+
+                    return prisma.dailyProduction.upsert({
+                        where: {
+                            date_bakeryProductId: {
+                                date: targetDate,
+                                bakeryProductId: item.bakeryProductId,
+                            },
+                        },
+                        update: {
+                            carriedOverAmount: carriedOver,
+                            ...(user?.id ? { createdById: user.id } : {}),
+                        },
+                        create: {
+                            date: targetDate,
+                            bakeryProductId: item.bakeryProductId,
+                            producedAmount: 0,
+                            carriedOverAmount: carriedOver,
+                            soldAmount: 0,
+                            ...(user?.id ? { createdById: user.id } : {}),
+                        },
+                    });
+                })
+                .filter(Boolean);
+
+            if (transferOps.length > 0) {
+                await prisma.$transaction(transferOps as any);
+            }
+
+            return NextResponse.json({
+                success: true,
+                message: `Pomyślnie przeniesiono ${transferOps.length} pozycji na dzień ${targetDateStr}!`,
+            });
+        }
+
+        // -------------------------------------------------------------
+        // ZWYKŁY ZAPIS RAPORTU DZIENNEGO
+        // -------------------------------------------------------------
         const { date, items, fiscalIncome } = body;
 
         if (!date || !Array.isArray(items)) {
@@ -344,8 +424,6 @@ export async function POST(request: NextRequest) {
             soldOutTimes: soldOutTimesMap,
         };
         saveExtras(extras);
-
-        const user = await getUserFromRequest(request);
 
         // 2. Próba zapisu do tabeli DailyIncome w Postgresie (jeśli dostępna)
         try {
@@ -378,6 +456,7 @@ export async function POST(request: NextRequest) {
         // 3. Zapis/Aktualizacja wpisów produkcji
         const operations = items.map((item: any) => {
             const producedAmt = Math.max(0, parseFloat(String(item.producedAmount).replace(",", ".")) || 0);
+            const carriedOverAmt = Math.max(0, parseFloat(String(item.carriedOverAmount || "0").replace(",", ".")) || 0);
             const soldAmt = Math.max(0, parseFloat(String(item.soldAmount).replace(",", ".")) || 0);
 
             return prisma.dailyProduction.upsert({
@@ -389,6 +468,7 @@ export async function POST(request: NextRequest) {
                 },
                 update: {
                     producedAmount: producedAmt,
+                    carriedOverAmount: carriedOverAmt,
                     soldAmount: soldAmt,
                     ...(user?.id ? { createdById: user.id } : {}),
                 },
@@ -396,6 +476,7 @@ export async function POST(request: NextRequest) {
                     date: targetDate,
                     bakeryProductId: item.bakeryProductId,
                     producedAmount: producedAmt,
+                    carriedOverAmount: carriedOverAmt,
                     soldAmount: soldAmt,
                     ...(user?.id ? { createdById: user.id } : {}),
                 },

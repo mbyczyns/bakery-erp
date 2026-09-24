@@ -14,6 +14,7 @@ export async function GET(
             where: { id },
             include: {
                 ingredients: {
+                    orderBy: { order: "asc" },
                     include: { ingredient: true },
                 },
                 bakeryRecipes: {
@@ -75,15 +76,17 @@ export async function PATCH(
                     unit: unit || "kg",
                     cost: calculatedUnitCost,
                     ingredients: {
-                        create: ingredients.map((item: any) => ({
+                        create: ingredients.map((item: any, index: number) => ({
                             ingredientId: item.ingredientId,
                             amount: item.amount,
                             unit: item.unit,
+                            order: item.order !== undefined ? Number(item.order) : index,
                         })),
                     },
                 },
                 include: {
                     ingredients: {
+                        orderBy: { order: "asc" },
                         include: { ingredient: true },
                     },
                 },

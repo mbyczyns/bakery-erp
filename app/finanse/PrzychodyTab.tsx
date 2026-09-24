@@ -648,57 +648,52 @@ export default function PrzychodyTab() {
                 <div className="flex items-center gap-1.5 p-1 bg-ui-accent/10 rounded-xl border border-ui-accent/30 overflow-x-auto max-w-full">
                     <button
                         onClick={() => setView("DAILY")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                            view === "DAILY"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "DAILY"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
                     >
                         <Calendar size={14} />
                         Dzienne (Sklep)
                     </button>
                     <button
                         onClick={() => setView("WEEKLY")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                            view === "WEEKLY"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "WEEKLY"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
                     >
                         <BarChart3 size={14} />
                         Tygodniowe
                     </button>
                     <button
                         onClick={() => setView("MONTHLY")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                            view === "MONTHLY"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "MONTHLY"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
                     >
                         <CalendarDays size={14} />
                         Miesięczne (z fakturami)
                     </button>
                     <button
                         onClick={() => setView("PRODUCTS")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                            view === "PRODUCTS"
-                                ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "PRODUCTS"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
                     >
                         <Wheat size={14} />
                         Struktura wyrobów ({data?.productRanking.length || 0})
                     </button>
                     <button
                         onClick={() => setView("INVOICES")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                            view === "INVOICES"
-                                ? "bg-white text-emerald-700 shadow-xs border border-ui-accent/50"
-                                : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "INVOICES"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
                     >
-                        <Receipt size={14} className={view === "INVOICES" ? "text-emerald-600" : ""} />
+                        <Receipt size={14} className={view === "INVOICES" ? "text-ui-primary" : ""} />
                         Faktury sprzedażowe ({data?.salesInvoices.length || 0})
                     </button>
                 </div>
@@ -717,11 +712,10 @@ export default function PrzychodyTab() {
                                 <button
                                     key={p.id}
                                     onClick={() => setPeriodPreset(p.id as PeriodPreset)}
-                                    className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                                        periodPreset === p.id
-                                            ? "bg-ui-primary text-white shadow-xs"
-                                            : "text-ui-secondary hover:bg-ui-accent/10"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${periodPreset === p.id
+                                        ? "bg-ui-primary text-white shadow-xs"
+                                        : "text-ui-secondary hover:bg-ui-accent/10"
+                                        }`}
                                 >
                                     {p.label}
                                 </button>
@@ -741,11 +735,10 @@ export default function PrzychodyTab() {
                                 <button
                                     key={c.id}
                                     onClick={() => setSelectedCategory(c.id as BakeryCategory)}
-                                    className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                                        selectedCategory === c.id
-                                            ? "bg-ui-primary text-white shadow-xs"
-                                            : "text-ui-secondary hover:bg-ui-accent/10"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${selectedCategory === c.id
+                                        ? "bg-ui-primary text-white shadow-xs"
+                                        : "text-ui-secondary hover:bg-ui-accent/10"
+                                        }`}
                                 >
                                     {c.label}
                                 </button>
@@ -809,7 +802,7 @@ export default function PrzychodyTab() {
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
                                 <ShoppingBag size={15} className="text-ui-primary" />
-                                Inne detal (kasa)
+                                Inne (kasa)
                             </span>
                             <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md border border-ui-accent/10">
                                 {activeStats.otherSharePercent}%
@@ -827,7 +820,7 @@ export default function PrzychodyTab() {
                         <div className="text-[11px] uppercase font-bold text-emerald-800 tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
                                 <Receipt size={15} className="text-emerald-600" />
-                                Faktury miesięczne (B2B)
+                                Faktury (B2B)
                             </span>
                             <span className="text-[11px] font-black text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
                                 {view === "DAILY" ? `${currentMonthInvoices.length} w ${selectedMonth}` : `${data?.salesInvoices?.length || 0} łącznie`}
@@ -1017,9 +1010,7 @@ export default function PrzychodyTab() {
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
                                 <Calendar size={14} /> Dzienny rejestr utargu i sprzedaży w sklepie
                             </h3>
-                            <p className="text-[11px] text-ui-secondary/80 mt-0.5">
-                                Rejestr sprzedaży sklepowej (faktury B2B rozliczane są w podsumowaniu całego miesiąca)
-                            </p>
+
                         </div>
                         <span className="text-[11px] font-semibold text-ui-secondary">
                             {filteredDailyData.length} dni
@@ -1049,9 +1040,8 @@ export default function PrzychodyTab() {
                                             <React.Fragment key={d.date}>
                                                 <tr
                                                     onClick={() => toggleRow(d.date)}
-                                                    className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${
-                                                        isExpanded ? "bg-ui-accent/10" : ""
-                                                    }`}
+                                                    className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
+                                                        }`}
                                                 >
                                                     <td className="p-3.5 font-bold text-ui-black">
                                                         {formatDate(d.date)}
@@ -1081,13 +1071,12 @@ export default function PrzychodyTab() {
                                                     <td className="p-3.5 text-center">
                                                         {d.totalProduced > 0 ? (
                                                             <span
-                                                                className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                                                                    d.sellThroughRate >= 90
-                                                                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                                                        : d.sellThroughRate >= 75
+                                                                className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${d.sellThroughRate >= 90
+                                                                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                                                    : d.sellThroughRate >= 75
                                                                         ? "bg-blue-50 text-blue-800 border border-blue-200"
                                                                         : "bg-amber-50 text-amber-800 border border-amber-200"
-                                                                }`}
+                                                                    }`}
                                                             >
                                                                 {d.sellThroughRate}%
                                                             </span>
@@ -1276,9 +1265,6 @@ export default function PrzychodyTab() {
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
                                 <CalendarDays size={14} /> Miesięczne zestawienie przychodów (Sklep + Faktury)
                             </h3>
-                            <p className="text-[11px] text-ui-secondary/80 mt-0.5">
-                                Łączny przychód miesiąca składa się z utargu sklepu oraz wystawionych w danym miesiącu faktur B2B
-                            </p>
                         </div>
                         <span className="text-[11px] font-semibold text-ui-secondary">
                             {filteredMonthlyData.length} miesięcy
@@ -1308,9 +1294,8 @@ export default function PrzychodyTab() {
                                             <React.Fragment key={m.key}>
                                                 <tr
                                                     onClick={() => m.salesInvoicesCount > 0 && toggleMonth(m.key)}
-                                                    className={`hover:bg-ui-accent/5 transition-colors ${
-                                                        m.salesInvoicesCount > 0 ? "cursor-pointer" : ""
-                                                    } ${isExpanded ? "bg-ui-accent/10" : ""}`}
+                                                    className={`hover:bg-ui-accent/5 transition-colors ${m.salesInvoicesCount > 0 ? "cursor-pointer" : ""
+                                                        } ${isExpanded ? "bg-ui-accent/10" : ""}`}
                                                 >
                                                     <td className="p-3.5 font-bold text-ui-black text-sm">
                                                         {m.label}
@@ -1592,9 +1577,8 @@ export default function PrzychodyTab() {
                                                 <React.Fragment key={inv.id}>
                                                     <tr
                                                         onClick={() => toggleInvoice(inv.id)}
-                                                        className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${
-                                                            isExpanded ? "bg-ui-accent/10" : ""
-                                                        }`}
+                                                        className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
+                                                            }`}
                                                     >
                                                         <td className="p-3.5 font-bold text-ui-black">
                                                             {formatDate(inv.issuedDate)}

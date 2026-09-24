@@ -15,11 +15,21 @@ import {
     BadgePercent,
     ChevronDown,
     Pencil,
-    Sparkles
+    Sparkles,
+    CheckCircle2,
+    ArrowUp,
+    ArrowDown
 } from "lucide-react";
 
 type ProductType = "BREAD" | "ROLL" | "SWEET" | "SAVORY";
-type MainTab = ProductType | "SEMI_FINISHED";
+type MainTab = "ALL" | ProductType | "SEMI_FINISHED";
+
+const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
+    BREAD: "Chleb",
+    ROLL: "Bułka",
+    SWEET: "Wypiek słodki",
+    SAVORY: "Wypiek słony",
+};
 
 interface DictionaryIngredient {
     id: string;
@@ -44,6 +54,7 @@ interface RecipeIngredientItem {
     id?: string;
     amount: number | string;
     ingredientUnit: string;
+    order?: number;
     ingredientId?: string | null;
     ingredient?: DictionaryIngredient | null;
     semiFinishedId?: string | null;
@@ -67,7 +78,7 @@ export default function PrzepisyPage() {
     const [dbIngredients, setDbIngredients] = useState<DictionaryIngredient[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeTab, setActiveTab] = useState<MainTab>("BREAD");
+    const [activeTab, setActiveTab] = useState<MainTab>("ALL");
 
     // Modal podglądu wypieku
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
@@ -167,6 +178,18 @@ export default function PrzepisyPage() {
         setFormItems((prev) =>
             prev.map((i) => (i.id === id && i.kind === kind ? { ...i, batchAmount: amount } : i))
         );
+    };
+
+    const handleMoveItem = (index: number, direction: "UP" | "DOWN") => {
+        setFormItems((prev) => {
+            const newItems = [...prev];
+            const targetIndex = direction === "UP" ? index - 1 : index + 1;
+            if (targetIndex < 0 || targetIndex >= newItems.length) return prev;
+            const temp = newItems[index];
+            newItems[index] = newItems[targetIndex];
+            newItems[targetIndex] = temp;
+            return newItems;
+        });
     };
 
     const openEditSemiFinished = (semi: SemiFinishedItem) => {
@@ -269,13 +292,14 @@ export default function PrzepisyPage() {
                     name: newName.trim(),
                     unit: newSemiUnit,
                     amount: batchNum,
-                    ingredients: formItems.map((item) => {
+                    ingredients: formItems.map((item, index) => {
                         const cleanAmtStr = item.batchAmount.toString().replace(",", ".").trim();
                         const amtNum = parseFloat(cleanAmtStr) || 0;
                         return {
                             ingredientId: item.id,
                             amount: amtNum / batchNum,
                             unit: item.unit,
+                            order: index,
                         };
                     }),
                 };
@@ -291,12 +315,13 @@ export default function PrzepisyPage() {
                     throw new Error(data.error || "Nie udało się zaktualizować półproduktu");
                 }
             } else if (creationKind === "PRODUCT") {
-                const singleUnitIngredients = formItems.map((item) => {
+                const singleUnitIngredients = formItems.map((item, index) => {
                     const cleanAmtStr = item.batchAmount.toString().replace(",", ".").trim();
                     const amtNum = parseFloat(cleanAmtStr) || 0;
                     return {
                         amount: amtNum / batchNum,
                         unit: item.unit,
+                        order: index,
                         ingredientId: item.kind === "INGREDIENT" ? item.id : null,
                         semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
                     };
@@ -326,13 +351,14 @@ export default function PrzepisyPage() {
                     name: newName.trim(),
                     unit: newSemiUnit,
                     amount: batchNum,
-                    ingredients: formItems.map((item) => {
+                    ingredients: formItems.map((item, index) => {
                         const cleanAmtStr = item.batchAmount.toString().replace(",", ".").trim();
                         const amtNum = parseFloat(cleanAmtStr) || 0;
                         return {
                             ingredientId: item.id,
                             amount: amtNum / batchNum,
                             unit: item.unit,
+                            order: index,
                         };
                     }),
                 };
@@ -367,7 +393,7 @@ export default function PrzepisyPage() {
 
     // Filtry list
     const filteredRecipes = recipes
-        .filter((r) => r.type === activeTab)
+        .filter((r) => activeTab === "ALL" || r.type === activeTab)
         .filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const filteredSemiFinished = semiFinishedList.filter((s) =>
@@ -398,7 +424,7 @@ export default function PrzepisyPage() {
                         onClick={() => {
                             setEditingSemiFinishedId(null);
                             setCreationKind("PRODUCT");
-                            setNewProductType(activeTab === "SEMI_FINISHED" ? "BREAD" : activeTab);
+                            setNewProductType(activeTab === "SEMI_FINISHED" || activeTab === "ALL" ? "BREAD" : activeTab);
                             setBatchSize("10");
                             setNewPackagingCost("0");
                             setNewName("");
@@ -417,6 +443,7 @@ export default function PrzepisyPage() {
             <div className="flex border-b border-ui-accent mb-6 gap-1.5 sm:gap-2 overflow-x-auto pb-0.5">
                 {(
                     [
+                        { id: "ALL", label: "Wszystkie" },
                         { id: "BREAD", label: "Chleby" },
                         { id: "ROLL", label: "Bułki" },
                         { id: "SWEET", label: "Wypieki słodkie" },
@@ -426,7 +453,9 @@ export default function PrzepisyPage() {
                 ).map((tab) => {
                     const isActive = activeTab === tab.id;
                     const count =
-                        tab.id === "SEMI_FINISHED"
+                        tab.id === "ALL"
+                            ? recipes.length
+                            : tab.id === "SEMI_FINISHED"
                             ? semiFinishedList.length
                             : recipes.filter((r) => r.type === tab.id).length;
 
@@ -557,7 +586,14 @@ export default function PrzepisyPage() {
                                     className="hover:bg-ui-accent/10 transition-colors cursor-pointer group"
                                 >
                                     <td className="p-4 text-ui-black group-hover:text-ui-primary transition-colors">
-                                        {recipe.name}
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold">{recipe.name}</span>
+                                            {activeTab === "ALL" && (
+                                                <span className="text-[10px] bg-ui-accent/20 text-ui-secondary border border-ui-accent/40 px-2 py-0.5 rounded-md font-bold">
+                                                    {PRODUCT_TYPE_LABELS[recipe.type] || recipe.type}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="p-4 text-right text-ui-black">
                                         {Number(recipe.sellingPrice || 0).toFixed(2)} zł
@@ -1077,7 +1113,7 @@ export default function PrzepisyPage() {
                                             Wyszukaj i wybierz składniki powyżej, aby dodać je do receptury.
                                         </div>
                                     ) : (
-                                        formItems.map((item) => {
+                                        formItems.map((item, index) => {
                                             const currentBatchNum = parseFloat(batchSize.replace(",", ".")) || 1;
                                             const currentItemAmt = parseFloat(item.batchAmount.replace(",", ".")) || 0;
                                             const perUnitAmt = currentItemAmt / currentBatchNum;
@@ -1087,10 +1123,40 @@ export default function PrzepisyPage() {
                                                     key={`${item.kind}-${item.id}`}
                                                     className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-ui-accent/5 transition-colors"
                                                 >
-                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                        <span className="font-bold text-ui-black text-sm truncate">
-                                                            {item.name}
+                                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                        <div className="flex items-center gap-0.5 shrink-0 bg-ui-accent/10 p-1 rounded-lg border border-ui-accent/40">
+                                                            <button
+                                                                type="button"
+                                                                disabled={index === 0}
+                                                                onClick={() => handleMoveItem(index, "UP")}
+                                                                className="p-1 text-ui-secondary hover:text-ui-black hover:bg-ui-accent/20 rounded transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                                                title="Przesuń w górę"
+                                                            >
+                                                                <ArrowUp size={13} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={index === formItems.length - 1}
+                                                                onClick={() => handleMoveItem(index, "DOWN")}
+                                                                className="p-1 text-ui-secondary hover:text-ui-black hover:bg-ui-accent/20 rounded transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                                                title="Przesuń w dół"
+                                                            >
+                                                                <ArrowDown size={13} />
+                                                            </button>
+                                                        </div>
+
+                                                        <span className="text-xs font-bold text-ui-secondary w-5 text-center shrink-0">
+                                                            {index + 1}.
                                                         </span>
+
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 truncate">
+                                                            <span className="font-bold text-ui-black text-sm truncate">
+                                                                {item.name}
+                                                            </span>
+                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold w-fit ${item.kind === "SEMI_FINISHED" ? "bg-amber-100 text-amber-900 border border-amber-200" : "bg-slate-100 text-slate-700 border border-slate-200"}`}>
+                                                                {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
+                                                            </span>
+                                                        </div>
                                                     </div>
 
                                                     <div className="flex items-center gap-3 shrink-0">
@@ -1146,7 +1212,11 @@ export default function PrzepisyPage() {
                                     disabled={isSubmitting}
                                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                                 >
-                                    {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                                    {isSubmitting ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                    ) : (
+                                        <CheckCircle2 size={16} />
+                                    )}
                                     {editingSemiFinishedId ? "Zaktualizuj recepturę" : creationKind === "PRODUCT" ? "Zapisz przepis" : "Zapisz półprodukt"}
                                 </button>
                             </div>

@@ -8,6 +8,7 @@ export async function GET() {
         const semiFinished = await prisma.semiFinished.findMany({
             include: {
                 ingredients: {
+                    orderBy: { order: "asc" },
                     include: { ingredient: true },
                 },
             },
@@ -47,10 +48,11 @@ export async function POST(request: NextRequest) {
                 unit: unit || "kg",
                 cost: calculatedUnitCost,
                 ingredients: {
-                    create: ingredients.map((item: any) => ({
+                    create: ingredients.map((item: any, index: number) => ({
                         ingredientId: item.ingredientId,
                         amount: item.amount,
                         unit: item.unit,
+                        order: item.order !== undefined ? Number(item.order) : index,
                     })),
                 },
             },

@@ -12,6 +12,7 @@ export async function GET() {
         const recipes = await prisma.bakeryProduct.findMany({
             include: {
                 ingredients: {
+                    orderBy: { order: "asc" },
                     include: {
                         ingredient: true,
                         semiFinished: true,
@@ -49,9 +50,10 @@ export async function POST(request: NextRequest) {
                 packagingCost: Number(packagingCost || 0),
                 ...(user?.id ? { createdById: user.id } : {}),
                 ingredients: {
-                    create: ingredients.map((ing: any) => ({
+                    create: ingredients.map((ing: any, index: number) => ({
                         amount: Number(ing.amount),
                         ingredientUnit: ing.unit || "kg",
+                        order: ing.order !== undefined ? Number(ing.order) : index,
                         ingredientId: ing.ingredientId || null,
                         semiFinishedId: ing.semiFinishedId || null,
                     })),
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
             },
             include: {
                 ingredients: {
+                    orderBy: { order: "asc" },
                     include: {
                         ingredient: true,
                         semiFinished: true,

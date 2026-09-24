@@ -16,6 +16,7 @@ import {
     Coins,
     BarChart3,
     Calendar,
+    CheckCircle2,
     AlertCircle,
     Scale,
     PackageCheck,
@@ -27,6 +28,8 @@ import {
     Search,
     Plus,
     AlertTriangle,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import {
     BarChart,
@@ -258,6 +261,19 @@ export default function PrzepisSzczegolyPage({
         );
     };
 
+    // Zmiana kolejności składników w edycji
+    const handleMoveEditItem = (index: number, direction: "UP" | "DOWN") => {
+        setEditItems((prev) => {
+            const newItems = [...prev];
+            const targetIndex = direction === "UP" ? index - 1 : index + 1;
+            if (targetIndex < 0 || targetIndex >= newItems.length) return prev;
+            const temp = newItems[index];
+            newItems[index] = newItems[targetIndex];
+            newItems[targetIndex] = temp;
+            return newItems;
+        });
+    };
+
     // Zapis edycji przepisu
     const handleSaveEditRecipe = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -280,12 +296,13 @@ export default function PrzepisSzczegolyPage({
 
         setIsSavingEdit(true);
         try {
-            const formattedIngredients = editItems.map((item) => {
+            const formattedIngredients = editItems.map((item, index) => {
                 const cleanAmt = parseFloat(item.batchAmount.replace(",", ".").trim()) || 0;
                 const perPieceAmt = cleanAmt / batchNum;
                 return {
                     amount: perPieceAmt,
                     ingredientUnit: item.unit,
+                    order: index,
                     ingredientId: item.kind === "INGREDIENT" ? item.id : null,
                     semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
                 };
@@ -1197,24 +1214,53 @@ export default function PrzepisSzczegolyPage({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-ui-accent/40">
-                                            {editItems.map((item) => {
+                                            {editItems.map((item, index) => {
                                                 const cleanAmt = parseFloat(item.batchAmount.replace(",", ".").trim()) || 0;
                                                 const totalItemCost = cleanAmt * item.unitPrice;
 
                                                 return (
                                                     <tr key={`${item.kind}-${item.id}`} className="hover:bg-ui-accent/5">
                                                         <td className="py-3 px-3">
-                                                            <div className="font-bold text-ui-black">
-                                                                {item.name}
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex items-center gap-0.5 shrink-0 bg-ui-accent/10 p-0.5 rounded-lg border border-ui-accent/40">
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={index === 0}
+                                                                        onClick={() => handleMoveEditItem(index, "UP")}
+                                                                        className="p-1 text-ui-secondary hover:text-ui-black hover:bg-ui-accent/20 rounded transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                                                        title="Przesuń w górę"
+                                                                    >
+                                                                        <ArrowUp size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={index === editItems.length - 1}
+                                                                        onClick={() => handleMoveEditItem(index, "DOWN")}
+                                                                        className="p-1 text-ui-secondary hover:text-ui-black hover:bg-ui-accent/20 rounded transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                                                        title="Przesuń w dół"
+                                                                    >
+                                                                        <ArrowDown size={12} />
+                                                                    </button>
+                                                                </div>
+
+                                                                <span className="text-xs font-bold text-ui-secondary w-4 text-center shrink-0">
+                                                                    {index + 1}.
+                                                                </span>
+
+                                                                <div>
+                                                                    <div className="font-bold text-ui-black">
+                                                                        {item.name}
+                                                                    </div>
+                                                                    <span
+                                                                        className={`text-[9px] px-1 py-0.2 rounded font-semibold ${item.kind === "SEMI_FINISHED"
+                                                                            ? "text-amber-800 bg-amber-50"
+                                                                            : "text-blue-700 bg-blue-50"
+                                                                            }`}
+                                                                    >
+                                                                        {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                            <span
-                                                                className={`text-[9px] px-1 py-0.2 rounded font-semibold ${item.kind === "SEMI_FINISHED"
-                                                                    ? "text-amber-800 bg-amber-50"
-                                                                    : "text-blue-700 bg-blue-50"
-                                                                    }`}
-                                                            >
-                                                                {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
-                                                            </span>
                                                         </td>
 
                                                         <td className="py-3 px-3 text-center">
@@ -1312,7 +1358,7 @@ export default function PrzepisSzczegolyPage({
                                         </>
                                     ) : (
                                         <>
-                                            <Save size={15} />
+                                            <CheckCircle2 size={15} />
                                             Zapisz zmiany w przepisie
                                         </>
                                     )}
