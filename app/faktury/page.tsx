@@ -861,7 +861,6 @@ export default function FakturyPage() {
                                             <tr className="bg-ui-accent/20 text-ui-secondary font-bold uppercase border-b border-ui-accent">
                                                 <th className="p-3 text-left">Nazwa artykułu</th>
                                                 <th className="p-3 text-center whitespace-nowrap w-auto">Ilość</th>
-                                                <th className="p-3 text-right">Cena Netto</th>
                                                 <th className="p-3 text-right">Wartość Brutto</th>
                                             </tr>
                                         </thead>
@@ -872,7 +871,6 @@ export default function FakturyPage() {
                                                     <td className="p-3 text-center font-bold text-ui-primary whitespace-nowrap">
                                                         {pos.quantity} {pos.unit}
                                                     </td>
-                                                    <td className="p-3 text-right text-ui-primary/80">{Number(pos.netPrice || 0).toFixed(2)} zł</td>
                                                     <td className="p-3 text-right font-bold text-ui-black">{Number(pos.grossAmount || 0).toFixed(2)} zł</td>
                                                 </tr>
                                             ))}

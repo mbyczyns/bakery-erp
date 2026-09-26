@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
+import { matchesSearch } from "@/lib/search-utils";
 import {
     Plus,
     Search,
@@ -75,9 +76,9 @@ export default function SkladnikiPage() {
     }, []);
 
     const filteredIngredients = ingredients.filter((item) => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearchQuery = matchesSearch([item.name, item.lastSupplierName], searchTerm);
         const matchesType = selectedTypeFilter === "ALL" || item.type === selectedTypeFilter;
-        return matchesSearch && matchesType;
+        return matchesSearchQuery && matchesType;
     });
 
     const handleAddIngredient = async (e: React.FormEvent) => {

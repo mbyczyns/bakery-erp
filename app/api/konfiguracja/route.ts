@@ -1,44 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import fs from "fs";
-import path from "path";
+import { getSystemSettings, saveSystemSettings } from "@/lib/settings";
+import { PriceRoundingOption } from "@/lib/price-rounding";
 
 const prisma = new PrismaClient();
-const SETTINGS_FILE = path.join(process.cwd(), "data", "settings.json");
-
-interface SystemSettings {
-    waterPricePerLiter: number;
-}
-
-function getSettings(): SystemSettings {
-    try {
-        if (!fs.existsSync(SETTINGS_FILE)) {
-            return { waterPricePerLiter: 0 };
-        }
-        const raw = fs.readFileSync(SETTINGS_FILE, "utf-8");
-        const parsed = JSON.parse(raw);
-        return {
-            waterPricePerLiter: Number(parsed.waterPricePerLiter || 0),
-        };
-    } catch {
-        return { waterPricePerLiter: 0 };
-    }
-}
-
-function saveSettings(settings: SystemSettings) {
-    try {
-        const dir = path.dirname(SETTINGS_FILE);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
-    } catch (e) {
-        console.error("Błąd zapisu pliku settings.json:", e);
-    }
-}
 
 // GET: Pobranie ustawień konfiguracyjnych
 export async function GET() {
     try {
-        const settings = getSettings();
+        const settings = getSystemSettings();
 
         // Sprawdzamy czy woda istnieje w bazie składników
         const waterIngredients = await prisma.ingredient.findMany({
@@ -55,6 +25,8 @@ export async function GET() {
 
         return NextResponse.json({
             waterPricePerLiter: waterPrice,
+            priceRounding: settings.priceRounding || "none",
+            openingHours: settings.openingHours,
             waterIngredients: waterIngredients.map((w) => ({
                 id: w.id,
                 name: w.name,
@@ -68,137 +40,179 @@ export async function GET() {
     }
 }
 
-// POST / PATCH: Zapisanie ceny wody i automatyczna synchronizacja ze składnikami i foodcostem
+// POST / PATCH: Zapisanie ceny wody lub reguły zaokrąglania cen
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const waterPrice = parseFloat(String(body.waterPricePerLiter ?? body.waterPrice).replace(",", "."));
 
-        if (isNaN(waterPrice) || waterPrice < 0) {
-            return NextResponse.json(
-                { error: "Podaj prawidłową stawkę za litr wody (liczba większa lub równa 0)" },
-                { status: 400 }
-            );
-        }
+        // 1. Zapis konfiguracji zaokrąglania cen jeśli przesłano
+        if (body.priceRounding !== undefined) {
+            const validRoundingOptions: PriceRoundingOption[] = ["none", "0.10", "0.20", "0.50", "1.00"];
+            const roundingVal = String(body.priceRounding) as PriceRoundingOption;
+            if (!validRoundingOptions.includes(roundingVal)) {
+                return NextResponse.json(
+                    { error: "Nieprawidłowa opcja zaokrąglenia cen. Dozwolone: none, 0.10, 0.20, 0.50, 1.00" },
+                    { status: 400 }
+                );
+            }
+            saveSystemSettings({ priceRounding: roundingVal });
 
-        // 1. Zapisujemy w pliku konfiguracyjnym
-        saveSettings({ waterPricePerLiter: waterPrice });
-
-        // 2. Wyszukujemy lub tworzymy składniki "Woda" oraz "Dolewka wody"
-        const waterNames = ["Woda", "Dolewka wody"];
-        const affectedIngredientIds: string[] = [];
-
-        for (const name of waterNames) {
-            const existing = await prisma.ingredient.findFirst({
-                where: {
-                    name: { equals: name, mode: "insensitive" },
-                },
-            });
-
-            if (existing) {
-                const updated = await prisma.ingredient.update({
-                    where: { id: existing.id },
-                    data: {
-                        calculatedPrice: waterPrice,
-                        unit: "l",
-                    },
+            // Jeśli przesłano tylko priceRounding, od razu zwracamy sukces
+            if (body.waterPricePerLiter === undefined && body.waterPrice === undefined && body.openingHours === undefined) {
+                return NextResponse.json({
+                    success: true,
+                    priceRounding: roundingVal,
+                    message: "Zasada zaokrąglania cen została zaktualizowana.",
                 });
-                affectedIngredientIds.push(updated.id);
-            } else {
-                const created = await prisma.ingredient.create({
-                    data: {
-                        name,
-                        unit: "l",
-                        calculatedPrice: waterPrice,
-                        type: "OTHER",
-                    },
-                });
-                affectedIngredientIds.push(created.id);
             }
         }
 
-        // 3. Przeliczamy koszt wszystkich półproduktów wykorzystujących wodę / dolewkę wody
-        const allSemi = await prisma.semiFinished.findMany({
-            include: {
-                ingredients: {
-                    include: { ingredient: true },
-                },
-            },
-        });
-
-        for (const semi of allSemi) {
-            let calculatedCost = 0;
-            for (const item of semi.ingredients) {
-                const amt = Number(item.amount || 0);
-                const price = affectedIngredientIds.includes(item.ingredientId)
-                    ? waterPrice
-                    : Number(item.ingredient?.calculatedPrice || 0);
-                calculatedCost += amt * price;
+        // 2. Zapis godzin otwarcia jeśli przesłano
+        if (body.openingHours !== undefined) {
+            const updated = saveSystemSettings({ openingHours: body.openingHours });
+            if (body.waterPricePerLiter === undefined && body.waterPrice === undefined) {
+                return NextResponse.json({
+                    success: true,
+                    openingHours: updated.openingHours,
+                    message: "Godziny otwarcia piekarni zostały pomyślnie zaktualizowane.",
+                });
             }
-
-            await prisma.semiFinished.update({
-                where: { id: semi.id },
-                data: { cost: calculatedCost },
-            });
         }
 
-        // 4. Przeliczamy foodcost (productionCost) wszystkich wyrobów gotowych
-        const allBakeryProducts = await prisma.bakeryProduct.findMany({
-            include: {
-                ingredients: {
-                    include: {
-                        ingredient: true,
-                        semiFinished: {
-                            include: {
-                                ingredients: {
-                                    include: { ingredient: true },
+        // 2. Obsługa ceny wody jeśli przesłano
+        if (body.waterPricePerLiter !== undefined || body.waterPrice !== undefined) {
+            const waterPrice = parseFloat(String(body.waterPricePerLiter ?? body.waterPrice).replace(",", "."));
+
+            if (isNaN(waterPrice) || waterPrice < 0) {
+                return NextResponse.json(
+                    { error: "Podaj prawidłową stawkę za litr wody (liczba większa lub równa 0)" },
+                    { status: 400 }
+                );
+            }
+
+            // Zapisujemy w pliku konfiguracyjnym
+            saveSystemSettings({ waterPricePerLiter: waterPrice });
+
+            // Wyszukujemy lub tworzymy składniki "Woda" oraz "Dolewka wody"
+            const waterNames = ["Woda", "Dolewka wody"];
+            const affectedIngredientIds: string[] = [];
+
+            for (const name of waterNames) {
+                const existing = await prisma.ingredient.findFirst({
+                    where: {
+                        name: { equals: name, mode: "insensitive" },
+                    },
+                });
+
+                if (existing) {
+                    const updated = await prisma.ingredient.update({
+                        where: { id: existing.id },
+                        data: {
+                            calculatedPrice: waterPrice,
+                            unit: "l",
+                        },
+                    });
+                    affectedIngredientIds.push(updated.id);
+                } else {
+                    const created = await prisma.ingredient.create({
+                        data: {
+                            name,
+                            unit: "l",
+                            calculatedPrice: waterPrice,
+                            type: "OTHER",
+                        },
+                    });
+                    affectedIngredientIds.push(created.id);
+                }
+            }
+
+            // Przeliczamy koszt wszystkich półproduktów wykorzystujących wodę / dolewkę wody
+            const allSemi = await prisma.semiFinished.findMany({
+                include: {
+                    ingredients: {
+                        include: { ingredient: true },
+                    },
+                },
+            });
+
+            for (const semi of allSemi) {
+                let calculatedCost = 0;
+                for (const item of semi.ingredients) {
+                    const amt = Number(item.amount || 0);
+                    const price = affectedIngredientIds.includes(item.ingredientId)
+                        ? waterPrice
+                        : Number(item.ingredient?.calculatedPrice || 0);
+                    calculatedCost += amt * price;
+                }
+
+                await prisma.semiFinished.update({
+                    where: { id: semi.id },
+                    data: { cost: calculatedCost },
+                });
+            }
+
+            // Przeliczamy foodcost (productionCost) wszystkich wyrobów gotowych
+            const allBakeryProducts = await prisma.bakeryProduct.findMany({
+                include: {
+                    ingredients: {
+                        include: {
+                            ingredient: true,
+                            semiFinished: {
+                                include: {
+                                    ingredients: {
+                                        include: { ingredient: true },
+                                    },
                                 },
                             },
                         },
                     },
                 },
-            },
-        });
+            });
 
-        for (const bp of allBakeryProducts) {
-            let totalFoodCost = 0;
-            for (const item of bp.ingredients) {
-                const amt = Number(item.amount || 0);
-                if (item.ingredient) {
-                    const price = affectedIngredientIds.includes(item.ingredient.id)
-                        ? waterPrice
-                        : Number(item.ingredient.calculatedPrice || 0);
-                    totalFoodCost += amt * price;
-                } else if (item.semiFinished) {
-                    // Pobieramy zaktualizowany koszt półproduktu
-                    let semiUnitCost = 0;
-                    for (const sItem of item.semiFinished.ingredients) {
-                        const sAmt = Number(sItem.amount || 0);
-                        const sPrice = affectedIngredientIds.includes(sItem.ingredientId)
+            for (const bp of allBakeryProducts) {
+                let totalFoodCost = 0;
+                for (const item of bp.ingredients) {
+                    const amt = Number(item.amount || 0);
+                    if (item.ingredient) {
+                        const price = affectedIngredientIds.includes(item.ingredient.id)
                             ? waterPrice
-                            : Number(sItem.ingredient?.calculatedPrice || 0);
-                        semiUnitCost += sAmt * sPrice;
+                            : Number(item.ingredient.calculatedPrice || 0);
+                        totalFoodCost += amt * price;
+                    } else if (item.semiFinished) {
+                        // Pobieramy zaktualizowany koszt półproduktu
+                        let semiUnitCost = 0;
+                        for (const sItem of item.semiFinished.ingredients) {
+                            const sAmt = Number(sItem.amount || 0);
+                            const sPrice = affectedIngredientIds.includes(sItem.ingredientId)
+                                ? waterPrice
+                                : Number(sItem.ingredient?.calculatedPrice || 0);
+                            semiUnitCost += sAmt * sPrice;
+                        }
+                        totalFoodCost += amt * semiUnitCost;
                     }
-                    totalFoodCost += amt * semiUnitCost;
                 }
+
+                // Doliczamy koszt opakowania
+                totalFoodCost += Number((bp as any).packagingCost || 0);
+
+                await prisma.bakeryProduct.update({
+                    where: { id: bp.id },
+                    data: { productionCost: totalFoodCost },
+                });
             }
 
-            // Doliczamy koszt opakowania
-            totalFoodCost += Number((bp as any).packagingCost || 0);
-
-            await prisma.bakeryProduct.update({
-                where: { id: bp.id },
-                data: { productionCost: totalFoodCost },
+            return NextResponse.json({
+                success: true,
+                waterPricePerLiter: waterPrice,
+                priceRounding: getSystemSettings().priceRounding,
+                message: "Ustawienia zostały zaktualizowane i przeliczone we wszystkich recepturach i foodcostach.",
             });
         }
 
-        return NextResponse.json({
-            success: true,
-            waterPricePerLiter: waterPrice,
-            message: "Cena wody została zaktualizowana i przeliczona we wszystkich recepturach i foodcostach.",
-        });
+        return NextResponse.json({ success: true });
     } catch (error: any) {
-        console.error("Błąd zapisu konfiguracji wody:", error);
+        console.error("Błąd zapisu konfiguracji:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

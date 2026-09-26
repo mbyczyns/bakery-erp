@@ -186,17 +186,18 @@ model Ingredient {
 }
 
 model SemiFinished {
-  id            String                   @id @default(uuid())
-  name          String
-  cost          Decimal                  @default(0.00)
-  unit          String
-  ingredients   SemiFinishedIngredient[]
-  bakeryRecipes RecipeIngredient[]
+  id                 String                   @id @default(uuid())
+  name               String
+  cost               Decimal                  @default(0.00)
+  unit               String
+  ingredients        SemiFinishedIngredient[] @relation("ParentSemiFinished")
+  usedInSemiFinished SemiFinishedIngredient[] @relation("ChildSemiFinished")
+  bakeryRecipes      RecipeIngredient[]
 
-  createdById   String?
-  createdBy     User?                    @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
 
-  createdAt     DateTime                 @default(now())
+  createdAt DateTime @default(now())
 }
 
 model SemiFinishedIngredient {
@@ -206,10 +207,13 @@ model SemiFinishedIngredient {
   order  Int     @default(0)
 
   semiFinishedId String
-  semiFinished   SemiFinished @relation(fields: [semiFinishedId], references: [id], onDelete: Cascade)
+  semiFinished   SemiFinished @relation("ParentSemiFinished", fields: [semiFinishedId], references: [id], onDelete: Cascade)
 
-  ingredientId String
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  ingredientId String?
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  childSemiFinishedId String?
+  childSemiFinished   SemiFinished? @relation("ChildSemiFinished", fields: [childSemiFinishedId], references: [id], onDelete: Cascade)
 }
 
 model BakeryProduct {

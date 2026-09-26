@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:backup": "docker compose exec -T db sh -c 'pg_dump -U $(cat /run/secrets/db_user) $(cat /run/secrets/db_name)' > backup_$(date +%Y%m%d_%H%M%S).sql"
+    "db:backup": "docker compose exec -T db sh -c 'pg_dump -U $(cat /run/secrets/db_user) $(cat /run/secrets/db_name)' > sql-backups/backup_$(date +%Y%m%d_%H%M%S).sql"
   },
   "dependencies": {
     "fast-xml-parser": "^5.10.1",

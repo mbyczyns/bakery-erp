@@ -55,9 +55,9 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
     const allMenuItems = [
         { name: "Faktury", href: "/faktury", icon: ReceiptEuroIcon },
         { name: "Dostawcy i kontrahenci", href: "/kontrahenci", icon: ShoppingCart },
-        { name: "Produkcja i sprzedaż", href: "/produkcja", icon: Microwave },
         { name: "Składniki", href: "/skladniki", icon: Milk },
         { name: "Przepisy i foodcosty", href: "/przepisy", icon: FileText },
+        { name: "Produkcja i sprzedaż", href: "/produkcja", icon: Microwave },
         { name: "Finanse", href: "/finanse", icon: DollarSign },
         { name: "Konfiguracja", href: "/konfiguracja", icon: Settings },
     ];
@@ -140,8 +140,8 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
                                 href={item.href}
                                 onClick={() => onCloseMobile?.()}
                                 className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${isActive
-                                        ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
-                                        : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
+                                    ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
+                                    : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
                                     }`}
                                 title={!isMobile && isCollapsed ? item.name : undefined}
                             >
@@ -167,8 +167,8 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
                         href="/powiadomienia"
                         onClick={() => onCloseMobile?.()}
                         className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${isNotificationsActive
-                                ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
-                                : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
+                            ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
+                            : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
                             }`}
                         title={!isMobile && isCollapsed ? (notificationsCount > 0 ? `Powiadomienia (${notificationsCount})` : "Powiadomienia") : undefined}
                     >

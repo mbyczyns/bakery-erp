@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getCustomNamesMap } from "@/lib/contractor-names";
+import { getSystemSettings } from "@/lib/settings";
+import { roundPriceByRule } from "@/lib/price-rounding";
 import fs from "fs";
 import path from "path";
 
@@ -165,6 +167,9 @@ export async function GET(request: NextRequest) {
             },
         });
 
+        const settings = getSystemSettings();
+        const priceRounding = settings.priceRounding || "none";
+
         const priceAlerts: Array<{
             id: string;
             ingredientId: string;
@@ -277,7 +282,8 @@ export async function GET(request: NextRequest) {
                     const costIncrease = Math.round(amountNum * diff * 100) / 100;
                     const curSellPrice = Number(bp.sellingPrice || 0);
                     const curProdCost = Number(bp.productionCost || 0);
-                    const suggestedSellPrice = Math.round((curSellPrice + costIncrease) * 100) / 100;
+                    const rawSuggested = curSellPrice > 0 ? curSellPrice + costIncrease : curProdCost + costIncrease;
+                    const suggestedSellPrice = roundPriceByRule(rawSuggested, priceRounding);
 
                     affectedMap.set(bp.id, {
                         productId: bp.id,
@@ -309,14 +315,17 @@ export async function GET(request: NextRequest) {
                         const costIncrease = Math.round(effectiveAmount * diff * 100) / 100;
                         const curSellPrice = Number(bp.sellingPrice || 0);
                         const curProdCost = Number(bp.productionCost || 0);
-                        const suggestedSellPrice = Math.round((curSellPrice + costIncrease) * 100) / 100;
 
                         const existing = affectedMap.get(bp.id);
                         if (existing) {
-                            existing.amountUsed += effectiveAmount;
+                            existing.amountUsed = Math.round((existing.amountUsed + effectiveAmount) * 1000) / 1000;
                             existing.foodCostIncrease = Math.round((existing.foodCostIncrease + costIncrease) * 100) / 100;
-                            existing.suggestedSellingPrice = Math.round((curSellPrice + existing.foodCostIncrease) * 100) / 100;
+                            const rawSuggested = curSellPrice > 0 ? curSellPrice + existing.foodCostIncrease : curProdCost + existing.foodCostIncrease;
+                            existing.suggestedSellingPrice = roundPriceByRule(rawSuggested, priceRounding);
                         } else {
+                            const rawSuggested = curSellPrice > 0 ? curSellPrice + costIncrease : curProdCost + costIncrease;
+                            const suggestedSellPrice = roundPriceByRule(rawSuggested, priceRounding);
+
                             affectedMap.set(bp.id, {
                                 productId: bp.id,
                                 productName: bp.name,
@@ -333,7 +342,18 @@ export async function GET(request: NextRequest) {
                     });
                 });
 
-                const affectedProductsList = Array.from(affectedMap.values());
+                // Filtrujemy wyroby: sugerujemy podwyżkę tylko, jeśli cena sprzedaży faktycznie wzrośnie po zaokrągleniu
+                const allAffectedList = Array.from(affectedMap.values());
+                const qualifyingProducts = allAffectedList.filter((prod) => {
+                    if (prod.currentSellingPrice > 0) {
+                        return prod.suggestedSellingPrice > prod.currentSellingPrice;
+                    }
+                    return prod.foodCostIncrease > 0;
+                });
+
+                // Jeśli żaden wyrób nie przekroczył progu zaokrąglenia dla podwyżki ceny, pomijamy ten alert
+                if (qualifyingProducts.length === 0) continue;
+
                 const alertId = `price-${ing.id}-${latest.date}-${latest.unitPrice}`;
 
                 priceAlerts.push({
@@ -348,7 +368,7 @@ export async function GET(request: NextRequest) {
                     lastSupplierName: latest.supplierName,
                     lastPurchaseDate: latest.date,
                     lastInvoiceNumber: latest.invoiceNumber,
-                    affectedProducts: affectedProductsList,
+                    affectedProducts: qualifyingProducts,
                     isDismissed: dismissedIds.has(alertId),
                 });
             }

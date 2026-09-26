@@ -25,7 +25,10 @@ export async function GET(
                             include: {
                                 ingredients: {
                                     orderBy: { order: "asc" },
-                                    include: { ingredient: true },
+                                    include: {
+                                        ingredient: true,
+                                        childSemiFinished: true,
+                                    },
                                 },
                             },
                         },
@@ -191,6 +194,27 @@ export async function PUT(
             );
         }
 
+        const ingredientIds = ingredients.map((i: any) => i.ingredientId).filter(Boolean);
+        const semiFinishedIds = ingredients.map((i: any) => i.semiFinishedId).filter(Boolean);
+
+        const [dbIngredients, dbSemiFinished] = await Promise.all([
+            prisma.ingredient.findMany({ where: { id: { in: ingredientIds } } }),
+            prisma.semiFinished.findMany({ where: { id: { in: semiFinishedIds } } }),
+        ]);
+
+        const ingPriceMap = new Map(dbIngredients.map((i) => [i.id, Number(i.calculatedPrice || 0)]));
+        const semiCostMap = new Map(dbSemiFinished.map((s) => [s.id, Number(s.cost || 0)]));
+
+        let calculatedFoodCost = Number(packagingCost || 0);
+        for (const ing of ingredients) {
+            const amt = Number(ing.amount || 0);
+            if (ing.ingredientId && ingPriceMap.has(ing.ingredientId)) {
+                calculatedFoodCost += amt * ingPriceMap.get(ing.ingredientId)!;
+            } else if (ing.semiFinishedId && semiCostMap.has(ing.semiFinishedId)) {
+                calculatedFoodCost += amt * semiCostMap.get(ing.semiFinishedId)!;
+            }
+        }
+
         await prisma.$transaction(async (tx) => {
             // 1. Usunięcie dotychczasowych składników receptury
             await tx.recipeIngredient.deleteMany({
@@ -203,6 +227,7 @@ export async function PUT(
                 data: {
                     name: name.trim(),
                     type: type || "BREAD",
+                    productionCost: calculatedFoodCost,
                     ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
                     ...(packagingCost !== undefined && { packagingCost: Number(packagingCost) }),
                     ingredients: {

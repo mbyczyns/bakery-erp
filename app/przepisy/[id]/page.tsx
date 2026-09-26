@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { matchesSearch } from "@/lib/search-utils";
 import {
     ArrowLeft,
     Loader2,
@@ -30,6 +31,9 @@ import {
     AlertTriangle,
     ArrowUp,
     ArrowDown,
+    Circle,
+    CircleCheck,
+    ChevronDown,
 } from "lucide-react";
 import {
     BarChart,
@@ -41,6 +45,7 @@ import {
     ResponsiveContainer,
     Legend,
 } from "recharts";
+import { roundPriceByRule, PRICE_ROUNDING_OPTIONS, PriceRoundingOption } from "@/lib/price-rounding";
 
 interface DetailedIngredient {
     id: string;
@@ -109,6 +114,7 @@ export default function PrzepisSzczegolyPage({
 
     // Dynamiczny kalkulator partii w tabeli składników
     const [previewBatchSize, setPreviewBatchSize] = useState<number>(1);
+    const [batchInput, setBatchInput] = useState<string>("1");
 
     // Interaktywny kalkulator marży i ceny (stały VAT 5% dla wyrobów piekarniczych)
     const VAT_RATE = 5;
@@ -143,17 +149,38 @@ export default function PrzepisSzczegolyPage({
     const [editSearchInput, setEditSearchInput] = useState("");
     const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+    // Szybkie tworzenie składnika w modalu edycji
+    const [isCreateIngredientOpen, setIsCreateIngredientOpen] = useState(false);
+    const [quickIngredientName, setQuickIngredientName] = useState("");
+    const [quickIngredientType, setQuickIngredientType] = useState<"FLOUR" | "FRUIT" | "DAIRY" | "OTHER" | "">("");
+    const [quickIngredientUnit, setQuickIngredientUnit] = useState("kg");
+    const [isCreatingQuickIngredient, setIsCreatingQuickIngredient] = useState(false);
+
     // -------------------------------------------------------------
     // STAN MODALU USUWANIA PRZEPISU
     // -------------------------------------------------------------
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // Konfiguracja zaokrąglania cen
+    const [priceRounding, setPriceRounding] = useState<PriceRoundingOption>("none");
+
     const fetchData = async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/przepisy/${id}`);
+            const [res, configRes] = await Promise.all([
+                fetch(`/api/przepisy/${id}`),
+                fetch("/api/konfiguracja"),
+            ]);
+
+            if (configRes.ok) {
+                const configData = await configRes.json();
+                if (configData.priceRounding) {
+                    setPriceRounding(configData.priceRounding as PriceRoundingOption);
+                }
+            }
+
             if (!res.ok) {
                 if (res.status === 404) {
                     setError("Nie znaleziono wybranego przepisu.");
@@ -247,6 +274,53 @@ export default function PrzepisSzczegolyPage({
             { id, kind, name, unit, batchAmount: "1.0", unitPrice },
         ]);
         setEditSearchInput("");
+    };
+
+    // Szybkie dodawanie nowego składnika w modalu edycji
+    const handleSaveQuickIngredient = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quickIngredientName.trim()) {
+            alert("Wprowadź nazwę składnika!");
+            return;
+        }
+        if (!quickIngredientType) {
+            alert("Wybierz typ / kategorię składnika!");
+            return;
+        }
+        setIsCreatingQuickIngredient(true);
+        try {
+            const res = await fetch("/api/skladniki", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: quickIngredientName.trim(),
+                    type: quickIngredientType,
+                    unit: quickIngredientUnit,
+                }),
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "Nie udało się utworzyć składnika");
+            }
+            const data = await res.json();
+            const newIng = {
+                id: data.ingredient?.id || data.id,
+                name: data.ingredient?.name || quickIngredientName.trim(),
+                unit: data.ingredient?.unit || quickIngredientUnit,
+                calculatedPrice: Number(data.calculatedPrice || data.ingredient?.calculatedPrice || 0),
+            };
+
+            setAvailableIngredients((prev) => [...prev, newIng]);
+            handleSelectEditItem(newIng.id, "INGREDIENT", newIng.name, newIng.unit, newIng.calculatedPrice);
+            setQuickIngredientName("");
+            setQuickIngredientType("");
+            setQuickIngredientUnit("kg");
+            setIsCreateIngredientOpen(false);
+        } catch (error: any) {
+            alert(`Błąd: ${error.message || "Nie udało się utworzyć składnika"}`);
+        } finally {
+            setIsCreatingQuickIngredient(false);
+        }
     };
 
     // Usuwanie składnika z edycji
@@ -397,9 +471,12 @@ export default function PrzepisSzczegolyPage({
     // => CenaNetto = Koszt / (1 - Marża/100)
     const validMargin = Math.min(99, Math.max(0, targetMargin));
     const calculatedNetFromMargin = foodCostPerUnit / (1 - validMargin / 100);
-    const calculatedGrossFromMargin = calculatedNetFromMargin * (1 + VAT_RATE / 100);
-    const profitPerUnitFromMargin = calculatedNetFromMargin - foodCostPerUnit;
-    const markupFromMargin = (profitPerUnitFromMargin / foodCostPerUnit) * 100;
+    const rawGrossFromMargin = calculatedNetFromMargin * (1 + VAT_RATE / 100);
+    const calculatedGrossFromMargin = roundPriceByRule(rawGrossFromMargin, priceRounding);
+    const actualNetFromMargin = calculatedGrossFromMargin / (1 + VAT_RATE / 100);
+    const profitPerUnitFromMargin = actualNetFromMargin - foodCostPerUnit;
+    const markupFromMargin = foodCostPerUnit > 0 ? (profitPerUnitFromMargin / foodCostPerUnit) * 100 : 0;
+    const actualMarginFromRounded = actualNetFromMargin > 0 ? ((actualNetFromMargin - foodCostPerUnit) / actualNetFromMargin) * 100 : 0;
 
     // 2. Z ceny na marżę (tryb odwrotny):
     const inputPriceGross = parseFloat(customGrossPrice.replace(",", ".")) || 0;
@@ -410,11 +487,11 @@ export default function PrzepisSzczegolyPage({
 
     // Wybrana cena do zapisu:
     const finalNetToSave =
-        calcMode === "FROM_MARGIN" ? calculatedNetFromMargin : inputPriceNet;
+        calcMode === "FROM_MARGIN" ? actualNetFromMargin : inputPriceNet;
     const finalGrossToSave =
         calcMode === "FROM_MARGIN" ? calculatedGrossFromMargin : inputPriceGross;
     const activeMargin =
-        calcMode === "FROM_MARGIN" ? validMargin : marginFromPrice;
+        calcMode === "FROM_MARGIN" ? actualMarginFromRounded : marginFromPrice;
 
     // Zapisywanie ceny sprzedaży do bazy (w kwocie brutto)
     const handleSaveSellingPrice = async () => {
@@ -581,22 +658,45 @@ export default function PrzepisSzczegolyPage({
                             </div>
 
                             {/* Przelicznik partii */}
-                            <div className="grid grid-cols-5 gap-2 bg-ui-accent/10 p-2 rounded-xl border border-ui-accent/40">
-                                <span className="text-xs font-bold text-ui-primary flex items-center justify-center whitespace-nowrap">
+                            <div className="flex items-center gap-2 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40">
+                                <span className="text-xs font-bold text-ui-primary px-1 whitespace-nowrap">
                                     Partia:
                                 </span>
-                                {[1, 10, 50, 100].map((size) => (
-                                    <button
-                                        key={size}
-                                        onClick={() => setPreviewBatchSize(size)}
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${previewBatchSize === size
-                                            ? "bg-ui-primary text-white shadow-sm"
-                                            : "text-ui-secondary hover:bg-amber-200/60"
-                                            }`}
-                                    >
-                                        {size} szt.
-                                    </button>
-                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPreviewBatchSize(1);
+                                        setBatchInput("1");
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        previewBatchSize === 1 && (batchInput === "1" || batchInput === "")
+                                            ? "bg-ui-primary text-white shadow-xs"
+                                            : "bg-ui-white/80 hover:bg-ui-accent/30 text-ui-secondary border border-ui-accent/40"
+                                    }`}
+                                >
+                                    1 szt.
+                                </button>
+                                <div className="flex items-center gap-1.5 bg-ui-white border border-ui-accent rounded-lg px-2.5 py-1 shadow-2xs focus-within:border-ui-primary focus-within:ring-1 focus-within:ring-ui-primary transition-all">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        step="any"
+                                        placeholder="Wpisz ilość"
+                                        value={batchInput}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setBatchInput(val);
+                                            const parsed = parseFloat(val);
+                                            if (!isNaN(parsed) && parsed > 0) {
+                                                setPreviewBatchSize(parsed);
+                                            }
+                                        }}
+                                        className="w-20 text-center text-xs font-bold text-ui-black bg-transparent focus:outline-none"
+                                    />
+                                    <span className="text-[11px] font-semibold text-ui-secondary select-none">
+                                        szt.
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
@@ -799,9 +899,14 @@ export default function PrzepisSzczegolyPage({
                         {/* KARTA WYNIKÓW KALKULACJI */}
                         <div className="bg-ui-accent/5 border border-ui-accent/40 rounded-xl p-4.5 space-y-3 mb-6">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-ui-black uppercase tracking-wider">
-                                    Sugerowana cena (Brutto):
-                                </span>
+                                <div>
+                                    <span className="text-xs font-bold text-ui-black uppercase tracking-wider block">
+                                        Sugerowana cena (Brutto):
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-ui-secondary">
+                                        Zaokrąglenie: {PRICE_ROUNDING_OPTIONS.find((o) => o.id === priceRounding)?.label || "Brak zaokrąglenia"}
+                                    </span>
+                                </div>
                                 <div className="text-2xl font-black text-ui-black">
                                     {finalGrossToSave.toFixed(2)} zł
                                 </div>
@@ -831,8 +936,6 @@ export default function PrzepisSzczegolyPage({
                                         {activeMargin.toFixed(1)}%
                                     </span>
                                 </div>
-
-
                             </div>
                         </div>
 
@@ -859,7 +962,7 @@ export default function PrzepisSzczegolyPage({
                                     </>
                                 ) : (
                                     <>
-                                        <Save size={18} />
+                                        <CircleCheck size={18} />
                                         Zapisz cenę sprzedaży ({finalGrossToSave.toFixed(2)} zł brutto)
                                     </>
                                 )}
@@ -1048,16 +1151,21 @@ export default function PrzepisSzczegolyPage({
                                     <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
                                         Kategoria
                                     </label>
-                                    <select
-                                        value={editType}
-                                        onChange={(e) => setEditType(e.target.value as any)}
-                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black focus:outline-none focus:border-ui-accent cursor-pointer transition-all shadow-sm font-semibold"
-                                    >
-                                        <option value="BREAD">Chleb</option>
-                                        <option value="ROLL">Bułka</option>
-                                        <option value="SWEET">Słodkie</option>
-                                        <option value="SAVORY">Słone</option>
-                                    </select>
+                                    <div className="relative">
+                                        <select
+                                            value={editType}
+                                            onChange={(e) => setEditType(e.target.value as any)}
+                                            className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm font-semibold"
+                                        >
+                                            <option value="BREAD">Chleb</option>
+                                            <option value="ROLL">Bułka</option>
+                                            <option value="SWEET">Słodkie</option>
+                                            <option value="SAVORY">Słone</option>
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Koszt opakowania */}
@@ -1102,86 +1210,115 @@ export default function PrzepisSzczegolyPage({
 
                             {/* Wyszukiwarka surowców / półproduktów */}
                             <div>
-                                <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
-                                    Dodaj surowiec lub półprodukt
-                                </label>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider">
+                                        Dodaj surowiec lub półprodukt
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setQuickIngredientName(editSearchInput.trim());
+                                            setIsCreateIngredientOpen(true);
+                                        }}
+                                        className="flex items-right gap-1 ml-auto text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                    >
+                                        <Plus size={13} />
+                                        Nowy składnik
+                                    </button>
+                                </div>
                                 <div className="relative">
                                     <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ui-secondary" />
                                     <input
                                         type="text"
-                                        placeholder="Szukaj ..."
+                                        placeholder="Wyszukaj i wybierz składnik lub półprodukt..."
                                         value={editSearchInput}
                                         onChange={(e) => setEditSearchInput(e.target.value)}
-                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 text-sm text-ui-black focus:outline-none focus:border-ui-accent transition-all shadow-sm"
+                                        className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-10 pr-4 text-sm text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
                                     />
 
                                     {editSearchInput.trim() && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-ui-white border border-ui-accent rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-ui-accent/50">
-                                            {/* Surowce */}
-                                            {availableIngredients
-                                                .filter((ing) =>
-                                                    ing.name.toLowerCase().includes(editSearchInput.toLowerCase())
-                                                )
-                                                .map((ing) => (
-                                                    <div
-                                                        key={`ing-${ing.id}`}
-                                                        onClick={() =>
-                                                            handleSelectEditItem(
-                                                                ing.id,
-                                                                "INGREDIENT",
-                                                                ing.name,
-                                                                ing.unit,
-                                                                Number(ing.calculatedPrice || 0)
-                                                            )
-                                                        }
-                                                        className="p-3 hover:bg-amber-50 flex items-center justify-between cursor-pointer transition-colors"
+                                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-ui-white border border-ui-accent rounded-xl shadow-xl z-20 max-h-52 overflow-y-auto divide-y divide-ui-accent/40">
+                                            {availableIngredients.filter((ing) => matchesSearch(ing.name, editSearchInput)).length === 0 &&
+                                                availableSemiFinished.filter((semi) => matchesSearch(semi.name, editSearchInput)).length === 0 ? (
+                                                <div className="p-4 text-center text-ui-secondary text-xs">
+                                                    <p className="italic mb-2">Nie znaleziono pozycji &quot;{editSearchInput}&quot;</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setQuickIngredientName(editSearchInput.trim());
+                                                            setIsCreateIngredientOpen(true);
+                                                        }}
+                                                        className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-all cursor-pointer shadow-xs"
                                                     >
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                                                                Surowiec
-                                                            </span>
-                                                            <span className="font-bold text-ui-black text-xs">
-                                                                {ing.name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-ui-secondary">
-                                                            {Number(ing.calculatedPrice || 0).toFixed(2)} zł / {ing.unit}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                        <Plus size={14} />
+                                                        Utwórz &quot;{editSearchInput.trim()}&quot; jako nowy składnik
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* Półprodukty */}
+                                                    {availableSemiFinished
+                                                        .filter((semi) =>
+                                                            matchesSearch(semi.name, editSearchInput)
+                                                        )
+                                                        .map((semi) => (
+                                                            <div
+                                                                key={`semi-${semi.id}`}
+                                                                onClick={() =>
+                                                                    handleSelectEditItem(
+                                                                        semi.id,
+                                                                        "SEMI_FINISHED",
+                                                                        semi.name,
+                                                                        semi.unit,
+                                                                        Number(semi.cost || 0)
+                                                                    )
+                                                                }
+                                                                className="p-3 hover:bg-amber-50 flex items-center justify-between cursor-pointer transition-colors bg-amber-50/40 font-bold text-amber-950"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300">
+                                                                        Półprodukt
+                                                                    </span>
+                                                                    <span className="text-xs">
+                                                                        {semi.name}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-xs font-semibold text-ui-secondary">[{semi.unit}]</span>
+                                                            </div>
+                                                        ))}
 
-                                            {/* Półprodukty */}
-                                            {availableSemiFinished
-                                                .filter((semi) =>
-                                                    semi.name.toLowerCase().includes(editSearchInput.toLowerCase())
-                                                )
-                                                .map((semi) => (
-                                                    <div
-                                                        key={`semi-${semi.id}`}
-                                                        onClick={() =>
-                                                            handleSelectEditItem(
-                                                                semi.id,
-                                                                "SEMI_FINISHED",
-                                                                semi.name,
-                                                                semi.unit,
-                                                                Number(semi.cost || 0)
-                                                            )
-                                                        }
-                                                        className="p-3 hover:bg-amber-50 flex items-center justify-between cursor-pointer transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                                                                Półprodukt
-                                                            </span>
-                                                            <span className="font-bold text-ui-black text-xs">
-                                                                {semi.name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-ui-secondary">
-                                                            {Number(semi.cost || 0).toFixed(2)} zł / {semi.unit}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    {/* Surowce */}
+                                                    {availableIngredients
+                                                        .filter((ing) =>
+                                                            matchesSearch(ing.name, editSearchInput)
+                                                        )
+                                                        .map((ing) => (
+                                                            <div
+                                                                key={`ing-${ing.id}`}
+                                                                onClick={() =>
+                                                                    handleSelectEditItem(
+                                                                        ing.id,
+                                                                        "INGREDIENT",
+                                                                        ing.name,
+                                                                        ing.unit,
+                                                                        Number(ing.calculatedPrice || 0)
+                                                                    )
+                                                                }
+                                                                className="p-3 hover:bg-amber-50/70 flex items-center justify-between cursor-pointer transition-colors"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                                                        Surowiec
+                                                                    </span>
+                                                                    <span className="font-bold text-ui-black text-xs">
+                                                                        {ing.name}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-xs font-semibold text-ui-secondary">[{ing.unit}]</span>
+                                                            </div>
+                                                        ))}
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1203,14 +1340,21 @@ export default function PrzepisSzczegolyPage({
                                         Brak składników w recepturze. Użyj wyszukiwarki powyżej, aby dodać surowce.
                                     </div>
                                 ) : (
-                                    <table className="w-full text-left text-xs border-collapse">
+                                    <table className="w-full text-left text-xs border-collapse table-fixed">
+                                        <colgroup>
+                                            <col className="w-auto" />
+                                            <col className="w-36" />
+                                            <col className="w-24" />
+                                            <col className="w-28" />
+                                            <col className="w-12" />
+                                        </colgroup>
                                         <thead>
-                                            <tr className="border-b border-ui-accent/60 text-ui-secondary font-bold uppercase text-[9px]">
+                                            <tr className="border-b border-ui-accent/60 bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[9px]">
                                                 <th className="py-2.5 px-3">Składnik</th>
-                                                <th className="py-2.5 px-3 text-center w-36">Ilość na partię</th>
+                                                <th className="py-2.5 px-3 text-center">Ilość na partię</th>
                                                 <th className="py-2.5 px-3 text-right">Cena jedn.</th>
                                                 <th className="py-2.5 px-3 text-right">Koszt partii</th>
-                                                <th className="py-2.5 px-3 text-center w-12">Usuń</th>
+                                                <th className="py-2.5 px-3 text-center">Usuń</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-ui-accent/40">
@@ -1219,9 +1363,9 @@ export default function PrzepisSzczegolyPage({
                                                 const totalItemCost = cleanAmt * item.unitPrice;
 
                                                 return (
-                                                    <tr key={`${item.kind}-${item.id}`} className="hover:bg-ui-accent/5">
-                                                        <td className="py-3 px-3">
-                                                            <div className="flex items-center gap-2">
+                                                    <tr key={`${item.kind}-${item.id}`} className="hover:bg-ui-accent/5 focus-within:bg-amber-500/10 transition-colors">
+                                                        <td className="py-2.5 px-3 min-w-0">
+                                                            <div className="flex items-center gap-2 min-w-0">
                                                                 <div className="flex items-center gap-0.5 shrink-0 bg-ui-accent/10 p-0.5 rounded-lg border border-ui-accent/40">
                                                                     <button
                                                                         type="button"
@@ -1247,14 +1391,14 @@ export default function PrzepisSzczegolyPage({
                                                                     {index + 1}.
                                                                 </span>
 
-                                                                <div>
-                                                                    <div className="font-bold text-ui-black">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="font-bold text-ui-black text-xs sm:text-sm truncate" title={item.name}>
                                                                         {item.name}
                                                                     </div>
                                                                     <span
-                                                                        className={`text-[9px] px-1 py-0.2 rounded font-semibold ${item.kind === "SEMI_FINISHED"
-                                                                            ? "text-amber-800 bg-amber-50"
-                                                                            : "text-blue-700 bg-blue-50"
+                                                                        className={`text-[9px] px-1.5 py-0.2 rounded font-semibold inline-block ${item.kind === "SEMI_FINISHED"
+                                                                            ? "text-amber-800 bg-amber-50 border border-amber-200/60"
+                                                                            : "text-slate-700 bg-slate-100 border border-slate-200/60"
                                                                             }`}
                                                                     >
                                                                         {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
@@ -1263,9 +1407,10 @@ export default function PrzepisSzczegolyPage({
                                                             </div>
                                                         </td>
 
-                                                        <td className="py-3 px-3 text-center">
+                                                        <td className="py-2.5 px-3 text-center">
                                                             <div className="relative inline-block w-28">
                                                                 <input
+                                                                    id={`edit-recipe-qty-${index}`}
                                                                     type="text"
                                                                     inputMode="decimal"
                                                                     value={item.batchAmount}
@@ -1276,23 +1421,46 @@ export default function PrzepisSzczegolyPage({
                                                                             e.target.value
                                                                         )
                                                                     }
-                                                                    className="w-full bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-bold text-xs text-ui-black focus:outline-none focus:border-amber-600"
+                                                                    onFocus={(e) => {
+                                                                        e.target.select();
+                                                                        e.target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "ArrowDown" || e.key === "Enter") {
+                                                                            e.preventDefault();
+                                                                            const next = document.getElementById(`edit-recipe-qty-${index + 1}`) as HTMLInputElement | null;
+                                                                            if (next) {
+                                                                                next.focus();
+                                                                                next.select();
+                                                                                next.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                                                                            }
+                                                                        } else if (e.key === "ArrowUp") {
+                                                                            e.preventDefault();
+                                                                            const prev = document.getElementById(`edit-recipe-qty-${index - 1}`) as HTMLInputElement | null;
+                                                                            if (prev) {
+                                                                                prev.focus();
+                                                                                prev.select();
+                                                                                prev.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className="w-full bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-bold text-xs text-ui-black focus:outline-none focus:border-amber-600 shadow-2xs tabular-nums"
                                                                 />
-                                                                <span className="absolute right-2 top-1.5 text-[10px] text-ui-secondary pointer-events-none">
+                                                                <span className="absolute right-2 top-1.5 text-[10px] text-ui-secondary pointer-events-none font-bold">
                                                                     {item.unit}
                                                                 </span>
                                                             </div>
                                                         </td>
 
-                                                        <td className="py-3 px-3 text-right text-ui-secondary">
+                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
                                                             {item.unitPrice.toFixed(2)} zł
                                                         </td>
 
-                                                        <td className="py-3 px-3 text-right font-bold text-ui-black">
+                                                        <td className="py-2.5 px-3 text-right font-bold text-ui-black tabular-nums">
                                                             {totalItemCost.toFixed(2)} zł
                                                         </td>
 
-                                                        <td className="py-3 px-3 text-center">
+                                                        <td className="py-2.5 px-3 text-center">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRemoveEditItem(item.id, item.kind)}
@@ -1430,6 +1598,111 @@ export default function PrzepisSzczegolyPage({
                                 )}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL SZYBKIEGO DODAWANIA SKŁADNIKA WIDOKU EDYCJI         */}
+            {/* ========================================================= */}
+            {isCreateIngredientOpen && (
+                <div
+                    className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
+                    onClick={() => setIsCreateIngredientOpen(false)}
+                >
+                    <div
+                        className="bg-ui-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-ui-accent"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-ui-accent bg-amber-50/60 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-ui-black flex items-center gap-2">
+                                <Sparkles size={18} className="text-amber-700" />
+                                Nowy składnik / surowiec
+                            </h3>
+                            <button
+                                onClick={() => setIsCreateIngredientOpen(false)}
+                                className="p-1.5 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveQuickIngredient} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1">
+                                    Nazwa składnika <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="np. Drożdże prasowane"
+                                    value={quickIngredientName}
+                                    onChange={(e) => setQuickIngredientName(e.target.value)}
+                                    className="w-full h-10 bg-ui-white border border-ui-accent rounded-xl px-3 text-sm text-ui-black placeholder:text-ui-secondary/50 focus:outline-none focus:border-amber-600 shadow-sm"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1">
+                                    Kategoria / Typ <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        required
+                                        value={quickIngredientType}
+                                        onChange={(e) => setQuickIngredientType(e.target.value as any)}
+                                        className="w-full h-10 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-9 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer appearance-none shadow-sm"
+                                    >
+                                        <option value="" disabled>-- Wybierz typ / kategorię --</option>
+                                        <option value="FLOUR">Mąka</option>
+                                        <option value="DAIRY">Nabiał</option>
+                                        <option value="FRUIT">Owoce/warzywa/bakalie</option>
+                                        <option value="OTHER">Inne</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                        <ChevronDown size={15} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1">
+                                    Jednostka miary <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={quickIngredientUnit}
+                                        onChange={(e) => setQuickIngredientUnit(e.target.value)}
+                                        className="w-full h-10 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-9 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer appearance-none shadow-sm"
+                                    >
+                                        <option value="kg">kg (kilogram)</option>
+                                        <option value="l">l (litr)</option>
+                                        <option value="szt">szt (sztuka)</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-ui-secondary">
+                                        <ChevronDown size={15} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-3 border-t border-ui-accent flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreateIngredientOpen(false)}
+                                    className="px-4 py-2 rounded-xl border border-ui-accent text-ui-primary font-semibold text-xs hover:bg-ui-accent/20 transition-colors cursor-pointer"
+                                >
+                                    Anuluj
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isCreatingQuickIngredient}
+                                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    {isCreatingQuickIngredient && <Loader2 size={14} className="animate-spin" />}
+                                    Dodaj i wstaw do receptury
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

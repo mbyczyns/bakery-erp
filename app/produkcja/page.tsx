@@ -27,14 +27,32 @@ import {
     AlertTriangle,
     Search,
     Copy,
-    ArrowRight,
     CheckCheck,
     FileText,
-    Flame
+    Flame,
+    DoorClosed,
+    DoorOpen,
+    CalendarOff,
+    Ban,
+    ArrowRight,
+    BarChart3,
+    TrendingUp,
+    Info,
+    RotateCcw
 } from "lucide-react";
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip as RechartsTooltip,
+    ResponsiveContainer,
+    Legend
+} from "recharts";
 
 type ProductType = "BREAD" | "ROLL" | "SWEET" | "SAVORY";
-type ListGroupingType = "DAYS" | "WEEKS" | "MONTHS" | "PRODUCTS";
+type ActiveReportTab = "CALENDAR" | "LAST_7_DAYS" | "LAST_WEEKS" | "LAST_MONTHS";
 
 interface BakeryProduct {
     id: string;
@@ -66,6 +84,8 @@ interface DaySummary {
     bakerySalesIncome: number;
     fiscalIncome: number;
     hasReport: boolean;
+    isClosed?: boolean;
+    closedReason?: string;
     productsCount: number;
     products?: DayProductItem[];
 }
@@ -81,6 +101,19 @@ interface MonthStats {
     totalDaysInMonth: number;
 }
 
+interface AggregatedProduct {
+    productId: string;
+    productName: string;
+    productType: string;
+    sellingPrice: number;
+    producedAmount: number;
+    carriedOverAmount: number;
+    totalAssortment: number;
+    soldAmount: number;
+    salesIncome: number;
+    sellThroughRate: number;
+}
+
 interface ProductionDetailItem {
     bakeryProductId: string;
     producedAmount: string;
@@ -90,139 +123,113 @@ interface ProductionDetailItem {
     soldOutTime: string;
 }
 
-interface AggregatedProduct {
-    productId: string;
-    productName: string;
-    productType: string;
-    sellingPrice: number;
-    producedAmount: number;
-    carriedOverAmount?: number;
-    totalAssortment?: number;
-    soldAmount: number;
-    salesIncome: number;
-    sellThroughRate: number;
-}
-
-interface WeekSummary {
-    weekId: string;
-    label: string;
-    startDate: string;
-    endDate: string;
-    totalProduced: number;
-    totalCarriedOver?: number;
-    totalAssortment?: number;
-    totalSold: number;
-    bakerySalesIncome: number;
-    fiscalIncome: number;
-    daysCount: number;
-    days: DaySummary[];
-    products: AggregatedProduct[];
-}
-
-interface MonthGroupSummary {
-    monthId: string;
-    label: string;
-    totalProduced: number;
-    totalSold: number;
-    bakerySalesIncome: number;
-    fiscalIncome: number;
-    daysWithReport: number;
-    missingReportsCount: number;
-    products: AggregatedProduct[];
-}
-
-// -------------------------------------------------------------
-// INTERFEJSY DLA ALGORYTMU SUGEROWANEGO PLANU PRODUKCJI
-// -------------------------------------------------------------
-interface PlanHistoryWeek {
-    weekLabel: string;
-    date: string;
-    hasData: boolean;
-    fiscalIncome: number;
-    bakeryIncome: number;
-    effectiveIncome: number;
-    isAnomaly: boolean;
-    anomalyReason?: string;
-    weight: number;
-}
-
-interface PlanProductHistoryItem {
-    weekLabel: string;
-    dateStr: string;
-    producedAmount: number;
-    soldAmount: number;
-    soldOutTime?: string;
-    unmetMultiplier: number;
-    adjustmentReason: string;
-    adjustedDemand: number;
-    weight: number;
-    contribution: number;
-    isAnomaly: boolean;
-}
-
-interface PlanProductSuggestion {
+interface PlanSuggestionItem {
     id: string;
     name: string;
     type: ProductType;
     sellingPrice: number;
-    productionCost: number;
     suggestedAmount: number;
-    rawDemand: number;
-    history: PlanProductHistoryItem[];
+    roundedAmount: number;
+    rawCalculatedAmount: number;
+    roundingStep: number;
+    basis: {
+        recentHistoryCount: number;
+        avgProduced: number;
+        avgSold: number;
+        avgSellThrough: number;
+        soldOutEventsCount: number;
+        bufferMultiplier: number;
+    };
+    explanation: string;
 }
 
 interface PlanApiResponse {
     targetDate: string;
-    dayOfWeek: number;
+    targetDayOfWeek: number;
     dayName: string;
     isClosed: boolean;
-    message?: string;
-    dataQuality?: {
-        availableWeeksCount: number;
-        hasFullHistory: boolean;
-        warningMessage: string | null;
-        averageHistoricalIncome: number;
-        anomaliesCount: number;
-        anomalies: Array<{
-            date: string;
-            weekLabel: string;
-            income: number;
-            deviationPercent: number;
-            reason: string;
-        }>;
-    };
-    historicalWeeks?: PlanHistoryWeek[];
-    totals?: {
+    closedReason?: string;
+    isSunday: boolean;
+    historicalDaysCount: number;
+    historicalDaysUsed: string[];
+    suggestions: PlanSuggestionItem[];
+    totals: {
         totalUnits: number;
         estimatedRevenue: number;
-        estimatedProductionCost: number;
-        estimatedProfit: number;
-        productsCount: number;
     };
-    suggestions: PlanProductSuggestion[];
 }
 
-const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-    BREAD: { label: "Chleby", icon: Wheat },
-    ROLL: { label: "Bułki", icon: Layers },
-    SWEET: { label: "Wypieki słodkie", icon: Croissant },
-    SAVORY: { label: "Wypieki słone", icon: Pizza },
+const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
+    BREAD: "Chleby",
+    ROLL: "Bułki",
+    SWEET: "Słodkie",
+    SAVORY: "Słone / Przekąski",
+};
+
+const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ReactNode; color: string; badge: string }> = {
+    BREAD: {
+        label: "Chleby",
+        icon: <Wheat size={16} className="text-amber-600" />,
+        color: "text-amber-700 bg-amber-50 border-amber-200",
+        badge: "bg-amber-100 text-amber-800 border-amber-300",
+    },
+    ROLL: {
+        label: "Bułki",
+        icon: <Layers size={16} className="text-sky-600" />,
+        color: "text-sky-700 bg-sky-50 border-sky-200",
+        badge: "bg-sky-100 text-sky-800 border-sky-300",
+    },
+    SWEET: {
+        label: "Słodkie",
+        icon: <Croissant size={16} className="text-pink-600" />,
+        color: "text-pink-700 bg-pink-50 border-pink-200",
+        badge: "bg-pink-100 text-pink-800 border-pink-300",
+    },
+    SAVORY: {
+        label: "Słone / Przekąski",
+        icon: <Pizza size={16} className="text-emerald-600" />,
+        color: "text-emerald-700 bg-emerald-50 border-emerald-200",
+        badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
+    },
 };
 
 const POLISH_MONTHS = [
-    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
-    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+    "Styczeń",
+    "Luty",
+    "Marzec",
+    "Kwiecień",
+    "Maj",
+    "Czerwiec",
+    "Lipiec",
+    "Sierpień",
+    "Wrzesień",
+    "Październik",
+    "Listopad",
+    "Grudzień",
 ];
 
-const WEEKDAY_NAMES = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"];
-const SHORT_WEEKDAYS = ["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"];
+const WEEKDAY_NAMES = [
+    "Poniedziałek",
+    "Wtorek",
+    "Środa",
+    "Czwartek",
+    "Piątek",
+    "Sobota",
+    "Niedziela",
+];
+
+const SHORT_WEEKDAYS = ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"];
 
 function formatCurrency(amount: number): string {
-    return (amount || 0).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł";
+    return new Intl.NumberFormat("pl-PL", {
+        style: "currency",
+        currency: "PLN",
+        minimumFractionDigits: 2,
+    }).format(amount);
 }
 
 function formatDate(dateStr: string): string {
-    if (!dateStr) return "-";
+    if (!dateStr) return "";
     const parts = dateStr.split("-");
     if (parts.length === 3) {
         return `${parts[2]}.${parts[1]}.${parts[0]}`;
@@ -240,10 +247,26 @@ export default function ProdukcjaPage() {
 
     const [currentMonth, setCurrentMonth] = useState<string>(todayStr.slice(0, 7)); // "YYYY-MM"
 
-    // Widoki: "LIST" | "CALENDAR"
-    const [viewMode, setViewMode] = useState<"LIST" | "CALENDAR">("LIST");
-    // Grupowanie na liście: "DAYS" | "WEEKS" | "MONTHS" | "PRODUCTS"
-    const [listGrouping, setListGrouping] = useState<ListGroupingType>("DAYS");
+    // Główne 4 zakładki: "CALENDAR" (domyślny), "LAST_7_DAYS", "LAST_WEEKS", "LAST_MONTHS"
+    const [activeTab, setActiveTab] = useState<ActiveReportTab>("CALENDAR");
+
+    // Stan analityki dla 7 dni (ostatni tydzień)
+    const [daysOffset, setDaysOffset] = useState<number>(0);
+    const [daysCount, setDaysCount] = useState<number>(7);
+    const [daysAnalytics, setDaysAnalytics] = useState<any>(null);
+    const [isLoadingDaysAnalytics, setIsLoadingDaysAnalytics] = useState<boolean>(false);
+
+    // Stan analityki dla ostatnich tygodni
+    const [weeksOffset, setWeeksOffset] = useState<number>(0);
+    const [weeksCount, setWeeksCount] = useState<number>(6);
+    const [weeksAnalytics, setWeeksAnalytics] = useState<any>(null);
+    const [isLoadingWeeksAnalytics, setIsLoadingWeeksAnalytics] = useState<boolean>(false);
+
+    // Stan analityki dla ostatnich miesięcy
+    const [monthsOffset, setMonthsOffset] = useState<number>(0);
+    const [monthsCount, setMonthsCount] = useState<number>(6);
+    const [monthsAnalytics, setMonthsAnalytics] = useState<any>(null);
+    const [isLoadingMonthsAnalytics, setIsLoadingMonthsAnalytics] = useState<boolean>(false);
 
     const [daysSummary, setDaysSummary] = useState<DaySummary[]>([]);
     const [monthlyProductsData, setMonthlyProductsData] = useState<AggregatedProduct[]>([]);
@@ -257,11 +280,6 @@ export default function ProdukcjaPage() {
     });
     const [isLoadingSummary, setIsLoadingSummary] = useState(true);
 
-    // Stan rozwiniętych wierszy akordeonu
-    const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-    const [productSearch, setProductSearch] = useState("");
-    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("ALL");
-
     // -------------------------------------------------------------
     // MODAL FORMULARZA RAPORTU (Nowy raport / Edycja)
     // -------------------------------------------------------------
@@ -274,8 +292,72 @@ export default function ProdukcjaPage() {
     const [isSavingForm, setIsSavingForm] = useState(false);
     const [formSaveSuccess, setFormSaveSuccess] = useState(false);
     const [isCopyingPrevious, setIsCopyingPrevious] = useState(false);
-    const [isTransferringLeftovers, setIsTransferringLeftovers] = useState(false);
+    const [transferringProductId, setTransferringProductId] = useState<string | null>(null);
+    const [transferredProductIds, setTransferredProductIds] = useState<Record<string, boolean>>({});
     const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "info" | "error"; text: string } | null>(null);
+    const [formDefaultClosingTime, setFormDefaultClosingTime] = useState<string>("18:00");
+
+    // -------------------------------------------------------------
+    // MODAL OZNACZANIA DNIA ZAMKNIĘTEGO (Remont, Święto itp.)
+    // -------------------------------------------------------------
+    const [closedDayModal, setClosedDayModal] = useState<{
+        isOpen: boolean;
+        date: string;
+        isClosed: boolean;
+        reason: string;
+        isSaving: boolean;
+    } | null>(null);
+
+    const handleOpenClosedDayModal = (date: string, currentlyClosed: boolean, currentReason?: string) => {
+        setClosedDayModal({
+            isOpen: true,
+            date,
+            isClosed: !currentlyClosed,
+            reason: currentReason || "Remont piekarni",
+            isSaving: false,
+        });
+    };
+
+    const handleSaveClosedDay = async (date: string, isClosed: boolean, reason: string) => {
+        if (closedDayModal) {
+            setClosedDayModal((prev) => (prev ? { ...prev, isSaving: true } : null));
+        }
+        try {
+            const res = await fetch("/api/produkcja", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "toggle_closed_day",
+                    date,
+                    isClosed,
+                    reason,
+                }),
+            });
+
+            if (res.ok) {
+                setDaysSummary((prev) =>
+                    prev.map((d) =>
+                        d.date === date
+                            ? { ...d, isClosed, closedReason: isClosed ? reason : "" }
+                            : d
+                    )
+                );
+                setClosedDayModal(null);
+                fetchSummary(currentMonth);
+                refreshActiveAnalytics();
+            } else {
+                const err = await res.json();
+                alert(`Błąd: ${err.error || "Nie udało się zaktualizować statusu dnia"}`);
+            }
+        } catch (err) {
+            console.error("Błąd zapisu dnia zamkniętego:", err);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            if (closedDayModal) {
+                setClosedDayModal((prev) => (prev ? { ...prev, isSaving: false } : null));
+            }
+        }
+    };
 
     // -------------------------------------------------------------
     // MODAL SUGEROWANEGO PLANU PRODUKCJI
@@ -296,17 +378,12 @@ export default function ProdukcjaPage() {
         isOpen: boolean;
         title: string;
         subtitle: string;
-        products: AggregatedProduct[];
+        products: any[];
         totalProduced: number;
         totalSold: number;
         bakeryIncome: number;
         fiscalIncome: number;
     } | null>(null);
-
-    const toggleRow = (id: string, e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
-    };
 
     const togglePlanProduct = (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -342,7 +419,7 @@ export default function ProdukcjaPage() {
         fetchSummary(currentMonth);
     }, [currentMonth]);
 
-    // Nawigacja po miesiącach
+    // Nawigacja po miesiącach w kalendarzu
     const handlePrevMonth = () => {
         const [yStr, mStr] = currentMonth.split("-");
         let y = parseInt(yStr, 10);
@@ -366,6 +443,51 @@ export default function ProdukcjaPage() {
     };
 
     // -------------------------------------------------------------
+    // POBIERANIE DANYCH ANALITYCZNYCH (7 DNI / TYGODNIE / MIESIĄCE)
+    // -------------------------------------------------------------
+    const fetchAnalytics = async (type: "days" | "weeks" | "months", count: number, offset: number) => {
+        try {
+            if (type === "days") setIsLoadingDaysAnalytics(true);
+            if (type === "weeks") setIsLoadingWeeksAnalytics(true);
+            if (type === "months") setIsLoadingMonthsAnalytics(true);
+
+            const res = await fetch(`/api/produkcja?mode=analytics&type=${type}&count=${count}&offset=${offset}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (type === "days") setDaysAnalytics(data);
+                if (type === "weeks") setWeeksAnalytics(data);
+                if (type === "months") setMonthsAnalytics(data);
+            }
+        } catch (e) {
+            console.error("Błąd pobierania analityki:", e);
+        } finally {
+            if (type === "days") setIsLoadingDaysAnalytics(false);
+            if (type === "weeks") setIsLoadingWeeksAnalytics(false);
+            if (type === "months") setIsLoadingMonthsAnalytics(false);
+        }
+    };
+
+    const refreshActiveAnalytics = () => {
+        if (activeTab === "LAST_7_DAYS") {
+            fetchAnalytics("days", daysCount, daysOffset);
+        } else if (activeTab === "LAST_WEEKS") {
+            fetchAnalytics("weeks", weeksCount, weeksOffset);
+        } else if (activeTab === "LAST_MONTHS") {
+            fetchAnalytics("months", monthsCount, monthsOffset);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === "LAST_7_DAYS") {
+            fetchAnalytics("days", daysCount, daysOffset);
+        } else if (activeTab === "LAST_WEEKS") {
+            fetchAnalytics("weeks", weeksCount, weeksOffset);
+        } else if (activeTab === "LAST_MONTHS") {
+            fetchAnalytics("months", monthsCount, monthsOffset);
+        }
+    }, [activeTab, daysCount, daysOffset, weeksCount, weeksOffset, monthsCount, monthsOffset]);
+
+    // -------------------------------------------------------------
     // OBSŁUGA FORMULARZA RAPORTU DZIENNEGO
     // -------------------------------------------------------------
     const openNewReportModal = async (defaultDate?: string, prefillProducedMap?: Record<string, number>) => {
@@ -375,6 +497,8 @@ export default function ProdukcjaPage() {
         setIsLoadingFormData(true);
         setFormSaveSuccess(false);
         setFeedbackMessage(null);
+        setTransferringProductId(null);
+        setTransferredProductIds({});
 
         try {
             const res = await fetch(`/api/produkcja?date=${dateToUse}`);
@@ -426,6 +550,9 @@ export default function ProdukcjaPage() {
                     };
                 });
                 setFormItems(itemsMap);
+                if (data.defaultClosingTime) {
+                    setFormDefaultClosingTime(data.defaultClosingTime);
+                }
             }
         } catch (error) {
             console.error("Błąd podczas ładowania danych formularza:", error);
@@ -467,6 +594,9 @@ export default function ProdukcjaPage() {
                 if (hasAssortment && left !== null) {
                     const sold = Math.max(0, Math.round((totalAssort - left) * 100) / 100);
                     updated.soldAmount = String(sold);
+                    if (left === 0 && totalAssort > 0 && (!updated.soldOutTime || updated.soldOutTime.trim() === "")) {
+                        updated.soldOutTime = formDefaultClosingTime || "18:00";
+                    }
                 } else if (left === null && hasAssortment && current.soldAmount === "") {
                     updated.soldAmount = "";
                 }
@@ -478,9 +608,15 @@ export default function ProdukcjaPage() {
                     if (left !== null) {
                         const newSold = Math.max(0, Math.round((totalAssort - left) * 100) / 100);
                         updated.soldAmount = String(newSold);
+                        if (left === 0 && totalAssort > 0 && (!updated.soldOutTime || updated.soldOutTime.trim() === "")) {
+                            updated.soldOutTime = formDefaultClosingTime || "18:00";
+                        }
                     } else if (sold !== null) {
                         const newLeft = Math.max(0, Math.round((totalAssort - sold) * 100) / 100);
                         updated.leftoverAmount = String(newLeft);
+                        if (newLeft === 0 && totalAssort > 0 && (!updated.soldOutTime || updated.soldOutTime.trim() === "")) {
+                            updated.soldOutTime = formDefaultClosingTime || "18:00";
+                        }
                     }
                 }
             } else if (field === "soldAmount") {
@@ -488,6 +624,17 @@ export default function ProdukcjaPage() {
                 if (hasAssortment && sold !== null) {
                     const left = Math.max(0, Math.round((totalAssort - sold) * 100) / 100);
                     updated.leftoverAmount = String(left);
+                    if (sold === totalAssort && totalAssort > 0 && (!updated.soldOutTime || updated.soldOutTime.trim() === "")) {
+                        updated.soldOutTime = formDefaultClosingTime || "18:00";
+                    }
+                }
+            } else if (field === "soldOutTime") {
+                if (value && value.trim() !== "") {
+                    // Wpisanie godziny wyprzedania automatycznie oznacza wyprzedanie wszystkiego
+                    updated.leftoverAmount = "0";
+                    if (hasAssortment && totalAssort > 0) {
+                        updated.soldAmount = String(totalAssort);
+                    }
                 }
             }
 
@@ -499,13 +646,27 @@ export default function ProdukcjaPage() {
     };
 
     const handleSaveReportFormInternal = async () => {
-        const itemsPayload = Object.values(formItems).map((it) => ({
-            bakeryProductId: it.bakeryProductId,
-            producedAmount: parseFloat(String(it.producedAmount || "0").replace(",", ".")) || 0,
-            carriedOverAmount: parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0,
-            soldAmount: parseFloat(String(it.soldAmount || "0").replace(",", ".")) || 0,
-            soldOutTime: it.soldOutTime || null,
-        }));
+        const itemsPayload = Object.values(formItems).map((it) => {
+            const prod = parseFloat(String(it.producedAmount || "0").replace(",", ".")) || 0;
+            const carried = parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0;
+            const total = prod + carried;
+            let sold = parseFloat(String(it.soldAmount || "0").replace(",", ".")) || 0;
+
+            // Jeśli wpisana godzina wyprzedania lub leftover wynosi 0 i soldAmount nie był wyliczony
+            if ((it.soldOutTime && it.soldOutTime.trim() !== "") || it.leftoverAmount === "0") {
+                if (sold === 0 && total > 0) {
+                    sold = total;
+                }
+            }
+
+            return {
+                bakeryProductId: it.bakeryProductId,
+                producedAmount: prod,
+                carriedOverAmount: carried,
+                soldAmount: sold,
+                soldOutTime: it.soldOutTime || null,
+            };
+        });
 
         const fiscalVal = parseFloat(formFiscalIncome.replace(",", ".")) || 0;
 
@@ -535,6 +696,7 @@ export default function ProdukcjaPage() {
                     setIsFormModalOpen(false);
                     setFormSaveSuccess(false);
                     fetchSummary(currentMonth);
+                    refreshActiveAnalytics();
                 }, 800);
             }
         } catch (error) {
@@ -575,19 +737,20 @@ export default function ProdukcjaPage() {
                                 soldAmount: "",
                                 soldOutTime: "",
                             };
-                            const carriedOver = parseFloat(String(current.carriedOverAmount || "0").replace(",", ".")) || 0;
-                            const totalAssort = prevProduced + carriedOver;
-                            const leftVal = current.leftoverAmount !== "" ? parseFloat(String(current.leftoverAmount).replace(",", ".")) : null;
 
-                            let newSold = current.soldAmount;
-                            if (leftVal !== null && !isNaN(leftVal)) {
-                                newSold = String(Math.max(0, Math.round((totalAssort - leftVal) * 100) / 100));
+                            const carried = parseFloat(String(current.carriedOverAmount || "0").replace(",", ".")) || 0;
+                            const totalAssort = prevProduced + carried;
+                            const left = current.leftoverAmount !== "" ? (parseFloat(String(current.leftoverAmount).replace(",", ".")) || 0) : null;
+
+                            let sVal = current.soldAmount;
+                            if (left !== null) {
+                                sVal = String(Math.max(0, Math.round((totalAssort - left) * 100) / 100));
                             }
 
                             updated[prod.id] = {
                                 ...current,
                                 producedAmount: String(prevProduced),
-                                soldAmount: newSold,
+                                soldAmount: sVal,
                             };
                         }
                     });
@@ -597,17 +760,17 @@ export default function ProdukcjaPage() {
                 if (copiedCount > 0) {
                     setFeedbackMessage({
                         type: "success",
-                        text: `Skopiowano wielkości wyprodukowane z wczoraj (${formatDate(prevDateStr)}) — ${copiedCount} pozycji.`,
+                        text: `Skopiowano ilości produkcji (${copiedCount} pozycji) z dnia ${formatDate(prevDateStr)}.`,
                     });
                 } else {
                     setFeedbackMessage({
                         type: "info",
-                        text: `Brak zapisanej produkcji w poprzednim dniu (${formatDate(prevDateStr)}).`,
+                        text: `Brak zapisanej produkcji w dniu ${formatDate(prevDateStr)}.`,
                     });
                 }
             }
-        } catch (error) {
-            console.error("Błąd kopiowania produkcji z wczoraj:", error);
+        } catch (err) {
+            console.error("Błąd kopiowania produkcji z poprzedniego dnia:", err);
             setFeedbackMessage({
                 type: "error",
                 text: "Nie udało się pobrać danych z poprzedniego dnia.",
@@ -617,28 +780,14 @@ export default function ProdukcjaPage() {
         }
     };
 
-    const handleTransferLeftoversToNextDay = async () => {
-        setIsTransferringLeftovers(true);
+    const handleTransferProductLeftover = async (product: BakeryProduct) => {
+        const it = formItems[product.id];
+        if (!it) return;
+        const leftAmt = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
+        if (leftAmt <= 0) return;
+
+        setTransferringProductId(product.id);
         setFeedbackMessage(null);
-
-        const itemsToTransfer = Object.values(formItems)
-            .filter((it) => {
-                const val = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
-                return val > 0;
-            })
-            .map((it) => ({
-                bakeryProductId: it.bakeryProductId,
-                leftoverAmount: it.leftoverAmount,
-            }));
-
-        if (itemsToTransfer.length === 0) {
-            setFeedbackMessage({
-                type: "info",
-                text: "Brak niesprzedanych wyrobów (ilości 'Zostało' są równe 0).",
-            });
-            setIsTransferringLeftovers(false);
-            return;
-        }
 
         const d = new Date(formDate);
         d.setDate(d.getDate() + 1);
@@ -653,35 +802,36 @@ export default function ProdukcjaPage() {
                 body: JSON.stringify({
                     action: "transfer_leftovers",
                     targetDate: nextDateStr,
-                    items: itemsToTransfer,
+                    items: [{
+                        bakeryProductId: product.id,
+                        leftoverAmount: it.leftoverAmount,
+                    }],
                 }),
             });
 
             if (res.ok) {
-                const sumLeftovers = itemsToTransfer.reduce(
-                    (sum, it) => sum + (parseFloat(String(it.leftoverAmount).replace(",", ".")) || 0),
-                    0
-                );
+                setTransferredProductIds((prev) => ({ ...prev, [product.id]: true }));
                 setFeedbackMessage({
                     type: "success",
-                    text: `Pomyślnie przeniesiono ${sumLeftovers.toLocaleString("pl-PL")} szt. niesprzedanych wyrobów na dzień ${formatDate(nextDateStr)}! Zostaną doliczone do asortymentu w nowym dniu.`,
+                    text: `Pomyślnie przeniesiono ${leftAmt.toLocaleString("pl-PL")} szt. (${product.name}) na dzień ${formatDate(nextDateStr)}!`,
                 });
                 fetchSummary(currentMonth);
+                refreshActiveAnalytics();
             } else {
                 const errData = await res.json();
                 setFeedbackMessage({
                     type: "error",
-                    text: errData.error || "Nie udało się przenieść niesprzedanych wyrobów.",
+                    text: errData.error || `Nie udało się przenieść produktu ${product.name}.`,
                 });
             }
-        } catch (err: any) {
-            console.error("Błąd przenoszenia niesprzedanych wyrobów:", err);
+        } catch (err) {
+            console.error("Błąd przenoszenia produktu:", err);
             setFeedbackMessage({
                 type: "error",
-                text: "Wystąpił błąd podczas przenoszenia na serwer.",
+                text: "Wystąpił błąd podczas komunikacji z serwerem.",
             });
         } finally {
-            setIsTransferringLeftovers(false);
+            setTransferringProductId(null);
         }
     };
 
@@ -710,117 +860,81 @@ export default function ProdukcjaPage() {
         const totalRows = formOrderedProducts.length;
         if (totalRows === 0) return;
 
+        const focusInput = (el: HTMLInputElement | null) => {
+            if (el) {
+                el.focus();
+                el.select();
+                el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            }
+        };
+
         if (e.key === "ArrowDown" || e.key === "Enter") {
             e.preventDefault();
             const nextRow = (rowIndex + 1) % totalRows;
             const target = document.querySelector<HTMLInputElement>(
                 `input[data-row="${nextRow}"][data-col="${colIndex}"]`
             );
-            if (target) {
-                target.focus();
-                target.select();
-            }
+            focusInput(target);
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             const prevRow = (rowIndex - 1 + totalRows) % totalRows;
             const target = document.querySelector<HTMLInputElement>(
                 `input[data-row="${prevRow}"][data-col="${colIndex}"]`
             );
-            if (target) {
-                target.focus();
-                target.select();
-            }
+            focusInput(target);
         } else if (e.key === "ArrowRight") {
             if (colIndex === 0) {
                 e.preventDefault();
                 const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex}"][data-col="1"]`
                 );
-                if (target) {
-                    target.focus();
-                    target.select();
-                }
+                focusInput(target);
             } else if (colIndex === 1) {
-                e.preventDefault();
-                const target = document.querySelector<HTMLInputElement>(
-                    `input[data-row="${rowIndex}"][data-col="2"]`
-                );
-                if (target) {
-                    target.focus();
-                    target.select();
-                }
-            } else if (colIndex === 2) {
                 const soldOutInput = document.querySelector<HTMLInputElement>(
-                    `input[data-row="${rowIndex}"][data-col="3"]`
+                    `input[data-row="${rowIndex}"][data-col="2"]`
                 );
                 if (soldOutInput) {
                     e.preventDefault();
-                    soldOutInput.focus();
-                    soldOutInput.select();
+                    focusInput(soldOutInput);
                 } else if (rowIndex < totalRows - 1) {
                     e.preventDefault();
                     const target = document.querySelector<HTMLInputElement>(
                         `input[data-row="${rowIndex + 1}"][data-col="0"]`
                     );
-                    if (target) {
-                        target.focus();
-                        target.select();
-                    }
+                    focusInput(target);
                 }
-            } else if (colIndex === 3 && rowIndex < totalRows - 1) {
+            } else if (colIndex === 2 && rowIndex < totalRows - 1) {
                 e.preventDefault();
                 const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex + 1}"][data-col="0"]`
                 );
-                if (target) {
-                    target.focus();
-                    target.select();
-                }
+                focusInput(target);
             }
         } else if (e.key === "ArrowLeft") {
-            if (colIndex === 3) {
-                e.preventDefault();
-                const target = document.querySelector<HTMLInputElement>(
-                    `input[data-row="${rowIndex}"][data-col="2"]`
-                );
-                if (target) {
-                    target.focus();
-                    target.select();
-                }
-            } else if (colIndex === 2) {
+            if (colIndex === 2) {
                 e.preventDefault();
                 const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex}"][data-col="1"]`
                 );
-                if (target) {
-                    target.focus();
-                    target.select();
-                }
+                focusInput(target);
             } else if (colIndex === 1) {
                 e.preventDefault();
                 const target = document.querySelector<HTMLInputElement>(
                     `input[data-row="${rowIndex}"][data-col="0"]`
                 );
-                if (target) {
-                    target.focus();
-                    target.select();
-                }
+                focusInput(target);
             } else if (colIndex === 0 && rowIndex > 0) {
                 e.preventDefault();
                 const prevSoldOut = document.querySelector<HTMLInputElement>(
-                    `input[data-row="${rowIndex - 1}"][data-col="3"]`
+                    `input[data-row="${rowIndex - 1}"][data-col="2"]`
                 );
                 if (prevSoldOut) {
-                    prevSoldOut.focus();
-                    prevSoldOut.select();
+                    focusInput(prevSoldOut);
                 } else {
                     const target = document.querySelector<HTMLInputElement>(
-                        `input[data-row="${rowIndex - 1}"][data-col="2"]`
+                        `input[data-row="${rowIndex - 1}"][data-col="1"]`
                     );
-                    if (target) {
-                        target.focus();
-                        target.select();
-                    }
+                    focusInput(target);
                 }
             }
         }
@@ -870,14 +984,16 @@ export default function ProdukcjaPage() {
         text += `Łącznie sztuk do wypieku: ${planData.totals?.totalUnits || 0} szt.\n`;
         text += `Szacowany utarg: ${formatCurrency(planData.totals?.estimatedRevenue || 0)}\n\n`;
         text += `LISTA WYROBÓW:\n`;
-        text += `------------------------------------\n`;
 
-        planData.suggestions
-            .filter((s) => s.suggestedAmount > 0)
-            .forEach((s, idx) => {
-                const cat = CATEGORY_MAP[s.type]?.label || s.type;
-                text += `${idx + 1}. ${s.name} [${cat}]: ${s.suggestedAmount} szt. (Cena: ${s.sellingPrice.toFixed(2)} zł)\n`;
-            });
+        Object.keys(CATEGORY_MAP).forEach((catKey) => {
+            const items = planData.suggestions.filter((s) => s.type === catKey && s.suggestedAmount > 0);
+            if (items.length > 0) {
+                text += `\n--- ${CATEGORY_MAP[catKey as ProductType].label.toUpperCase()} ---\n`;
+                items.forEach((it) => {
+                    text += `- ${it.name}: ${it.suggestedAmount} szt. (sugerowane: ${it.roundedAmount})\n`;
+                });
+            }
+        });
 
         navigator.clipboard.writeText(text);
         setIsPlanCopied(true);
@@ -885,181 +1001,42 @@ export default function ProdukcjaPage() {
     };
 
     // -------------------------------------------------------------
-    // GRUPOWANIE DANYCH DLA LISTY (DNI / TYGODNIE / MIESIĄCE / WYROBY)
-    // -------------------------------------------------------------
-    const weeksList = useMemo<WeekSummary[]>(() => {
-        const weeksMap: Record<string, WeekSummary> = {};
-
-        daysSummary.forEach((day) => {
-            const dObj = new Date(day.date);
-            const d = new Date(Date.UTC(dObj.getUTCFullYear(), dObj.getUTCMonth(), dObj.getUTCDate()));
-            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-            const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-
-            const weekId = `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
-
-            if (!weeksMap[weekId]) {
-                const weekStart = new Date(day.date);
-                const dayOfWeek = (weekStart.getUTCDay() + 6) % 7; // 0 = Poniedziałek
-                weekStart.setUTCDate(weekStart.getUTCDate() - dayOfWeek);
-                const weekEnd = new Date(weekStart);
-                weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
-
-                weeksMap[weekId] = {
-                    weekId,
-                    label: `Tydzień ${weekNo} (${currentMonth})`,
-                    startDate: weekStart.toISOString().split("T")[0],
-                    endDate: weekEnd.toISOString().split("T")[0],
-                    totalProduced: 0,
-                    totalSold: 0,
-                    bakerySalesIncome: 0,
-                    fiscalIncome: 0,
-                    daysCount: 0,
-                    days: [],
-                    products: [],
-                };
-            }
-
-            weeksMap[weekId].totalProduced += day.totalProduced;
-            weeksMap[weekId].totalSold += day.totalSold;
-            weeksMap[weekId].bakerySalesIncome += day.bakerySalesIncome;
-            weeksMap[weekId].fiscalIncome += day.fiscalIncome;
-            if (day.hasReport) weeksMap[weekId].daysCount++;
-            weeksMap[weekId].days.push(day);
-        });
-
-        return Object.values(weeksMap).map((week) => {
-            const prodAggMap = new Map<string, AggregatedProduct>();
-
-            week.days.forEach((day) => {
-                day.products?.forEach((p) => {
-                    const existing = prodAggMap.get(p.productId) || {
-                        productId: p.productId,
-                        productName: p.productName,
-                        productType: p.productType,
-                        sellingPrice: p.sellingPrice,
-                        producedAmount: 0,
-                        carriedOverAmount: 0,
-                        totalAssortment: 0,
-                        soldAmount: 0,
-                        salesIncome: 0,
-                        sellThroughRate: 0,
-                    };
-                    existing.producedAmount += p.producedAmount;
-                    existing.carriedOverAmount = (existing.carriedOverAmount || 0) + (p.carriedOverAmount || 0);
-                    existing.totalAssortment = (existing.totalAssortment || 0) + (p.totalAssortment || (p.producedAmount + (p.carriedOverAmount || 0)));
-                    existing.soldAmount += p.soldAmount;
-                    existing.salesIncome += p.salesIncome;
-                    prodAggMap.set(p.productId, existing);
-                });
-            });
-
-            const productsList = Array.from(prodAggMap.values()).map((p) => {
-                const totalAssort = p.totalAssortment || (p.producedAmount + (p.carriedOverAmount || 0));
-                return {
-                    ...p,
-                    totalAssortment: totalAssort,
-                    sellThroughRate: totalAssort > 0 ? Math.round((p.soldAmount / totalAssort) * 1000) / 10 : (p.producedAmount > 0 ? Math.round((p.soldAmount / p.producedAmount) * 1000) / 10 : 0),
-                };
-            }).sort((a, b) => b.soldAmount - a.soldAmount);
-
-            return {
-                ...week,
-                products: productsList,
-            };
-        });
-    }, [daysSummary, currentMonth]);
-
-    const monthsList = useMemo<MonthGroupSummary[]>(() => {
-        const monthProdList = [...monthlyProductsData].sort((a, b) => b.soldAmount - a.soldAmount);
-
-        return [
-            {
-                monthId: currentMonth,
-                label: `${POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]} ${currentMonth.split("-")[0]}`,
-                totalProduced: stats.monthProduced,
-                totalSold: stats.monthSold,
-                bakerySalesIncome: stats.monthBakeryIncome,
-                fiscalIncome: stats.monthFiscalIncome,
-                daysWithReport: daysSummary.filter((d) => d.hasReport).length,
-                missingReportsCount: stats.missingReportsCount,
-                products: monthProdList,
-            },
-        ];
-    }, [currentMonth, stats, daysSummary, monthlyProductsData]);
-
-    // Filtrowana lista produktów dla zakładki "PRODUCTS"
-    const filteredProductsRanking = useMemo(() => {
-        let list = [...monthlyProductsData];
-
-        if (selectedCategoryFilter !== "ALL") {
-            list = list.filter((p) => p.productType === selectedCategoryFilter);
-        }
-
-        if (productSearch.trim()) {
-            const q = productSearch.toLowerCase();
-            list = list.filter((p) => p.productName.toLowerCase().includes(q));
-        }
-
-        return list.sort((a, b) => b.soldAmount - a.soldAmount);
-    }, [monthlyProductsData, selectedCategoryFilter, productSearch]);
-
-    // Filtrowana lista produktów w modalu sugerowanego planu
-    const filteredPlanSuggestions = useMemo(() => {
-        if (!planData || !planData.suggestions) return [];
-        let list = [...planData.suggestions];
-
-        if (planCategoryFilter !== "ALL") {
-            list = list.filter((p) => p.type === planCategoryFilter);
-        }
-
-        if (planSearch.trim()) {
-            const q = planSearch.toLowerCase();
-            list = list.filter((p) => p.name.toLowerCase().includes(q));
-        }
-
-        return list;
-    }, [planData, planCategoryFilter, planSearch]);
-
-    // -------------------------------------------------------------
-    // GENEROWANIE SIATKI KALENDARZA
+    // PRZYGOTOWANIE KALENDARZA (Siatka 7 kolumn)
     // -------------------------------------------------------------
     const calendarGrid = useMemo(() => {
-        const [y, m] = currentMonth.split("-").map(Number);
-        const firstDayOfMonth = new Date(Date.UTC(y, m - 1, 1));
-        const lastDayOfMonth = new Date(Date.UTC(y, m, 0));
+        const [yearStr, monthNumStr] = currentMonth.split("-");
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthNumStr, 10);
 
-        const daysInMonth = lastDayOfMonth.getUTCDate();
-        const startDayOfWeek = (firstDayOfMonth.getUTCDay() + 6) % 7; // Pon = 0, ..., Nd = 6
+        const firstDayOfMonth = new Date(Date.UTC(year, month - 1, 1));
+        const lastDayOfMonth = new Date(Date.UTC(year, month, 0));
+        const totalDays = lastDayOfMonth.getUTCDate();
 
-        const cells: Array<{
-            dateStr?: string;
-            dayNumber?: number;
-            isCurrentMonth: boolean;
-            isSunday?: boolean;
-            isPastOrToday?: boolean;
-            dayData?: DaySummary;
-        }> = [];
+        // Dzień tygodnia 1. dnia miesiąca: 0 (Pon) do 6 (Nd)
+        let startDayOfWeek = firstDayOfMonth.getUTCDay();
+        startDayOfWeek = (startDayOfWeek + 6) % 7;
 
+        const cells = [];
+        // Puste komórki przed 1. dniem
         for (let i = 0; i < startDayOfWeek; i++) {
             cells.push({ isCurrentMonth: false });
         }
 
-        for (let d = 1; d <= daysInMonth; d++) {
+        // Komórki dni miesiąca
+        for (let d = 1; d <= totalDays; d++) {
             const dateStr = `${currentMonth}-${String(d).padStart(2, "0")}`;
-            const dObj = new Date(dateStr);
-            const isSunday = dObj.getUTCDay() === 0;
-            const isPastOrToday = dateStr <= todayStr;
             const dayData = daysSummary.find((item) => item.date === dateStr);
+            const dateObj = new Date(`${dateStr}T00:00:00.000Z`);
+            const isSunday = dateObj.getUTCDay() === 0;
+            const isPastOrToday = dateStr <= todayStr;
 
             cells.push({
-                dateStr,
-                dayNumber: d,
                 isCurrentMonth: true,
+                dayNumber: d,
+                dateStr,
+                dayData,
                 isSunday,
                 isPastOrToday,
-                dayData,
             });
         }
 
@@ -1067,27 +1044,29 @@ export default function ProdukcjaPage() {
     }, [currentMonth, daysSummary, todayStr]);
 
     return (
-        <div className="min-h-screen bg-ui-white text-ui-primary pb-20">
-            {/* ---------------- NAGŁÓWEK STRONY ---------------- */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+        <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative space-y-6">
+            {/* ---------------- GÓRNY NAGŁÓWEK STRONY ---------------- */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ui-black flex items-center gap-2.5 sm:gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">
                         Produkcja i sprzedaż
                     </h1>
                 </div>
 
-                {/* Akcje nagłówka: Sugerowany plan, Nowy raport, Miesiąc */}
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                {/* Górne przyciski akcji i selektor miesiąca */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
                         onClick={() => openProductionPlanModal()}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
+                        title="Wygeneruj sugerowany plan produkcji"
                     >
-                        Sugerowany plan
+                        <Sparkles size={16} />
+                        <span>Sugerowany plan</span>
                     </button>
 
                     <button
                         onClick={() => openNewReportModal()}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-medium shadow-xs transition-all text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                     >
                         <Plus size={16} />
                         <span>Raport dzienny</span>
@@ -1115,698 +1094,122 @@ export default function ProdukcjaPage() {
                 </div>
             </div>
 
-            {/* ---------------- KARTY PODSUMOWANIA MIESIĄCA (KPI) ---------------- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
-
-                {/* KARTA 3: UTARG Z WYPIEKÓW */}
-                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                    <div>
-                        <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                                <Coins size={15} className="text-ui-secondary" />
-                                Utarg ze sprzedaży wypieków
-                            </span>
-                        </div>
-                        <div className="mt-2 text-2xl sm:text-3xl flex items-center justify-center font-black text-ui-primary tracking-tight">
-                            {formatCurrency(stats.monthBakeryIncome)}
-                        </div>
-                    </div>
-                </div>
-
-                {/* KARTA 4: STATUS RAPORTÓW */}
-                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                    <div>
-                        <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                                <CheckCircle2 size={15} className="text-ui-secondary" />
-                                Kompletność raportów
-                            </span>
-                        </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-black tracking-tight">
-                            {daysSummary.filter((d) => d.hasReport).length}{" "}
-                            <span className="text-sm font-semibold text-ui-secondary">dni z raportem</span>
-                        </div>
-                    </div>
-                    <div className="text-[11px] font-semibold mt-2">
-                        {stats.missingReportsCount > 0 ? (
-                            <span className="text-rose-600 flex items-center gap-1">
-                                <AlertTriangle size={13} />
-                                Brak {stats.missingReportsCount} raportów w dniach roboczych
-                            </span>
-                        ) : (
-                            <span className="text-emerald-700 flex items-center gap-1">
-                                <CheckCircle2 size={13} /> Wszystkie raporty uzupełnione
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ---------------- PRZEŁĄCZNIK WIDOKÓW I GRUPOWANIA ---------------- */}
-            <div className="bg-white border border-ui-accent rounded-2xl p-3 shadow-xs mb-6 flex flex-wrap items-center justify-between gap-3">
-                {/* Lewa strona: Zakładki grupowania */}
-                <div className="flex items-center gap-1.5 p-1 bg-ui-accent/10 rounded-xl border border-ui-accent/30">
-                    <button
-                        onClick={() => {
-                            setViewMode("LIST");
-                            setListGrouping("DAYS");
-                        }}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "LIST" && listGrouping === "DAYS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <CalendarIcon size={14} />
-                        Widok dzienny
-                    </button>
-                    <button
-                        onClick={() => {
-                            setViewMode("LIST");
-                            setListGrouping("WEEKS");
-                        }}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "LIST" && listGrouping === "WEEKS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <CalendarDays size={14} />
-                        Widok tygodniowy ({weeksList.length} tyg.)
-                    </button>
-                    <button
-                        onClick={() => {
-                            setViewMode("LIST");
-                            setListGrouping("MONTHS");
-                        }}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "LIST" && listGrouping === "MONTHS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <List size={14} />
-                        Podsumowanie miesiąca
-                    </button>
-                    <button
-                        onClick={() => {
-                            setViewMode("LIST");
-                            setListGrouping("PRODUCTS");
-                        }}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "LIST" && listGrouping === "PRODUCTS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <Wheat size={14} />
-                        Sztuki wyrobów ({monthlyProductsData.length})
-                    </button>
-                    <button
-                        onClick={() => setViewMode("CALENDAR")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "CALENDAR"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <CalendarDays size={14} />
-                        Kalendarz
-                    </button>
-                </div>
-
-                {/* Prawa strona: Filtry i wyszukiwarka */}
-                <div className="flex items-center gap-2">
-                    {listGrouping === "PRODUCTS" && (
-                        <div className="flex items-center gap-1 text-xs">
-                            {[
-                                { id: "ALL", label: "Wszystkie" },
-                                { id: "BREAD", label: "Chleby" },
-                                { id: "ROLL", label: "Bułki" },
-                                { id: "SWEET", label: "Słodkie" },
-                                { id: "SAVORY", label: "Słone" },
-                            ].map((c) => (
-                                <button
-                                    key={c.id}
-                                    onClick={() => setSelectedCategoryFilter(c.id)}
-                                    className={`px-2.5 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${selectedCategoryFilter === c.id
-                                        ? "bg-ui-primary text-white shadow-xs"
-                                        : "text-ui-secondary hover:bg-ui-accent/10"
-                                        }`}
-                                >
-                                    {c.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    <div className="relative">
-                        <Search size={14} className="absolute left-3 top-2.5 text-ui-secondary" />
-                        <input
-                            type="text"
-                            placeholder="Szukaj wyrobu lub daty..."
-                            value={productSearch}
-                            onChange={(e) => setProductSearch(e.target.value)}
-                            className="text-xs pl-8 pr-3 py-1.5 rounded-xl border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-secondary w-48 sm:w-56"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* ---------------- 1. TABELA LISTOWA (DNI / TYGODNIE / MIESIĄCE) ---------------- */}
-            {viewMode === "LIST" && listGrouping !== "PRODUCTS" && (
-                <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
-                    {isLoadingSummary ? (
-                        <div className="p-16 flex items-center justify-center gap-3 text-ui-secondary text-sm">
-                            <Loader2 size={24} className="animate-spin text-ui-primary" />
-                            Ładowanie zestawienia produkcji...
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                    <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
-                                        <th className="py-3 px-3.5">Okres / Data</th>
-                                        <th className="py-3 px-3.5 text-right">Wyprodukowano</th>
-                                        <th className="py-3 px-3.5 text-right">Sprzedano</th>
-                                        <th className="py-3 px-3.5 text-right">Skuteczność</th>
-                                        <th className="py-3 px-3.5 text-right">Utarg z wypieków</th>
-                                        <th className="py-3 px-3.5 text-right">Kasa fiskalna</th>
-                                        <th className="py-3 px-3.5 text-right">Różnica</th>
-                                        <th className="py-3 px-3.5 text-center w-28">Akcje / Wyroby</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-ui-accent/30">
-                                    {/* --- 1.1 WIDOK DZIENNY --- */}
-                                    {listGrouping === "DAYS" &&
-                                        daysSummary
-                                            .filter((day) => !productSearch.trim() || day.date.includes(productSearch.trim()) || day.products?.some(p => p.productName.toLowerCase().includes(productSearch.toLowerCase())))
-                                            .map((day) => {
-                                                const dObj = new Date(day.date);
-                                                const dayOfWeek = dObj.getUTCDay();
-                                                const isSunday = dayOfWeek === 0;
-                                                const diff = day.fiscalIncome - day.bakerySalesIncome;
-                                                const efficiency = day.totalProduced > 0 ? (day.totalSold / day.totalProduced) * 100 : 0;
-                                                const isExpanded = !!expandedRows[day.date];
-
-                                                return (
-                                                    <React.Fragment key={day.date}>
-                                                        <tr
-                                                            onClick={() => toggleRow(day.date)}
-                                                            className={`hover:bg-ui-accent/5 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
-                                                                } ${!day.hasReport && !isSunday && day.date <= todayStr ? "bg-rose-50/20" : ""}`}
-                                                        >
-                                                            <td className="py-3.5 px-3.5">
-                                                                <div className="font-bold text-ui-black text-sm">{formatDate(day.date)}</div>
-                                                                <div className="text-[11px] text-ui-secondary">
-                                                                    {WEEKDAY_NAMES[(dayOfWeek + 6) % 7]}
-                                                                    {isSunday && " (Piekarnia nieczynna)"}
-                                                                </div>
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-medium text-ui-black text-sm">
-                                                                {day.totalProduced > 0 || (day.totalCarriedOver || 0) > 0 ? (
-                                                                    <div>
-                                                                        <div className="font-bold text-ui-black text-sm">{day.totalProduced.toLocaleString("pl-PL")} szt.</div>
-                                                                        {(day.totalCarriedOver || 0) > 0 && (
-                                                                            <div className="text-[10px] text-sky-800 font-bold">
-                                                                                (+{(day.totalCarriedOver || 0).toLocaleString("pl-PL")} z wczoraj = {(day.totalAssortment || (day.totalProduced + (day.totalCarriedOver || 0))).toLocaleString("pl-PL")} szt.)
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                ) : "—"}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-bold text-ui-black text-sm">
-                                                                {day.totalSold > 0 ? `${day.totalSold.toLocaleString("pl-PL")} szt.` : "—"}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                                {(day.totalAssortment || day.totalProduced) > 0 ? (
-                                                                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                                                        {efficiency.toFixed(0)}%
-                                                                    </span>
-                                                                ) : "—"}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-bold text-ui-primary text-sm">
-                                                                {day.bakerySalesIncome > 0 ? formatCurrency(day.bakerySalesIncome) : "—"}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-bold text-ui-primary text-sm">
-                                                                {day.fiscalIncome > 0 ? formatCurrency(day.fiscalIncome) : "—"}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                                {day.hasReport && day.fiscalIncome > 0 ? (
-                                                                    <span className={`text-[11px] ${diff >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                                                                        {diff >= 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)} zł
-                                                                    </span>
-                                                                ) : "—"}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-center">
-                                                                <div className="inline-flex items-center gap-1.5 text-ui-secondary">
-                                                                    {!isSunday && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                openProductionPlanModal(day.date);
-                                                                            }}
-                                                                            className="p-1 hover:bg-amber-100 hover:text-amber-800 rounded-lg transition-colors cursor-pointer"
-                                                                            title="Sugerowany plan produkcji na ten dzień"
-                                                                        >
-                                                                            <FileText size={14} className="text-ui-secondary" />
-                                                                        </button>
-                                                                    )}
-                                                                    <span className="text-[10px] font-bold">{day.products?.length || 0}</span>
-                                                                    {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-
-                                                        {/* ROZWINIĘCIE POZYCJI WYROBÓW DLA DNIA */}
-                                                        {isExpanded && (
-                                                            <tr className="bg-ui-accent/5">
-                                                                <td colSpan={8} className="p-4 border-b border-ui-accent/30">
-                                                                    <div className="space-y-3">
-                                                                        <div className="flex items-center justify-between text-xs font-bold text-ui-secondary uppercase">
-                                                                            <span>Wyroby wyprodukowane i sprzedane w dniu {formatDate(day.date)}:</span>
-                                                                            <div className="flex items-center gap-3">
-                                                                                {!isSunday && (
-                                                                                    <button
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            openProductionPlanModal(day.date);
-                                                                                        }}
-                                                                                        className="inline-flex items-center gap-1 text-[11px] text-ui-secondary hover:text-ui-secondary font-bold hover:underline cursor-pointer"
-                                                                                    >
-                                                                                        <FileText size={13} /> Sugerowany plan dla tej daty
-                                                                                    </button>
-                                                                                )}
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        openNewReportModal(day.date);
-                                                                                    }}
-                                                                                    className="inline-flex items-center gap-1 text-[11px] text-ui-primary font-bold hover:underline cursor-pointer"
-                                                                                >
-                                                                                    <Edit3 size={12} /> Edytuj raport
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {day.products && day.products.length > 0 ? (
-                                                                            <div className="border border-ui-accent/50 rounded-xl overflow-hidden bg-white shadow-2xs">
-                                                                                <table className="w-full text-left text-xs border-collapse">
-                                                                                    <thead>
-                                                                                        <tr className="bg-ui-accent/10 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
-                                                                                            <th className="p-2.5">Nazwa wyrobu</th>
-                                                                                            <th className="p-2.5 text-right">Cena jedn.</th>
-                                                                                            <th className="p-2.5 text-right">Z wczoraj</th>
-                                                                                            <th className="p-2.5 text-right">Wyprodukowano</th>
-                                                                                            <th className="p-2.5 text-right">Łączny asortyment</th>
-                                                                                            <th className="p-2.5 text-right">Sprzedano</th>
-                                                                                            <th className="p-2.5 text-right">Niesprzedane</th>
-                                                                                            <th className="p-2.5 text-center">Wyprzedano o</th>
-                                                                                            <th className="p-2.5 text-right">Przychód</th>
-                                                                                        </tr>
-                                                                                    </thead>
-                                                                                    <tbody className="divide-y divide-ui-accent/30">
-                                                                                        {day.products.map((p) => {
-                                                                                            const carriedOver = p.carriedOverAmount || 0;
-                                                                                            const produced = p.producedAmount || 0;
-                                                                                            const totalAssort = p.totalAssortment || (produced + carriedOver);
-                                                                                            const unsold = Math.max(0, Math.round((totalAssort - p.soldAmount) * 100) / 100);
-
-                                                                                            return (
-                                                                                                <tr key={p.productId} className="hover:bg-ui-accent/5">
-                                                                                                    <td className="p-2.5 font-bold text-ui-black">{p.productName}</td>
-                                                                                                    <td className="p-2.5 text-right text-ui-secondary">{p.sellingPrice.toFixed(2)} zł</td>
-                                                                                                    <td className="p-2.5 text-right font-medium text-sky-900">
-                                                                                                        {carriedOver > 0 ? `${carriedOver.toLocaleString("pl-PL")} szt.` : "—"}
-                                                                                                    </td>
-                                                                                                    <td className="p-2.5 text-right font-semibold text-ui-black">{produced.toLocaleString("pl-PL")} szt.</td>
-                                                                                                    <td className="p-2.5 text-right font-bold text-ui-black">
-                                                                                                        {totalAssort > 0 ? `${totalAssort.toLocaleString("pl-PL")} szt.` : "—"}
-                                                                                                    </td>
-                                                                                                    <td className="p-2.5 text-right font-black text-emerald-900">{p.soldAmount.toLocaleString("pl-PL")} szt.</td>
-                                                                                                    <td className="p-2.5 text-right font-medium text-rose-700">
-                                                                                                        {unsold > 0 ? `-${unsold.toLocaleString("pl-PL")} szt.` : "0"}
-                                                                                                    </td>
-                                                                                                    <td className="p-2.5 text-center">
-                                                                                                        {p.soldOutTime ? (
-                                                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-900 rounded text-[10px] font-bold">
-                                                                                                                <Clock size={11} /> {p.soldOutTime}
-                                                                                                            </span>
-                                                                                                        ) : "—"}
-                                                                                                    </td>
-                                                                                                    <td className="p-2.5 text-right font-bold text-ui-primary">{formatCurrency(p.salesIncome)}</td>
-                                                                                                </tr>
-                                                                                            );
-                                                                                        })}
-                                                                                    </tbody>
-                                                                                </table>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="p-4 text-center text-ui-secondary italic bg-white rounded-xl border border-ui-accent/30">
-                                                                                Brak szczegółowych pozycji wyrobów w tym dniu
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        )}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-
-                                    {/* --- 1.2 WIDOK TYGODNIOWY --- */}
-                                    {listGrouping === "WEEKS" &&
-                                        weeksList
-                                            .filter((w) => !productSearch.trim() || w.label.toLowerCase().includes(productSearch.toLowerCase()) || w.products.some(p => p.productName.toLowerCase().includes(productSearch.toLowerCase())))
-                                            .map((week) => {
-                                                const diff = week.fiscalIncome - week.bakerySalesIncome;
-                                                const efficiency = week.totalProduced > 0 ? (week.totalSold / week.totalProduced) * 100 : 0;
-                                                const isExpanded = !!expandedRows[week.weekId];
-
-                                                return (
-                                                    <React.Fragment key={week.weekId}>
-                                                        <tr
-                                                            onClick={() => toggleRow(week.weekId)}
-                                                            className={`hover:bg-ui-accent/5 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
-                                                                }`}
-                                                        >
-                                                            <td className="py-3.5 px-3.5">
-                                                                <div className="font-bold text-ui-black text-sm">{week.label}</div>
-                                                                <div className="text-[11px] text-ui-secondary">
-                                                                    {formatDate(week.startDate)} — {formatDate(week.endDate)} ({week.daysCount}/6 dni)
-                                                                </div>
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-medium text-ui-black text-sm">
-                                                                {week.totalProduced.toLocaleString("pl-PL")} szt.
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-bold text-ui-black text-sm">
-                                                                {week.totalSold.toLocaleString("pl-PL")} szt.
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                                                    {efficiency.toFixed(0)}%
-                                                                </span>
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-bold text-ui-primary text-sm">
-                                                                {formatCurrency(week.bakerySalesIncome)}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-bold text-ui-primary text-sm">
-                                                                {formatCurrency(week.fiscalIncome)}
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                                <span className={`text-[11px] ${diff >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                                                                    {diff >= 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)} zł
-                                                                </span>
-                                                            </td>
-
-                                                            <td className="py-3.5 px-3.5 text-center">
-                                                                <div className="inline-flex items-center gap-1 text-ui-secondary">
-                                                                    <span className="text-[10px] font-bold">{week.products.length} poz.</span>
-                                                                    {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-
-                                                        {isExpanded && (
-                                                            <tr className="bg-ui-accent/5">
-                                                                <td colSpan={8} className="p-4 border-b border-ui-accent/30">
-                                                                    <div className="space-y-3">
-                                                                        <div className="text-xs font-bold text-ui-secondary uppercase">
-                                                                            Podsumowanie produkcji i sprzedaży produktów w {week.label}:
-                                                                        </div>
-                                                                        <div className="border border-ui-accent/50 rounded-xl overflow-hidden bg-white shadow-2xs">
-                                                                            <table className="w-full text-left text-xs border-collapse">
-                                                                                <thead>
-                                                                                    <tr className="bg-ui-accent/10 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
-                                                                                        <th className="p-2.5">Wyrób</th>
-                                                                                        <th className="p-2.5">Kategoria</th>
-                                                                                        <th className="p-2.5 text-right">Cena jedn.</th>
-                                                                                        <th className="p-2.5 text-right">Wyprodukowano</th>
-                                                                                        <th className="p-2.5 text-right">Sprzedano</th>
-                                                                                        <th className="p-2.5 text-right">Niesprzedane</th>
-                                                                                        <th className="p-2.5 text-center">Wskaźnik wyprzedania</th>
-                                                                                        <th className="p-2.5 text-right">Utarg ze sprzedaży</th>
-                                                                                    </tr>
-                                                                                </thead>
-                                                                                <tbody className="divide-y divide-ui-accent/30">
-                                                                                    {week.products.map((p) => {
-                                                                                        const unsold = p.producedAmount - p.soldAmount;
-                                                                                        const cat = CATEGORY_MAP[p.productType as ProductType];
-                                                                                        return (
-                                                                                            <tr key={p.productId} className="hover:bg-ui-accent/5">
-                                                                                                <td className="p-2.5 font-bold text-ui-black">{p.productName}</td>
-                                                                                                <td className="p-2.5 text-ui-secondary text-[11px]">{cat?.label || p.productType}</td>
-                                                                                                <td className="p-2.5 text-right text-ui-secondary">{p.sellingPrice.toFixed(2)} zł</td>
-                                                                                                <td className="p-2.5 text-right font-semibold text-ui-black">{p.producedAmount.toLocaleString("pl-PL")} szt.</td>
-                                                                                                <td className="p-2.5 text-right font-black text-emerald-950">{p.soldAmount.toLocaleString("pl-PL")} szt.</td>
-                                                                                                <td className="p-2.5 text-right font-medium text-rose-700">
-                                                                                                    {unsold > 0 ? `-${unsold.toLocaleString("pl-PL")} szt.` : "0"}
-                                                                                                </td>
-                                                                                                <td className="p-2.5 text-center">
-                                                                                                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                                                                                        {p.sellThroughRate}%
-                                                                                                    </span>
-                                                                                                </td>
-                                                                                                <td className="p-2.5 text-right font-bold text-ui-primary">{formatCurrency(p.salesIncome)}</td>
-                                                                                            </tr>
-                                                                                        );
-                                                                                    })}
-                                                                                </tbody>
-                                                                            </table>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        )}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-
-                                    {/* --- 1.3 WIDOK MIESIĘCZNY --- */}
-                                    {listGrouping === "MONTHS" &&
-                                        monthsList.map((mGroup) => {
-                                            const isExpanded = true;
-                                            return (
-                                                <React.Fragment key={mGroup.monthId}>
-                                                    <tr className="bg-ui-accent/10 font-bold">
-                                                        <td className="py-3.5 px-3.5">
-                                                            <div className="font-extrabold text-ui-black text-base">{mGroup.label}</div>
-                                                            <div className="text-[11px] text-ui-secondary font-normal">
-                                                                Zarejestrowane raporty z {mGroup.daysWithReport} dni
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-right font-extrabold text-ui-black text-sm">
-                                                            {mGroup.totalProduced.toLocaleString("pl-PL")} szt.
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-right font-black text-emerald-950 text-sm">
-                                                            {mGroup.totalSold.toLocaleString("pl-PL")} szt.
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                            <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                                                {mGroup.totalProduced > 0 ? ((mGroup.totalSold / mGroup.totalProduced) * 100).toFixed(1) : 0}%
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-right font-black text-ui-primary text-sm">
-                                                            {formatCurrency(mGroup.bakerySalesIncome)}
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-right font-black text-ui-primary text-sm">
-                                                            {formatCurrency(mGroup.fiscalIncome)}
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-right font-semibold">
-                                                            <span className="text-[11px] text-ui-secondary">
-                                                                {formatCurrency(mGroup.fiscalIncome - mGroup.bakerySalesIncome)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3.5 px-3.5 text-center">
-                                                            <span className="text-[10px] font-bold text-ui-secondary">{mGroup.products.length} poz.</span>
-                                                        </td>
-                                                    </tr>
-
-                                                    {/* Lista produktów dla miesiąca */}
-                                                    <tr className="bg-ui-accent/5">
-                                                        <td colSpan={8} className="p-4 border-b border-ui-accent/30">
-                                                            <div className="space-y-3">
-                                                                <div className="text-xs font-bold text-ui-secondary uppercase">
-                                                                    Zbiorczy bilans wszystkich wyrobów w {mGroup.label}:
-                                                                </div>
-                                                                <div className="border border-ui-accent/50 rounded-xl overflow-hidden bg-white shadow-2xs">
-                                                                    <table className="w-full text-left text-xs border-collapse">
-                                                                        <thead>
-                                                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
-                                                                                <th className="p-2.5">Wyrób</th>
-                                                                                <th className="p-2.5">Kategoria</th>
-                                                                                <th className="p-2.5 text-right">Cena jedn.</th>
-                                                                                <th className="p-2.5 text-right">Wyprodukowano (m-c)</th>
-                                                                                <th className="p-2.5 text-right">Sprzedano (m-c)</th>
-                                                                                <th className="p-2.5 text-right">Niesprzedane</th>
-                                                                                <th className="p-2.5 text-center">Skuteczność</th>
-                                                                                <th className="p-2.5 text-right">Łączny utarg</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-ui-accent/30">
-                                                                            {mGroup.products.map((p) => {
-                                                                                const unsold = p.producedAmount - p.soldAmount;
-                                                                                const cat = CATEGORY_MAP[p.productType as ProductType];
-                                                                                return (
-                                                                                    <tr key={p.productId} className="hover:bg-ui-accent/5">
-                                                                                        <td className="p-2.5 font-bold text-ui-black">{p.productName}</td>
-                                                                                        <td className="p-2.5 text-ui-secondary text-[11px]">{cat?.label || p.productType}</td>
-                                                                                        <td className="p-2.5 text-right text-ui-secondary">{p.sellingPrice.toFixed(2)} zł</td>
-                                                                                        <td className="p-2.5 text-right font-semibold text-ui-black">{p.producedAmount.toLocaleString("pl-PL")} szt.</td>
-                                                                                        <td className="p-2.5 text-right font-black text-emerald-950">{p.soldAmount.toLocaleString("pl-PL")} szt.</td>
-                                                                                        <td className="p-2.5 text-right font-medium text-rose-700">
-                                                                                            {unsold > 0 ? `-${unsold.toLocaleString("pl-PL")} szt.` : "0"}
-                                                                                        </td>
-                                                                                        <td className="p-2.5 text-center">
-                                                                                            <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                                                                                {p.sellThroughRate}%
-                                                                                            </span>
-                                                                                        </td>
-                                                                                        <td className="p-2.5 text-right font-bold text-ui-primary">{formatCurrency(p.salesIncome)}</td>
-                                                                                    </tr>
-                                                                                );
-                                                                            })}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ---------------- 2. WIDOK SZTUK WYROBÓW (RANKING ASORTYMENTU) ---------------- */}
-            {viewMode === "LIST" && listGrouping === "PRODUCTS" && (
-                <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
-                    <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* ---------------- KARTY PODSUMOWANIA MIESIĄCA (Gdy aktywny Kalendarz) ---------------- */}
+            {activeTab === "CALENDAR" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* KARTA 1: UTARG Z WYPIEKÓW */}
+                    <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                         <div>
-                            <h3 className="font-bold text-sm text-ui-black flex items-center gap-2">
-                                <Wheat size={16} className="text-ui-primary" />
-                                Ilość sztuk wyprodukowanych i sprzedanych w miesiącu
-                            </h3>
-                        </div>
-                        <div className="text-xs text-ui-secondary font-medium">
-                            Pozycji w zestawieniu: <strong className="text-ui-black">{filteredProductsRanking.length}</strong>
+                            <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                    <Coins size={15} className="text-ui-secondary" />
+                                    Utarg ze sprzedaży wypieków ({POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]})
+                                </span>
+                            </div>
+                            <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                                {formatCurrency(stats.monthBakeryIncome)}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                                <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
-                                    <th className="py-3 px-3.5 w-12 text-center">#</th>
-                                    <th className="py-3 px-3.5">Wyrób</th>
-                                    <th className="py-3 px-3.5">Kategoria</th>
-                                    <th className="py-3 px-3.5 text-right">Cena sprzedaży</th>
-                                    <th className="py-3 px-3.5 text-right">Wyprodukowano</th>
-                                    <th className="py-3 px-3.5 text-right">Sprzedano</th>
-                                    <th className="py-3 px-3.5 text-right">Niesprzedane</th>
-                                    <th className="py-3 px-3.5 text-center">Wskaźnik wyprzedania</th>
-                                    <th className="py-3 px-3.5 text-right">Łączny utarg</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-ui-accent/30">
-                                {filteredProductsRanking.length > 0 ? (
-                                    filteredProductsRanking.map((p, idx) => {
-                                        const catInfo = CATEGORY_MAP[p.productType as ProductType];
-                                        const unsold = p.producedAmount - p.soldAmount;
-
-                                        return (
-                                            <tr key={p.productId} className="hover:bg-ui-accent/5 transition-colors">
-                                                <td className="py-3.5 px-3.5 text-center font-bold text-ui-secondary text-xs">
-                                                    {idx + 1}
-                                                </td>
-                                                <td className="py-3.5 px-3.5 font-bold text-ui-black text-sm">
-                                                    {p.productName}
-                                                </td>
-                                                <td className="py-3.5 px-3.5">
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-ui-accent/15 text-ui-primary">
-                                                        {catInfo?.label || p.productType}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-right font-semibold text-ui-secondary">
-                                                    {p.sellingPrice.toFixed(2)} zł
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-right font-semibold text-ui-black text-sm">
-                                                    {p.producedAmount.toLocaleString("pl-PL")} szt.
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-right font-black text-emerald-950 text-sm">
-                                                    {p.soldAmount.toLocaleString("pl-PL")} szt.
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-right font-medium text-rose-700">
-                                                    {unsold > 0 ? `-${unsold.toLocaleString("pl-PL")} szt.` : "0"}
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-center">
-                                                    <span
-                                                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${p.sellThroughRate >= 90
-                                                            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                                            : p.sellThroughRate >= 75
-                                                                ? "bg-blue-50 text-blue-800 border border-blue-200"
-                                                                : "bg-amber-50 text-amber-800 border border-amber-200"
-                                                            }`}
-                                                    >
-                                                        {p.sellThroughRate}%
-                                                    </span>
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-right font-black text-ui-primary text-sm">
-                                                    {formatCurrency(p.salesIncome)}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td colSpan={9} className="p-8 text-center text-ui-secondary italic">
-                                            Brak wyrobów spełniających kryteria wyszukiwania
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                            <tfoot>
-                                <tr className="bg-ui-accent/15 font-black text-ui-black border-t border-ui-accent/40">
-                                    <td colSpan={4} className="py-3.5 px-3.5 text-xs">
-                                        SUMA CAŁEGO MIESIĄCA
-                                    </td>
-                                    <td className="py-3.5 px-3.5 text-right text-sm">
-                                        {stats.monthProduced.toLocaleString("pl-PL")} szt.
-                                    </td>
-                                    <td className="py-3.5 px-3.5 text-right text-sm text-emerald-950">
-                                        {stats.monthSold.toLocaleString("pl-PL")} szt.
-                                    </td>
-                                    <td className="py-3.5 px-3.5 text-right text-sm text-rose-700">
-                                        {Math.max(0, stats.monthProduced - stats.monthSold).toLocaleString("pl-PL")} szt.
-                                    </td>
-                                    <td className="py-3.5 px-3.5 text-center">
-                                        {stats.monthProduced > 0 ? ((stats.monthSold / stats.monthProduced) * 100).toFixed(1) : 0}%
-                                    </td>
-                                    <td className="py-3.5 px-3.5 text-right text-sm text-ui-primary">
-                                        {formatCurrency(stats.monthBakeryIncome)}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                    {/* KARTA 2: STATUS RAPORTÓW */}
+                    <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                    <CheckCircle2 size={15} className="text-ui-secondary" />
+                                    Kompletność raportów
+                                </span>
+                            </div>
+                            <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-black tracking-tight">
+                                {daysSummary.filter((d) => d.hasReport).length}{" "}
+                                <span className="text-sm font-semibold text-ui-secondary">dni z raportem</span>
+                            </div>
+                        </div>
+                        <div className="text-[11px] font-semibold mt-2">
+                            {stats.missingReportsCount > 0 ? (
+                                <span className="text-rose-600 flex items-center gap-1">
+                                    <AlertTriangle size={13} />
+                                    Brak {stats.missingReportsCount} raportów w dniach roboczych
+                                </span>
+                            ) : (
+                                <span className="text-emerald-700 flex items-center gap-1">
+                                    <CheckCircle2 size={13} /> Wszystkie raporty uzupełnione
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* ---------------- 3. WIDOK KALENDARZA ---------------- */}
-            {viewMode === "CALENDAR" && (
-                <div className="bg-white border border-ui-accent rounded-2xl p-6 shadow-xs">
+            {/* ---------------- 4 GŁÓWNE ZAKŁADKI STRONY RAPORTÓW ---------------- */}
+            <div className="bg-white border border-ui-accent rounded-2xl p-2 shadow-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-ui-accent/10 rounded-xl border border-ui-accent/30">
+                    <button
+                        onClick={() => setActiveTab("CALENDAR")}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "CALENDAR"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <CalendarIcon size={16} />
+                        <span>Kalendarz</span>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setActiveTab("LAST_7_DAYS");
+                            setDaysOffset(0);
+                        }}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "LAST_7_DAYS"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <span>Raporty dzienne</span>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setActiveTab("LAST_WEEKS");
+                            setWeeksOffset(0);
+                        }}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "LAST_WEEKS"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <span>Raporty tygodniowe</span>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setActiveTab("LAST_MONTHS");
+                            setMonthsOffset(0);
+                        }}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "LAST_MONTHS"
+                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
+                            : "text-ui-secondary hover:text-ui-primary"
+                            }`}
+                    >
+                        <span>Raporty miesięczne</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* ZAKŁADKA 1: KALENDARZ (WIDOK DOMYŚLNY)                    */}
+            {/* ========================================================= */}
+            {activeTab === "CALENDAR" && (
+                <div className="bg-white border border-ui-accent rounded-2xl p-4 sm:p-6 shadow-xs">
+                    <div className="flex items-center justify-center mb-4 pb-3 border-b border-ui-accent/30">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-sm sm:text-xl font-bold text-ui-primary">
+                                {POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]} {currentMonth.split("-")[0]}
+                            </h2>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-ui-secondary uppercase tracking-wider">
                         {SHORT_WEEKDAYS.map((wd, i) => (
                             <div key={wd} className={`py-2 rounded-lg ${i === 6 ? "text-ui-secondary/50" : ""}`}>
@@ -1826,48 +1229,55 @@ export default function ProdukcjaPage() {
                                 );
                             }
 
-                            const hasData = cell.dayData && cell.dayData.hasReport;
-                            const isMissing = !hasData && cell.isPastOrToday && !cell.isSunday;
+                            const isClosed = Boolean(cell.dayData && cell.dayData.isClosed);
+                            const hasData = Boolean(cell.dayData && cell.dayData.hasReport);
+                            const isMissing = !hasData && cell.isPastOrToday && !cell.isSunday && !isClosed;
 
                             return (
                                 <div
                                     key={cell.dateStr}
                                     onClick={() => {
-                                        if (hasData) {
-                                            toggleRow(cell.dateStr!);
-                                            setViewMode("LIST");
-                                            setListGrouping("DAYS");
-                                        } else if (cell.isPastOrToday && !cell.isSunday) {
+                                        if (isClosed) {
+                                            handleOpenClosedDayModal(cell.dateStr!, true, cell.dayData?.closedReason);
+                                        } else if (hasData || cell.isPastOrToday) {
                                             openNewReportModal(cell.dateStr);
                                         } else if (!cell.isSunday) {
                                             openProductionPlanModal(cell.dateStr);
                                         }
                                     }}
-                                    className={`h-28 sm:h-32 rounded-2xl p-2.5 border transition-all flex flex-col justify-between cursor-pointer ${hasData
-                                        ? "bg-white border-ui-accent hover:border-ui-primary hover:shadow-md"
-                                        : isMissing
-                                            ? "bg-rose-50/40 border-rose-200 hover:border-rose-400"
-                                            : cell.isSunday
-                                                ? "bg-ui-accent/5 border-ui-accent/20 opacity-50 cursor-default"
-                                                : "bg-ui-white border-ui-accent/30 hover:border-amber-400"
+                                    className={`h-28 sm:h-32 rounded-2xl p-2.5 border transition-all flex flex-col justify-between cursor-pointer ${isClosed
+                                        ? "bg-slate-50/80 border-slate-200/80 hover:border-slate-400"
+                                        : hasData
+                                            ? "bg-white border-ui-accent hover:border-ui-primary hover:shadow-md ring-1 ring-ui-accent/20"
+                                            : isMissing
+                                                ? "bg-rose-50/40 border-rose-200 hover:border-rose-400"
+                                                : cell.isSunday
+                                                    ? "bg-ui-accent/5 border-ui-accent/20 opacity-50 cursor-default"
+                                                    : "bg-ui-white border-ui-accent/30 hover:border-amber-400"
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
                                         <span
                                             className={`text-xs font-black px-2 py-0.5 rounded-lg ${cell.dateStr === todayStr
                                                 ? "bg-ui-primary text-white"
-                                                : "text-ui-black bg-ui-accent/15"
+                                                : isClosed
+                                                    ? "text-slate-600 bg-slate-200/70"
+                                                    : "text-ui-black bg-ui-accent/15"
                                                 }`}
                                         >
                                             {cell.dayNumber}
                                         </span>
-                                        {hasData ? (
+                                        {isClosed ? (
+                                            <span className="text-[10px] font-bold text-slate-700 bg-slate-200/80 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                                <DoorClosed size={10} className="text-slate-600" /> Zamknięte
+                                            </span>
+                                        ) : hasData ? (
                                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                                                 {cell.dayData?.productsCount || 0} poz.
                                             </span>
                                         ) : isMissing ? (
                                             <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-md">
-                                                Brak
+                                                Brak raportu
                                             </span>
                                         ) : !cell.isSunday ? (
                                             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
@@ -1876,18 +1286,24 @@ export default function ProdukcjaPage() {
                                         ) : null}
                                     </div>
 
-                                    {hasData ? (
-                                        <div className="space-y-0.5 text-right">
-                                            <div className="text-[11px] font-bold text-ui-black">
-                                                {cell.dayData?.totalSold?.toLocaleString("pl-PL")} / {cell.dayData?.totalProduced?.toLocaleString("pl-PL")} szt.
+                                    {isClosed ? (
+                                        <div className="text-center py-1">
+                                            <div className="text-[11px] font-bold text-slate-700 line-clamp-1">
+                                                {cell.dayData?.closedReason || "Dzień wolny"}
                                             </div>
+                                            <div className="text-[9px] text-slate-400 mt-0.5">
+                                                Kliknij, aby otworzyć
+                                            </div>
+                                        </div>
+                                    ) : hasData ? (
+                                        <div className="space-y-0.5 text-right">
                                             <div className="text-xs font-black text-ui-primary">
                                                 {formatCurrency(cell.dayData?.bakerySalesIncome || 0)}
                                             </div>
                                         </div>
                                     ) : isMissing ? (
                                         <div className="text-center text-[10px] font-bold text-rose-600">
-                                            Kliknij aby dodać
+                                            Kliknij aby wpisać raport
                                         </div>
                                     ) : (
                                         <div className="text-center text-[10px] text-ui-secondary/60">
@@ -1902,6 +1318,531 @@ export default function ProdukcjaPage() {
             )}
 
             {/* ========================================================= */}
+            {/* ZAKŁADKI 2, 3, 4: ANALITYKA I WYKRESY (7 DNI, TYG, MIES)   */}
+            {/* ========================================================= */}
+            {activeTab !== "CALENDAR" && (() => {
+                const isDays = activeTab === "LAST_7_DAYS";
+                const isWeeks = activeTab === "LAST_WEEKS";
+                const isMonths = activeTab === "LAST_MONTHS";
+
+                const currentAnalytics = isDays ? daysAnalytics : isWeeks ? weeksAnalytics : monthsAnalytics;
+                const isLoadingCurrent = isDays ? isLoadingDaysAnalytics : isWeeks ? isLoadingWeeksAnalytics : isLoadingMonthsAnalytics;
+                const offsetVal = isDays ? daysOffset : isWeeks ? weeksOffset : monthsOffset;
+                const setOffsetFn = isDays ? setDaysOffset : isWeeks ? setWeeksOffset : setMonthsOffset;
+                const countVal = isDays ? daysCount : isWeeks ? weeksCount : monthsCount;
+                const setCountFn = isDays ? setDaysCount : isWeeks ? setWeeksCount : setMonthsCount;
+
+                const tabTitle = isDays ? "Ostatnie 7 dni" : isWeeks ? "Ostatnie tygodnie" : "Ostatnie miesiące";
+                const buckets = currentAnalytics?.buckets || [];
+                const totalStats = currentAnalytics?.totalStats || {
+                    totalProduced: 0,
+                    totalSold: 0,
+                    totalUnsold: 0,
+                    totalIncome: 0,
+                    sellThroughRate: 0,
+                };
+
+                // Transformacja danych dla Recharts (Grouped + Stacked)
+                const chartData = buckets.map((b: any) => ({
+                    id: b.id,
+                    label: b.label,
+                    subLabel: b.subLabel,
+                    startDate: b.startDate,
+                    endDate: b.endDate,
+                    rawBucket: b,
+                    // Chleby
+                    BREAD_sold: b.BREAD?.sold || 0,
+                    BREAD_unsold: b.BREAD?.unsold || 0,
+                    BREAD_produced: b.BREAD?.produced || 0,
+                    // Bułki
+                    ROLL_sold: b.ROLL?.sold || 0,
+                    ROLL_unsold: b.ROLL?.unsold || 0,
+                    ROLL_produced: b.ROLL?.produced || 0,
+                    // Słodkie
+                    SWEET_sold: b.SWEET?.sold || 0,
+                    SWEET_unsold: b.SWEET?.unsold || 0,
+                    SWEET_produced: b.SWEET?.produced || 0,
+                    // Słone
+                    SAVORY_sold: b.SAVORY?.sold || 0,
+                    SAVORY_unsold: b.SAVORY?.unsold || 0,
+                    SAVORY_produced: b.SAVORY?.produced || 0,
+                }));
+
+                // Własny Tooltip dla Recharts
+                const CustomChartTooltip = ({ active, payload }: any) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const itemData = payload[0]?.payload;
+                    const raw = itemData?.rawBucket;
+                    if (!raw) return null;
+
+                    const categories = [
+                        { key: "BREAD", label: "Chleby", color: "#D97706", lightColor: "#FDE68A", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-900" },
+                        { key: "ROLL", label: "Bułki", color: "#0284C7", lightColor: "#BAE6FD", bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-900" },
+                        { key: "SWEET", label: "Słodkie", color: "#DB2777", lightColor: "#FBCFE8", bg: "bg-pink-50", border: "border-pink-200", text: "text-pink-900" },
+                        { key: "SAVORY", label: "Słone", color: "#059669", lightColor: "#A7F3D0", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900" },
+                    ];
+
+                    return (
+                        <div className="bg-white/95 backdrop-blur-md border border-ui-accent rounded-2xl p-4 shadow-xl text-xs min-w-[280px] max-w-[340px] z-50">
+                            <div className="border-b border-ui-accent/40 pb-2 mb-2.5">
+                                <div className="font-extrabold text-sm text-ui-black">{itemData.label}</div>
+                                <div className="text-[11px] text-ui-secondary">{itemData.subLabel || `${itemData.startDate} - ${itemData.endDate}`}</div>
+                            </div>
+
+                            {/* Podsumowanie ogólne okresu */}
+                            <div className="grid grid-cols-2 gap-2 mb-3 bg-ui-accent/10 p-2 rounded-xl border border-ui-accent/30">
+                                <div>
+                                    <div className="text-[10px] text-ui-secondary font-medium">Wyprodukowano</div>
+                                    <div className="text-xs font-black text-ui-black">{raw.totalProduced.toLocaleString("pl-PL")} szt.</div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] text-ui-secondary font-medium">Sprzedano</div>
+                                    <div className="text-xs font-black text-emerald-700">
+                                        {raw.totalSold.toLocaleString("pl-PL")} szt. ({raw.sellThroughRate}%)
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] text-ui-secondary font-medium">Niesprzedane</div>
+                                    <div className="text-xs font-bold text-rose-700">{raw.totalUnsold.toLocaleString("pl-PL")} szt.</div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] text-ui-secondary font-medium">Utarg</div>
+                                    <div className="text-xs font-black text-ui-primary">{formatCurrency(raw.totalIncome)}</div>
+                                </div>
+                            </div>
+
+                            {/* Szczegóły 4 kategorii */}
+                            <div className="space-y-1.5">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-ui-secondary">Podział na kategorie:</div>
+                                {categories.map((c) => {
+                                    const catData = raw[c.key] || { produced: 0, sold: 0, unsold: 0, income: 0 };
+                                    const rate = catData.produced > 0 ? Math.round((catData.sold / catData.produced) * 100) : 0;
+                                    return (
+                                        <div key={c.key} className={`p-1.5 rounded-lg border ${c.bg} ${c.border} flex items-center justify-between`}>
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: c.color }} />
+                                                <span className={`font-bold ${c.text}`}>{c.label}:</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="font-extrabold text-ui-black">{catData.sold}</span>
+                                                <span className="text-ui-secondary"> / {catData.produced} szt.</span>
+                                                {catData.produced > 0 && (
+                                                    <span className="ml-1 text-[10px] font-bold text-emerald-800">({rate}%)</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                };
+
+                return (
+                    <div className="space-y-6">
+                        {/* 1. PASEK NAWIGACJI PO OKRESACH */}
+                        <div className="bg-white border border-ui-accent rounded-2xl p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-ui-primary/10 text-ui-primary">
+                                    <BarChart3 size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-sm sm:text-base font-extrabold text-ui-black">
+                                        {tabTitle}
+                                    </h2>
+                                    <div className="text-xs text-ui-secondary font-medium">
+                                        {currentAnalytics?.startDate && currentAnalytics?.endDate
+                                            ? `Zakres: ${currentAnalytics.startDate} do ${currentAnalytics.endDate}`
+                                            : "Analiza słupkowa produkcji i sprzedaży"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Kontrolki paginacji i liczby okresów */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {(isWeeks || isMonths) && (
+                                    <div className="flex items-center gap-1 bg-ui-accent/15 p-1 rounded-xl border border-ui-accent/30 text-xs font-bold">
+                                        <span className="px-2 text-ui-secondary text-[11px]">Liczba:</span>
+                                        {(isWeeks ? [4, 6, 8, 12] : [4, 6, 12]).map((cnt) => (
+                                            <button
+                                                key={cnt}
+                                                onClick={() => setCountFn(cnt)}
+                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${countVal === cnt
+                                                    ? "bg-white text-ui-primary shadow-xs font-black"
+                                                    : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                {cnt} {isWeeks ? "tyg." : "mies."}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="flex items-center gap-1.5 bg-ui-accent/15 p-1 rounded-xl border border-ui-accent/30">
+                                    <button
+                                        onClick={() => setOffsetFn(offsetVal + 1)}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-white text-ui-primary rounded-lg text-xs font-bold shadow-xs hover:bg-ui-accent/20 transition-all cursor-pointer border border-ui-accent/40"
+                                        title="Generuj wykres dla wcześniejszego okresu"
+                                    >
+                                        <ChevronLeft size={14} />
+                                        <span>Wcześniejsze</span>
+                                    </button>
+
+                                    {offsetVal > 0 && (
+                                        <button
+                                            onClick={() => setOffsetFn(0)}
+                                            className="px-2.5 py-1.5 text-xs font-bold text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                                            title="Wróć do aktualnego okresu"
+                                        >
+                                            <RotateCcw size={13} className="inline mr-1" />
+                                            Bieżące
+                                        </button>
+                                    )}
+
+                                    <button
+                                        onClick={() => setOffsetFn(Math.max(0, offsetVal - 1))}
+                                        disabled={offsetVal === 0}
+                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${offsetVal === 0
+                                            ? "text-ui-secondary/40 bg-transparent cursor-not-allowed"
+                                            : "bg-white text-ui-primary shadow-xs hover:bg-ui-accent/20 cursor-pointer border border-ui-accent/40"
+                                            }`}
+                                        title="Następny okres"
+                                    >
+                                        <span>Późniejsze</span>
+                                        <ChevronRight size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. LEGENDA KATEGORII I ODCIENI */}
+                        <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {/* Chleby */}
+                                <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 flex items-center gap-3">
+                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-amber-400/50 shrink-0 shadow-xs">
+                                        <div className="flex-1 bg-[#FDE68A]" title="Niesprzedane (jaśniejszy)" />
+                                        <div className="h-5 bg-[#D97706]" title="Sprzedane (ciemniejszy)" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
+                                            <Wheat size={13} className="text-amber-700" /> Chleby
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Bułki */}
+                                <div className="p-2.5 rounded-xl bg-sky-50/60 border border-sky-200/80 flex items-center gap-3">
+                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-sky-400/50 shrink-0 shadow-xs">
+                                        <div className="flex-1 bg-[#BAE6FD]" title="Niesprzedane (jaśniejszy)" />
+                                        <div className="h-5 bg-[#0284C7]" title="Sprzedane (ciemniejszy)" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-extrabold text-sky-900 flex items-center gap-1">
+                                            <Layers size={13} className="text-sky-700" /> Bułki
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Słodkie */}
+                                <div className="p-2.5 rounded-xl bg-pink-50/60 border border-pink-200/80 flex items-center gap-3">
+                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-pink-400/50 shrink-0 shadow-xs">
+                                        <div className="flex-1 bg-[#FBCFE8]" title="Niesprzedane (jaśniejszy)" />
+                                        <div className="h-5 bg-[#DB2777]" title="Sprzedane (ciemniejszy)" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-extrabold text-pink-900 flex items-center gap-1">
+                                            <Croissant size={13} className="text-pink-700" /> Słodkie
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Słone */}
+                                <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center gap-3">
+                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-emerald-400/50 shrink-0 shadow-xs">
+                                        <div className="flex-1 bg-[#A7F3D0]" title="Niesprzedane (jaśniejszy)" />
+                                        <div className="h-5 bg-[#059669]" title="Sprzedane (ciemniejszy)" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-extrabold text-emerald-900 flex items-center gap-1">
+                                            <Pizza size={13} className="text-emerald-700" /> Słone
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. GŁÓWNY WYKRES SŁUPKOWY */}
+                        <div className="bg-white border border-ui-accent rounded-2xl p-5 sm:p-6 shadow-xs">
+                            <div className="flex items-center justify-center mb-4">
+                                <h3 className="text-xs sm:text-sm font-extrabold text-ui-primary">
+                                    Produkcja i sprzedaż
+                                </h3>
+                                {isLoadingCurrent && (
+                                    <div className="flex items-center gap-1.5 text-xs text-ui-primary font-bold">
+                                        <Loader2 size={14} className="animate-spin" /> Ładowanie danych...
+                                    </div>
+                                )}
+                            </div>
+
+                            {chartData.length === 0 ? (
+                                <div className="p-16 text-center text-ui-secondary text-sm">
+                                    Brak danych produkcyjnych dla wybranego zakresu.
+                                </div>
+                            ) : (
+                                <div className="w-full h-80 sm:h-96">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={chartData}
+                                            margin={{ top: 20, right: 10, left: -10, bottom: 20 }}
+                                            barGap={4}
+                                            barCategoryGap="18%"
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                            <XAxis
+                                                dataKey="label"
+                                                tickLine={false}
+                                                axisLine={{ stroke: "#CBD5E1" }}
+                                                tick={{ fill: "#475569", fontSize: 11, fontWeight: 700 }}
+                                                dy={6}
+                                            />
+                                            <YAxis
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fill: "#64748B", fontSize: 10 }}
+                                                unit=" szt."
+                                            />
+                                            <RechartsTooltip content={<CustomChartTooltip />} />
+
+                                            {/* SŁUPEK 1: CHLEBY (Sprzedane ciemny + Niesprzedane jasny) */}
+                                            <Bar dataKey="BREAD_sold" stackId="BREAD" fill="#D97706" name="Chleby (Sprzedaż)" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="BREAD_unsold" stackId="BREAD" fill="#FDE68A" name="Chleby (Niesprzedane)" radius={[4, 4, 0, 0]} />
+
+                                            {/* SŁUPEK 2: BUŁKI (Sprzedane ciemny + Niesprzedane jasny) */}
+                                            <Bar dataKey="ROLL_sold" stackId="ROLL" fill="#0284C7" name="Bułki (Sprzedaż)" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="ROLL_unsold" stackId="ROLL" fill="#BAE6FD" name="Bułki (Niesprzedane)" radius={[4, 4, 0, 0]} />
+
+                                            {/* SŁUPEK 3: SŁODKIE (Sprzedane ciemny + Niesprzedane jasny) */}
+                                            <Bar dataKey="SWEET_sold" stackId="SWEET" fill="#DB2777" name="Słodkie (Sprzedaż)" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="SWEET_unsold" stackId="SWEET" fill="#FBCFE8" name="Słodkie (Niesprzedane)" radius={[4, 4, 0, 0]} />
+
+                                            {/* SŁUPEK 4: SŁONE (Sprzedane ciemny + Niesprzedane jasny) */}
+                                            <Bar dataKey="SAVORY_sold" stackId="SAVORY" fill="#059669" name="Słone (Sprzedaż)" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="SAVORY_unsold" stackId="SAVORY" fill="#A7F3D0" name="Słone (Niesprzedane)" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 4. KARTY STATYSTYK OKRESU (KPI) */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                            <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
+                                    <Wheat size={14} className="text-amber-600" />
+                                    Wyprodukowano
+                                </div>
+                                <div className="mt-2 text-xl sm:text-2xl font-black text-ui-black">
+                                    {totalStats.totalProduced.toLocaleString("pl-PL")}{" "}
+                                    <span className="text-xs font-semibold text-ui-secondary">szt.</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
+                                    <CheckCircle2 size={14} className="text-emerald-600" />
+                                    Sprzedano (% skut.)
+                                </div>
+                                <div className="mt-2 text-xl sm:text-2xl font-black text-emerald-700">
+                                    {totalStats.totalSold.toLocaleString("pl-PL")}{" "}
+                                    <span className="text-xs font-semibold text-emerald-800/80">
+                                        ({totalStats.sellThroughRate}%)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
+                                    <AlertCircle size={14} className="text-rose-600" />
+                                    Niesprzedane
+                                </div>
+                                <div className="mt-2 text-xl sm:text-2xl font-black text-rose-700">
+                                    {totalStats.totalUnsold.toLocaleString("pl-PL")}{" "}
+                                    <span className="text-xs font-semibold text-rose-600/70">szt.</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
+                                    <Coins size={14} className="text-ui-primary" />
+                                    Utarg ze sprzedaży
+                                </div>
+                                <div className="mt-2 text-xl sm:text-2xl font-black text-ui-primary">
+                                    {formatCurrency(totalStats.totalIncome)}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 5. TABELA ZESTAWIENIA LICZBOWEGO Z PODZIAŁEM NA KATEGORIE */}
+                        <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
+                            <div className="p-4 border-b border-ui-accent/40 flex items-center justify-between">
+                                <h3 className="text-xs sm:text-sm font-extrabold text-ui-black">
+                                    {tabTitle}
+                                </h3>
+
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
+                                            <th className="py-3 px-3.5">Okres / Data</th>
+                                            <th className="py-3 px-2 text-right">
+                                                <span className="text-amber-800">Chleby</span>
+                                            </th>
+                                            <th className="py-3 px-2 text-right">
+                                                <span className="text-sky-800">Bułki</span>
+                                            </th>
+                                            <th className="py-3 px-2 text-right">
+                                                <span className="text-pink-800">Słodkie</span>
+                                            </th>
+                                            <th className="py-3 px-2 text-right">
+                                                <span className="text-emerald-800">Słone</span>
+                                            </th>
+                                            <th className="py-3 px-3 text-right">Produkcja</th>
+                                            <th className="py-3 px-3 text-right">Sprzedaż</th>
+                                            <th className="py-3 px-2.5 text-right">Skuteczność</th>
+                                            <th className="py-3 px-3.5 text-right">Utarg</th>
+                                            <th className="py-3 px-1 text-center">Akcja</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-ui-accent/30">
+                                        {buckets.map((b: any) => {
+                                            return (
+                                                <tr
+                                                    key={b.id}
+                                                    onClick={() => {
+                                                        if (isDays) {
+                                                            openNewReportModal(b.startDate);
+                                                        } else {
+                                                            setPeriodPreviewModal({
+                                                                isOpen: true,
+                                                                title: b.label,
+                                                                subtitle: b.subLabel || `${b.startDate} do ${b.endDate}`,
+                                                                products: b.products || [],
+                                                                totalProduced: b.totalProduced,
+                                                                totalSold: b.totalSold,
+                                                                bakeryIncome: b.totalIncome,
+                                                                fiscalIncome: 0,
+                                                            });
+                                                        }
+                                                    }}
+                                                    className="hover:bg-ui-accent/10 transition-colors cursor-pointer"
+                                                >
+                                                    <td className="py-3 px-3.5 font-bold text-ui-black">
+                                                        <div className="text-sm">{b.label}</div>
+                                                        <div className="text-[11px] text-ui-secondary font-normal">{b.subLabel || `${b.startDate} do ${b.endDate}`}</div>
+                                                    </td>
+
+                                                    {/* Chleby */}
+                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                        <span className="font-extrabold text-amber-800">{b.BREAD?.sold || 0}</span>
+                                                        <span className="text-ui-secondary text-[11px]"> / {b.BREAD?.produced || 0}</span>
+                                                    </td>
+
+                                                    {/* Bułki */}
+                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                        <span className="font-extrabold text-sky-800">{b.ROLL?.sold || 0}</span>
+                                                        <span className="text-ui-secondary text-[11px]"> / {b.ROLL?.produced || 0}</span>
+                                                    </td>
+
+                                                    {/* Słodkie */}
+                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                        <span className="font-extrabold text-pink-800">{b.SWEET?.sold || 0}</span>
+                                                        <span className="text-ui-secondary text-[11px]"> / {b.SWEET?.produced || 0}</span>
+                                                    </td>
+
+                                                    {/* Słone */}
+                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                        <span className="font-extrabold text-emerald-800">{b.SAVORY?.sold || 0}</span>
+                                                        <span className="text-ui-secondary text-[11px]"> / {b.SAVORY?.produced || 0}</span>
+                                                    </td>
+
+                                                    {/* Razem prod */}
+                                                    <td className="py-3 px-3 text-right font-bold text-ui-black text-sm">
+                                                        {b.totalProduced.toLocaleString("pl-PL")} szt.
+                                                    </td>
+
+                                                    {/* Razem sprz */}
+                                                    <td className="py-3 px-3 text-right font-bold text-emerald-700 text-sm">
+                                                        {b.totalSold.toLocaleString("pl-PL")} szt.
+                                                    </td>
+
+                                                    {/* Skuteczność */}
+                                                    <td className="py-3 px-2.5 text-right font-semibold">
+                                                        <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                            {b.sellThroughRate}%
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Utarg */}
+                                                    <td className="py-3 px-3.5 text-right font-black text-ui-primary text-sm">
+                                                        {formatCurrency(b.totalIncome)}
+                                                    </td>
+
+                                                    {/* Akcja */}
+                                                    <td className="py-3 px-3 text-center">
+                                                        <span className="flex items-center justify-center gap-1 text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-1 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm">
+                                                            {isDays ? "Raport" : "Wyroby"}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="bg-ui-accent/20 font-black text-ui-black border-t-2 border-ui-accent">
+                                            <td className="py-3.5 px-3.5 uppercase text-xs">
+                                                Podsumowanie okresu
+                                            </td>
+                                            <td className="py-3.5 px-2 text-right text-amber-900 font-extrabold">
+                                                {buckets.reduce((acc: number, b: any) => acc + (b.BREAD?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.BREAD?.produced || 0), 0)}
+                                            </td>
+                                            <td className="py-3.5 px-2 text-right text-sky-900 font-extrabold">
+                                                {buckets.reduce((acc: number, b: any) => acc + (b.ROLL?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.ROLL?.produced || 0), 0)}
+                                            </td>
+                                            <td className="py-3.5 px-2 text-right text-pink-900 font-extrabold">
+                                                {buckets.reduce((acc: number, b: any) => acc + (b.SWEET?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.SWEET?.produced || 0), 0)}
+                                            </td>
+                                            <td className="py-3.5 px-2 text-right text-emerald-900 font-extrabold">
+                                                {buckets.reduce((acc: number, b: any) => acc + (b.SAVORY?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.SAVORY?.produced || 0), 0)}
+                                            </td>
+                                            <td className="py-3.5 px-3 text-right text-sm">
+                                                {totalStats.totalProduced.toLocaleString("pl-PL")} szt.
+                                            </td>
+                                            <td className="py-3.5 px-3 text-right text-sm text-emerald-700">
+                                                {totalStats.totalSold.toLocaleString("pl-PL")} szt.
+                                            </td>
+                                            <td className="py-3.5 px-2.5 text-right font-bold text-emerald-800">
+                                                {totalStats.sellThroughRate}%
+                                            </td>
+                                            <td className="py-3.5 px-3.5 text-right text-sm text-ui-primary font-black">
+                                                {formatCurrency(totalStats.totalIncome)}
+                                            </td>
+                                            <td className="py-3.5 px-3 text-center">
+                                                —
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ========================================================= */}
             {/* MODAL 1: FORMULARZ WPROWADZANIA RAPORTU                   */}
             {/* ========================================================= */}
             {isFormModalOpen && (
@@ -1914,668 +1855,592 @@ export default function ProdukcjaPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Formularza */}
-                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between gap-4">
+                        <div className="p-4 sm:p-5 border-b border-ui-accent bg-ui-accent/10 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-xl font-bold text-ui-black flex items-center gap-2">
-                                    <Edit3 size={20} className="text-ui-primary" />
-                                    Raport dzienny: {formatDate(formDate)}
+                                <h2 className="text-base sm:text-lg font-extrabold text-ui-black flex items-center gap-2">
+                                    <FileText size={20} className="text-ui-primary" />
+                                    Wprowadzanie raportu dziennego
                                 </h2>
+                                <p className="text-xs text-ui-secondary">
+                                    Data raportu: <span className="font-bold text-ui-black">{formatDate(formDate)}</span>
+                                </p>
                             </div>
+
                             <div className="flex items-center gap-2">
                                 <button
-                                    type="button"
                                     onClick={handleCopyPreviousDayProduction}
-                                    disabled={isCopyingPrevious || isLoadingFormData}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ui-accent bg-white hover:bg-ui-accent/15 text-ui-black text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                                    title="Kopiuj ilości wyprodukowane z poprzedniego dnia"
+                                    disabled={isCopyingPrevious}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-white text-ui-primary border border-ui-accent hover:bg-ui-accent/30 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                                    title="Wypełnij kolumnę 'Wyprodukowano' ilościami z poprzedniego dnia"
                                 >
                                     {isCopyingPrevious ? (
                                         <Loader2 size={13} className="animate-spin text-ui-primary" />
                                     ) : (
-                                        <Copy size={13} className="text-ui-primary" />
+                                        <Copy size={13} />
                                     )}
-                                    <span>Kopiuj produkcję z wczoraj</span>
+                                    <span>Skopiuj prod. z wczoraj</span>
                                 </button>
+
                                 <button
                                     onClick={() => setIsFormModalOpen(false)}
-                                    className="p-1.5 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer"
+                                    className="p-1.5 hover:bg-ui-accent/20 rounded-full text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
                                 >
-                                    <X size={20} />
+                                    <X size={18} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Zawartość Formularza */}
-                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                            {/* Baner informacyjny */}
-                            {feedbackMessage && (
-                                <div
-                                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs font-semibold ${
-                                        feedbackMessage.type === "success"
-                                            ? "bg-emerald-50 text-emerald-950 border-emerald-300"
-                                            : feedbackMessage.type === "info"
-                                            ? "bg-sky-50 text-sky-950 border-sky-300"
-                                            : "bg-rose-50 text-rose-950 border-rose-300"
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {feedbackMessage.type === "success" ? (
-                                            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                                        ) : feedbackMessage.type === "info" ? (
-                                            <AlertCircle size={16} className="text-sky-600 shrink-0" />
-                                        ) : (
-                                            <AlertTriangle size={16} className="text-rose-600 shrink-0" />
-                                        )}
-                                        <span>{feedbackMessage.text}</span>
-                                    </div>
-                                    <button
-                                        onClick={() => setFeedbackMessage(null)}
-                                        className="text-ui-secondary hover:text-ui-black cursor-pointer"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Panel Utargu Fiskalnego */}
-                            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 bg-emerald-600 text-white rounded-xl">
-                                        <Receipt size={20} />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-sm text-emerald-950">Łączny utarg z kasy fiskalnej</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        placeholder="0.00"
-                                        value={formFiscalIncome}
-                                        onFocus={(e) => e.target.select()}
-                                        onChange={(e) => setFormFiscalIncome(e.target.value.replace(/[^0-9.,]/g, ''))}
-                                        className="w-36 text-right px-3 py-2 bg-white border border-emerald-300 rounded-xl font-black text-emerald-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-2xs"
-                                    />
-                                    <span className="text-xs font-bold text-emerald-900">zł</span>
-                                </div>
+                        {/* Informacja zwrotna */}
+                        {feedbackMessage && (
+                            <div className={`p-3 text-xs font-bold border-b flex items-center gap-2 ${feedbackMessage.type === "success"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : feedbackMessage.type === "error"
+                                    ? "bg-rose-50 text-rose-800 border-rose-200"
+                                    : "bg-sky-50 text-sky-800 border-sky-200"
+                                }`}>
+                                {feedbackMessage.type === "success" && <CheckCircle2 size={16} />}
+                                {feedbackMessage.type === "error" && <AlertCircle size={16} />}
+                                {feedbackMessage.type === "info" && <Info size={16} />}
+                                <span>{feedbackMessage.text}</span>
                             </div>
+                        )}
 
-                            {/* Tabela Produktów */}
+                        {/* Ciało Formularza (Tabela produktów) */}
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                             {isLoadingFormData ? (
-                                <div className="p-12 text-center text-xs text-ui-secondary">
-                                    <Loader2 size={24} className="animate-spin mx-auto text-ui-primary mb-2" />
-                                    Ładowanie listy produktów...
+                                <div className="p-20 flex flex-col items-center justify-center gap-3 text-ui-secondary text-sm">
+                                    <Loader2 size={28} className="animate-spin text-ui-primary" />
+                                    Wczytywanie pozycji wypieków...
                                 </div>
-                            ) : (() => {
-                                let globalRowIndex = 0;
-                                return Object.entries(CATEGORY_MAP).map(([catKey, catInfo]) => {
-                                    const prods = allProducts.filter((p) => p.type === catKey);
-                                    if (prods.length === 0) return null;
-                                    const Icon = catInfo.icon;
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Podział na kategorie w formularzu */}
+                                    {Object.entries(CATEGORY_MAP).map(([catKey, catMeta]) => {
+                                        const catProducts = formOrderedProducts.filter((p) => p.type === catKey);
+                                        if (catProducts.length === 0) return null;
 
-                                    return (
-                                        <div key={catKey} className="border border-ui-accent rounded-2xl overflow-hidden shadow-2xs">
-                                            <div className="p-3 bg-ui-accent/15 border-b border-ui-accent flex items-center justify-between">
-                                                <div className="font-bold text-xs text-ui-black flex items-center gap-2">
-                                                    <Icon size={16} className="text-ui-primary" />
-                                                    {catInfo.label} ({prods.length})
+                                        return (
+                                            <div key={catKey} className="border border-ui-accent rounded-xl overflow-hidden shadow-2xs">
+                                                <div className={`px-4 py-2.5 font-bold text-xs flex items-center justify-between border-b ${catMeta.color}`}>
+                                                    <div className="flex items-center gap-2">
+                                                        {catMeta.icon}
+                                                        <span>{catMeta.label.toUpperCase()} ({catProducts.length})</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-xs border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent">
+                                                                <th className="py-2.5 px-3">Nazwa wyrobu</th>
+                                                                <th className="py-2.5 px-2 text-right">Z wczoraj</th>
+                                                                <th className="py-2.5 px-2 text-right">Wyprodukowano</th>
+                                                                <th className="py-2.5 px-2 text-right">Razem asort.</th>
+                                                                <th className="py-2.5 px-2 text-right">Zostało</th>
+                                                                <th className="py-2.5 px-2 text-right">Sprzedano</th>
+                                                                <th className="py-2.5 px-2 text-center w-28">Godz. wyprzed.</th>
+                                                                <th className="py-2.5 px-2 text-center w-28">Przenieś na jutro</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-ui-accent/20">
+                                                            {catProducts.map((prod) => {
+                                                                const rowIndex = formOrderedProducts.findIndex((p) => p.id === prod.id);
+                                                                const it = formItems[prod.id] || {
+                                                                    bakeryProductId: prod.id,
+                                                                    producedAmount: "",
+                                                                    carriedOverAmount: "",
+                                                                    leftoverAmount: "",
+                                                                    soldAmount: "",
+                                                                    soldOutTime: "",
+                                                                };
+
+                                                                const pVal = parseFloat(String(it.producedAmount || "0").replace(",", ".")) || 0;
+                                                                const cVal = parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0;
+                                                                const totalAssort = pVal + cVal;
+                                                                const leftVal = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
+                                                                const isTransferred = !!transferredProductIds[prod.id];
+                                                                const isTransferring = transferringProductId === prod.id;
+
+                                                                return (
+                                                                    <tr key={prod.id} className="hover:bg-ui-accent/5 transition-colors">
+                                                                        <td className="py-2 px-3 font-semibold text-ui-black">
+                                                                            {prod.name}
+                                                                            <span className="text-[10px] text-ui-secondary font-normal ml-1">
+                                                                                ({formatCurrency(Number(prod.sellingPrice))})
+                                                                            </span>
+                                                                        </td>
+
+                                                                        {/* Z wczoraj */}
+                                                                        <td className="py-2 px-2 text-right">
+                                                                            {cVal > 0 ? (
+                                                                                <span className="font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                                                                                    {cVal}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-ui-secondary/50">—</span>
+                                                                            )}
+                                                                        </td>
+
+                                                                        {/* Wyprodukowano (Input col 0) */}
+                                                                        <td className="py-2 px-2 text-right">
+                                                                            <input
+                                                                                type="text"
+                                                                                inputMode="decimal"
+                                                                                data-row={rowIndex}
+                                                                                data-col="0"
+                                                                                value={it.producedAmount}
+                                                                                onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value)}
+                                                                                onKeyDown={(e) => handleGridKeyDown(e, rowIndex, 0)}
+                                                                                placeholder="0"
+                                                                                className="w-16 sm:w-20 text-right px-2 py-1 bg-white border border-ui-accent rounded-lg text-xs font-bold text-ui-black focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary shadow-2xs"
+                                                                            />
+                                                                        </td>
+
+                                                                        {/* Razem asortyment */}
+                                                                        <td className="py-2 px-2 text-right font-bold text-ui-black">
+                                                                            {totalAssort > 0 ? totalAssort : "—"}
+                                                                        </td>
+
+                                                                        {/* Zostało (Input col 1) */}
+                                                                        <td className="py-2 px-2 text-right">
+                                                                            <input
+                                                                                type="text"
+                                                                                inputMode="decimal"
+                                                                                data-row={rowIndex}
+                                                                                data-col="1"
+                                                                                value={it.leftoverAmount}
+                                                                                onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value)}
+                                                                                onKeyDown={(e) => handleGridKeyDown(e, rowIndex, 1)}
+                                                                                placeholder="0"
+                                                                                className="w-16 sm:w-20 text-right px-2 py-1 bg-white border border-ui-accent rounded-lg text-xs font-bold text-ui-black focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary shadow-2xs"
+                                                                            />
+                                                                        </td>
+
+                                                                        {/* Sprzedano */}
+                                                                        <td className="py-2 px-2 text-right font-black text-emerald-700">
+                                                                            {it.soldAmount ? `${it.soldAmount} szt.` : "—"}
+                                                                        </td>
+
+                                                                        {/* Godzina wyprzedania (Input col 2) */}
+                                                                        <td className="py-2 px-2 text-center">
+                                                                            <input
+                                                                                type="text"
+                                                                                data-row={rowIndex}
+                                                                                data-col="2"
+                                                                                value={it.soldOutTime}
+                                                                                onChange={(e) => handleFormItemChange(prod.id, "soldOutTime", e.target.value)}
+                                                                                onKeyDown={(e) => handleGridKeyDown(e, rowIndex, 2)}
+                                                                                placeholder="np. 14:30"
+                                                                                className="w-20 text-center px-1.5 py-1 bg-white border border-ui-accent rounded-lg text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
+                                                                            />
+                                                                        </td>
+
+                                                                        {/* Przenieś na jutro */}
+                                                                        <td className="py-2 px-2 text-center">
+                                                                            {leftVal > 0 ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={isTransferred || isTransferring}
+                                                                                    onClick={() => handleTransferProductLeftover(prod)}
+                                                                                    className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer ${isTransferred
+                                                                                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default"
+                                                                                        : "bg-sky-50 text-sky-800 border border-sky-300 hover:bg-sky-100 shadow-2xs"
+                                                                                        }`}
+                                                                                >
+                                                                                    {isTransferring ? (
+                                                                                        <Loader2 size={12} className="animate-spin inline mr-1" />
+                                                                                    ) : isTransferred ? (
+                                                                                        <Check size={12} className="inline mr-1" />
+                                                                                    ) : (
+                                                                                        <ArrowRight size={12} className="inline mr-1" />
+                                                                                    )}
+                                                                                    {isTransferred ? "Przeniesiono" : "Przenieś"}
+                                                                                </button>
+                                                                            ) : (
+                                                                                <span className="text-ui-secondary/40 text-[11px]">—</span>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
-                                            <table className="w-full text-left text-xs border-collapse">
-                                                <thead>
-                                                    <tr className="bg-ui-accent/5 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent/30">
-                                                        <th className="p-2.5">Wyrób</th>
-                                                        <th className="p-2.5 text-right w-16">Cena</th>
-                                                        <th className="p-2.5 text-center w-24">Z wczoraj</th>
-                                                        <th className="p-2.5 text-center w-28">Wyprodukowano</th>
-                                                        <th className="p-2.5 text-center w-28">Łączny asortyment</th>
-                                                        <th className="p-2.5 text-center w-24">Zostało (szt.)</th>
-                                                        <th className="p-2.5 text-center w-24">Sprzedano</th>
-                                                        <th className="p-2.5 text-left w-36">Godzina wyprzedania</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-ui-accent/30 font-medium">
-                                                    {prods.map((prod) => {
-                                                        const currentRowIndex = globalRowIndex++;
-                                                        const it = formItems[prod.id] || {
-                                                            bakeryProductId: prod.id,
-                                                            producedAmount: "",
-                                                            carriedOverAmount: "",
-                                                            leftoverAmount: "",
-                                                            soldAmount: "",
-                                                            soldOutTime: "",
-                                                        };
-                                                        const prodAmt = parseFloat(String(it.producedAmount).replace(",", ".")) || 0;
-                                                        const carriedOverAmt = parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0;
-                                                        const totalAssortment = prodAmt + carriedOverAmt;
-                                                        const leftAmt = parseFloat(String(it.leftoverAmount).replace(",", ".")) || 0;
-                                                        const soldAmt = parseFloat(String(it.soldAmount).replace(",", ".")) || 0;
-                                                        const isSoldOut = totalAssortment > 0 && (it.leftoverAmount === "0" || leftAmt === 0);
+                                        );
+                                    })}
 
-                                                        return (
-                                                            <tr key={prod.id} className="hover:bg-ui-accent/5">
-                                                                <td className="p-2.5 font-bold text-ui-black">{prod.name}</td>
-                                                                <td className="p-2.5 text-right text-ui-secondary">{Number(prod.sellingPrice).toFixed(2)} zł</td>
-                                                                <td className="p-2.5 text-center">
-                                                                    <input
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        data-row={currentRowIndex}
-                                                                        data-col="0"
-                                                                        placeholder="0"
-                                                                        value={it.carriedOverAmount}
-                                                                        onFocus={(e) => e.target.select()}
-                                                                        onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 0)}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "carriedOverAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
-                                                                        className="w-16 text-center px-2 py-1 rounded-lg border border-sky-300 bg-sky-50/60 font-bold text-xs text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2.5 text-center">
-                                                                    <input
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        data-row={currentRowIndex}
-                                                                        data-col="1"
-                                                                        placeholder="0"
-                                                                        value={it.producedAmount}
-                                                                        onFocus={(e) => e.target.select()}
-                                                                        onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 1)}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
-                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-ui-accent bg-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-ui-secondary shadow-2xs"
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2.5 text-center">
-                                                                    {totalAssortment > 0 ? (
-                                                                        <span className="inline-block px-2 py-0.5 rounded-lg bg-ui-accent/20 text-ui-black font-extrabold text-xs">
-                                                                            {totalAssortment.toLocaleString("pl-PL")} szt.
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-ui-secondary/40 text-xs">—</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2.5 text-center">
-                                                                    <input
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        data-row={currentRowIndex}
-                                                                        data-col="2"
-                                                                        placeholder="0"
-                                                                        value={it.leftoverAmount}
-                                                                        onFocus={(e) => e.target.select()}
-                                                                        onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 2)}
-                                                                        onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value.replace(/[^0-9.,]/g, ''))}
-                                                                        className="w-20 text-center px-2 py-1 rounded-lg border border-amber-300 bg-amber-50/60 font-bold text-xs text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2.5 text-center">
-                                                                    {totalAssortment > 0 ? (
-                                                                        <span className="inline-block px-2.5 py-1 rounded-lg bg-ui-secondary/5 text-ui-secondary font-black text-xs border border-ui-secondary/20">
-                                                                            {soldAmt.toLocaleString("pl-PL")} szt.
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-ui-secondary/40 text-xs">—</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2.5">
-                                                                    {isSoldOut ? (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <Clock size={13} className="text-ui-primary shrink-0" />
-                                                                            <input
-                                                                                type="time"
-                                                                                data-row={currentRowIndex}
-                                                                                data-col="3"
-                                                                                value={it.soldOutTime}
-                                                                                onKeyDown={(e) => handleGridKeyDown(e, currentRowIndex, 3)}
-                                                                                onChange={(e) => handleFormItemChange(prod.id, "soldOutTime", e.target.value)}
-                                                                                className="px-2 py-0.5 rounded-lg border border-ui-primary bg-ui-primary/10 text-xs font-bold text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary"
-                                                                            />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-[11px] text-ui-secondary/40">—</span>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
+                                    {/* Pole Utargu z Kasy Fiskalnej */}
+                                    <div className="bg-ui-accent/15 border border-ui-accent rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-xs font-black text-ui-black flex items-center gap-1.5">
+                                                <Receipt size={16} className="text-ui-primary" />
+                                                Utarg z kasy fiskalnej (Raport dobowy):
+                                            </div>
+                                            <div className="text-[11px] text-ui-secondary">
+                                                Opcjonalna kwota z raportu fiskalnego na koniec dnia w celu porównania ze sprzedażą wypieków.
+                                            </div>
                                         </div>
-                                    );
-                                });
-                            })()}
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={formFiscalIncome}
+                                                onChange={(e) => setFormFiscalIncome(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-32 px-3 py-1.5 bg-white border border-ui-accent rounded-xl text-sm font-black text-ui-primary text-right focus:outline-none focus:border-ui-primary shadow-2xs"
+                                            />
+                                            <span className="text-xs font-bold text-ui-secondary">zł</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Stopka Formularza */}
-                        <div className="p-4 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between gap-3">
+                        <div className="p-4 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between">
                             <button
+                                type="button"
                                 onClick={() => setIsFormModalOpen(false)}
-                                className="px-4 py-2 rounded-xl border border-ui-accent text-ui-secondary hover:text-ui-primary font-semibold text-xs transition-colors cursor-pointer"
+                                className="px-4 py-2 text-xs font-bold text-ui-secondary hover:text-ui-black border border-ui-accent bg-white rounded-xl transition-colors cursor-pointer"
                             >
                                 Anuluj
                             </button>
-                            <div className="flex items-center gap-2.5">
-                                {(() => {
-                                    const sumLeftovers = Object.values(formItems).reduce((sum, it) => {
-                                        const val = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
-                                        return sum + val;
-                                    }, 0);
 
-                                    if (sumLeftovers <= 0) return null;
-
-                                    return (
-                                        <button
-                                            type="button"
-                                            onClick={handleTransferLeftoversToNextDay}
-                                            disabled={isTransferringLeftovers || isSavingForm}
-                                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-amber-950 transition-all shadow-2xs cursor-pointer"
-                                            title="Zapisuje raport i przenosi niesprzedane wyroby na następny dzień jako stan początkowy"
-                                        >
-                                            {isTransferringLeftovers ? (
-                                                <>
-                                                    <Loader2 size={14} className="animate-spin" />
-                                                    Przenoszenie...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <ArrowRight size={14} />
-                                                    Przenieś na nast. dzień ({sumLeftovers.toLocaleString("pl-PL")} szt.)
-                                                </>
-                                            )}
-                                        </button>
-                                    );
-                                })()}
-                                <button
-                                    onClick={handleSaveReportForm}
-                                    disabled={isSavingForm || isLoadingFormData}
-                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer ${formSaveSuccess ? "bg-emerald-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                        }`}
-                                >
-                                    {isSavingForm ? (
-                                        <>
-                                            <Loader2 size={14} className="animate-spin" />
-                                            Zapisywanie...
-                                        </>
-                                    ) : formSaveSuccess ? (
-                                        <>
-                                            <Check size={14} />
-                                            Zapisano pomyślnie!
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle2 size={14} />
-                                            Zapisz raport dzienny
-                                        </>
-                                    )}
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                disabled={isSavingForm}
+                                onClick={handleSaveReportForm}
+                                className="flex items-center gap-2 px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-ui-primary hover:bg-ui-secondary rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                            >
+                                {isSavingForm ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Zapisywanie raportu...
+                                    </>
+                                ) : formSaveSuccess ? (
+                                    <>
+                                        <Check size={16} />
+                                        Zapisano pomyślnie!
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 size={16} />
+                                        Zapisz raport dzienny
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* ========================================================= */}
-            {/* MODAL 2: SUGEROWANY PLAN PRODUKCJI NA DANY DZIEŃ         */}
+            {/* MODAL 2: SUGEROWANY PLAN PRODUKCJI                       */}
             {/* ========================================================= */}
             {isPlanModalOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
                     onClick={() => setIsPlanModalOpen(false)}
                 >
                     <div
-                        className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden border border-ui-accent max-h-[92vh] flex flex-col"
+                        className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[90vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Nagłówek Modala Planu */}
-                        <div className="p-6 border-b border-ui-accent  flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <div className="flex items-center gap-2.5">
-                                    <div className="bg-ui-accent/20 p-2.5 rounded-xl text-ui-primary">
-                                        <FileText size={24} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-extrabold text-ui-black tracking-tight">
-                                            Sugerowany plan produkcji
-                                        </h2>
-                                    </div>
+                        <div className="p-4 sm:p-5 border-b border-ui-accent bg-amber-500/10 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Sparkles size={22} className="text-amber-600" />
+                                <div>
+                                    <h2 className="text-base sm:text-lg font-extrabold text-ui-black">
+                                        Sugerowany Plan Produkcji
+                                    </h2>
+                                    <p className="text-xs text-ui-secondary">
+                                        Plan na dzień: <strong className="text-ui-black">{formatDate(planDate)}</strong> ({planData?.dayName || "—"})
+                                    </p>
                                 </div>
                             </div>
+                            <button
+                                onClick={() => setIsPlanModalOpen(false)}
+                                className="p-1.5 hover:bg-amber-100 rounded-full text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
 
-                            {/* Selektor daty dla planu */}
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center bg-white border border-ui-accent rounded-xl shadow-xs p-1">
-                                    <button
-                                        onClick={() => {
-                                            setPlanDate(todayStr);
-                                            fetchProductionPlan(todayStr);
-                                        }}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${planDate === todayStr ? "bg-ui-primary text-white" : "text-ui-secondary hover:text-ui-black"
-                                            }`}
-                                    >
-                                        Dziś
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setPlanDate(tomorrowStr);
-                                            fetchProductionPlan(tomorrowStr);
-                                        }}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${planDate === tomorrowStr ? "bg-ui-primary text-white" : "text-ui-secondary hover:text-ui-black"
-                                            }`}
-                                    >
-                                        Jutro
-                                    </button>
-                                    <input
-                                        type="date"
-                                        value={planDate}
-                                        onChange={(e) => {
-                                            const newD = e.target.value;
-                                            if (newD) {
-                                                setPlanDate(newD);
-                                                fetchProductionPlan(newD);
-                                            }
-                                        }}
-                                        className="text-xs font-bold px-2.5 py-1 rounded-lg text-ui-primary bg-transparent"
-                                    />
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                            {isLoadingPlan ? (
+                                <div className="p-16 flex flex-col items-center justify-center gap-3 text-ui-secondary text-sm">
+                                    <Loader2 size={28} className="animate-spin text-amber-600" />
+                                    Generowanie rekomendacji produkcyjnych...
                                 </div>
+                            ) : planData ? (
+                                <div className="space-y-4">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <div className="font-extrabold text-sm">
+                                                Łącznie rekomendowana produkcja: {planData.totals?.totalUnits || 0} szt.
+                                            </div>
+                                            <div className="text-[11px] text-amber-900/80">
+                                                Szacowany utarg: <strong>{formatCurrency(planData.totals?.estimatedRevenue || 0)}</strong> (analiza z {planData.historicalDaysCount} poprzednich takich samych dni tygodnia)
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handleCopyPlanToClipboard}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-amber-900 border border-amber-300 hover:bg-amber-100 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                            >
+                                                {isPlanCopied ? <CheckCheck size={14} className="text-emerald-700" /> : <Copy size={14} />}
+                                                <span>{isPlanCopied ? "Skopiowano!" : "Kopiuj listę"}</span>
+                                            </button>
+                                            <button
+                                                onClick={handleApplyPlanToReport}
+                                                className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                            >
+                                                <Plus size={14} />
+                                                <span>Wypełnij raport</span>
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                <button
-                                    onClick={() => setIsPlanModalOpen(false)}
-                                    className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-secondary hover:text-ui-black cursor-pointer"
-                                >
-                                    <X size={20} />
-                                </button>
+                                    {/* Lista sugerowanych wyrobów */}
+                                    <div className="space-y-3">
+                                        {planData.suggestions?.map((sug) => (
+                                            <div
+                                                key={sug.id}
+                                                className="p-3 rounded-xl border border-ui-accent bg-white hover:border-amber-400 transition-all shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                            >
+                                                <div>
+                                                    <div className="font-extrabold text-sm text-ui-black flex items-center gap-2">
+                                                        <span>{sug.name}</span>
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-ui-accent/20 text-ui-primary border border-ui-accent/40">
+                                                            {PRODUCT_TYPE_LABELS[sug.type] || sug.type}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-ui-secondary mt-0.5">
+                                                        {sug.explanation}
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-right shrink-0">
+                                                    <div className="text-base font-black text-amber-800">
+                                                        {sug.suggestedAmount} <span className="text-xs font-bold">szt.</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-ui-secondary">
+                                                        Wartość: {formatCurrency(sug.suggestedAmount * sug.sellingPrice)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 3: PODGLĄD WYROBÓW DLA DANEGO OKRESU               */}
+            {/* ========================================================= */}
+            {periodPreviewModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setPeriodPreviewModal(null)}
+                >
+                    <div
+                        className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[85vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-4 sm:p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-base sm:text-lg font-extrabold text-ui-black">
+                                    {periodPreviewModal.title}
+                                </h2>
+                                <p className="text-xs text-ui-secondary">
+                                    {periodPreviewModal.subtitle}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setPeriodPreviewModal(null)}
+                                className="p-1.5 hover:bg-ui-accent/20 rounded-full text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 bg-ui-accent/5 border-b border-ui-accent grid grid-cols-3 gap-2 text-center text-xs">
+                            <div className="bg-white p-2.5 rounded-xl border border-ui-accent">
+                                <div className="text-ui-secondary font-medium text-[10px]">Wyprodukowano</div>
+                                <div className="font-extrabold text-ui-black text-sm">{periodPreviewModal.totalProduced} szt.</div>
+                            </div>
+                            <div className="bg-white p-2.5 rounded-xl border border-ui-accent">
+                                <div className="text-ui-secondary font-medium text-[10px]">Sprzedano</div>
+                                <div className="font-extrabold text-emerald-700 text-sm">{periodPreviewModal.totalSold} szt.</div>
+                            </div>
+                            <div className="bg-white p-2.5 rounded-xl border border-ui-accent">
+                                <div className="text-ui-secondary font-medium text-[10px]">Łączny Utarg</div>
+                                <div className="font-black text-ui-primary text-sm">{formatCurrency(periodPreviewModal.bakeryIncome)}</div>
                             </div>
                         </div>
 
-                        {/* Zawartość Modala Planu */}
-                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                            {isLoadingPlan ? (
-                                <div className="p-20 text-center text-ui-secondary text-sm">
-                                    <Loader2 size={32} className="animate-spin mx-auto text-ui-primary mb-3" />
-                                    <div className="font-bold text-ui-black text-base">Wyliczanie optymalnego planu wypieków...</div>
-                                    <div className="text-xs text-ui-secondary mt-1">
-                                        Analiza historii 4 tygodni, korygowanie utraconego popytu i detekcja anomalii utargu
-                                    </div>
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                            {periodPreviewModal.products.length === 0 ? (
+                                <div className="p-12 text-center text-ui-secondary text-sm">
+                                    Brak szczegółowych danych pozycji wyrobów dla tego okresu.
                                 </div>
-                            ) : planData?.isClosed ? (
-                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center space-y-3">
-                                    <AlertCircle size={36} className="text-amber-600 mx-auto" />
-                                    <h3 className="text-lg font-bold text-amber-950">
-                                        {planData.dayName}, {formatDate(planData.targetDate)}: Piekarnia nieczynna
-                                    </h3>
-                                    <p className="text-xs text-amber-800 max-w-md mx-auto">
-                                        W niedziele piekarnia nie prowadzi wypieków ani sprzedaży. Wybierz inny dzień tygodnia (Poniedziałek – Sobota).
+                            ) : (
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent">
+                                            <th className="py-2.5 px-3">Wyrób</th>
+                                            <th className="py-2.5 px-2">Kategoria</th>
+                                            <th className="py-2.5 px-2 text-right">Wyprodukowano</th>
+                                            <th className="py-2.5 px-2 text-right">Sprzedano</th>
+                                            <th className="py-2.5 px-2 text-right">Niesprzedane</th>
+                                            <th className="py-2.5 px-3 text-right">Utarg</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-ui-accent/20">
+                                        {periodPreviewModal.products.map((p: any) => (
+                                            <tr key={p.id || p.productId || p.name} className="hover:bg-ui-accent/5">
+                                                <td className="py-2.5 px-3 font-bold text-ui-black">
+                                                    {p.name || p.productName}
+                                                </td>
+                                                <td className="py-2.5 px-2">
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-ui-accent/20 text-ui-primary">
+                                                        {PRODUCT_TYPE_LABELS[p.type as ProductType] || p.type}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2.5 px-2 text-right font-medium text-ui-black">
+                                                    {p.produced || p.producedAmount} szt.
+                                                </td>
+                                                <td className="py-2.5 px-2 text-right font-bold text-emerald-700">
+                                                    {p.sold || p.soldAmount} szt.
+                                                </td>
+                                                <td className="py-2.5 px-2 text-right font-bold text-rose-700">
+                                                    {p.unsold !== undefined ? p.unsold : Math.max(0, (p.produced || p.producedAmount || 0) - (p.sold || p.soldAmount || 0))} szt.
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right font-black text-ui-primary">
+                                                    {formatCurrency(p.income || p.salesIncome || 0)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 4: OZNACZANIE DNIA ZAMKNIĘTEGO                      */}
+            {/* ========================================================= */}
+            {closedDayModal && closedDayModal.isOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setClosedDayModal(null)}
+                >
+                    <div
+                        className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-ui-accent flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-ui-accent bg-slate-100/70 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <DoorClosed size={20} className="text-slate-700" />
+                                <div>
+                                    <h2 className="text-base font-extrabold text-ui-black">
+                                        {closedDayModal.isClosed ? "Oznacz dzień jako zamknięty" : "Przywróć dzień roboczy"}
+                                    </h2>
+                                    <p className="text-xs text-ui-secondary">
+                                        Data: <span className="font-bold text-ui-black">{formatDate(closedDayModal.date)}</span>
                                     </p>
                                 </div>
-                            ) : planData ? (
+                            </div>
+                            <button
+                                onClick={() => setClosedDayModal(null)}
+                                className="p-1.5 hover:bg-slate-200 rounded-full text-ui-secondary hover:text-ui-black transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            {closedDayModal.isClosed ? (
                                 <>
-                                    {/* 1. KARTY KPI PLANU */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
-                                        {/* Szacowany utarg */}
-                                        <div className=" bg-white border border-ui-accent rounded-2xl p-4 flex flex-col justify-between shadow-2xs">
-                                            <div className="text-[11px] uppercase font-bold text-ui-secondary flex items-center justify-between">
-                                                <span className="flex items-center gap-1.5">
-                                                    <Receipt size={16} /> Szacowany utarg
-                                                </span>
-
-                                            </div>
-                                            <div className="mt-2 text-3xl font-black text-ui-primary tracking-tight">
-                                                {formatCurrency(planData.totals?.estimatedRevenue || 0)}
-                                            </div>
-
-                                        </div>
-
-                                        {/* Szacowany koszt i marża */}
-                                        <div className="bg-white border border-ui-accent rounded-2xl p-4 flex flex-col justify-between shadow-2xs">
-                                            <div className="text-[11px] uppercase font-bold text-ui-secondary flex items-center justify-between">
-                                                <span className="flex items-center gap-1.5">
-                                                    <Coins size={16} /> Koszt surowcowy / Marża
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 text-3xl font-black text-ui-primary tracking-tight">
-                                                {formatCurrency(planData.totals?.estimatedProfit || 0)}
-                                            </div>
-                                        </div>
-
-                                        {/* Jakość danych historycznych */}
-                                        <div className="bg-white border border-ui-accent rounded-2xl p-4 flex flex-col justify-between shadow-2xs">
-                                            <div className="text-[11px] uppercase font-bold text-ui-secondary flex items-center justify-between">
-                                                <span className="flex items-center gap-1.5">
-                                                    <CheckCheck size={16} /> Jakość prognozy
-                                                </span>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${planData.dataQuality?.hasFullHistory ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                                                    }`}>
-                                                    {planData.dataQuality?.availableWeeksCount || 0}/4 tyg.
-                                                </span>
-                                            </div>
-
-
-                                        </div>
+                                    <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-950 leading-relaxed">
+                                        <p>
+                                            W oznaczony dzień piekarnia jest nieczynna (np. z powodu remontu lub święta). Dzień ten <strong>nie będzie traktowany jako brakujący raport</strong> w podsumowaniach miesięcznych.
+                                        </p>
                                     </div>
 
-                                    {/* 2. OSTRZEŻENIA / ALERTY O JAKOŚCI DANYCH I ANOMALIACH */}
-                                    {planData.dataQuality?.warningMessage && (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-3">
-                                            <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
-                                            <div className="text-xs text-amber-900 leading-relaxed">
-                                                <strong>Uwaga dotycząca bazy danych:</strong> {planData.dataQuality.warningMessage}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {planData.dataQuality?.anomalies && planData.dataQuality.anomalies.length > 0 && (
-                                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 space-y-2">
-                                            <div className="text-xs font-bold text-rose-950 flex items-center gap-2">
-                                                <Flame size={16} className="text-rose-600" />
-                                                Wykryto anomalie utargu w dniach historycznych (automatycznie obniżono ich wagi o 50%):
-                                            </div>
-                                            <div className="space-y-1 pl-6 text-xs text-rose-800">
-                                                {planData.dataQuality.anomalies.map((a, idx) => (
-                                                    <div key={idx}>
-                                                        • <strong>{a.weekLabel} ({formatDate(a.date)}):</strong> {a.reason}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-
-                                    {/* 4. FILTRY I WYSZUKIWARKA PRODUKTÓW W PLANIE */}
-                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                                        <div className="flex items-center gap-1 text-xs">
-                                            {[
-                                                { id: "ALL", label: "Wszystkie" },
-                                                { id: "BREAD", label: "Chleby" },
-                                                { id: "ROLL", label: "Bułki" },
-                                                { id: "SWEET", label: "Słodkie" },
-                                                { id: "SAVORY", label: "Słone" },
-                                            ].map((c) => (
+                                    <div>
+                                        <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                            Szybki powód zamknięcia:
+                                        </label>
+                                        <div className="flex flex-wrap gap-1.5 mb-3">
+                                            {["Remont piekarni", "Święto ustawowe", "Przerwa techniczna", "Dzień wolny"].map((reasonPreset) => (
                                                 <button
-                                                    key={c.id}
-                                                    onClick={() => setPlanCategoryFilter(c.id)}
-                                                    className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${planCategoryFilter === c.id
-                                                        ? "bg-ui-primary text-white shadow-xs"
-                                                        : "text-ui-secondary hover:bg-ui-accent/15"
+                                                    key={reasonPreset}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setClosedDayModal((prev) => (prev ? { ...prev, reason: reasonPreset } : null))
+                                                    }
+                                                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${closedDayModal.reason === reasonPreset
+                                                        ? "bg-slate-800 text-white border-slate-800 shadow-2xs"
+                                                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                                                         }`}
                                                 >
-                                                    {c.label}
+                                                    {reasonPreset}
                                                 </button>
                                             ))}
                                         </div>
 
-                                        <div className="relative">
-                                            <Search size={14} className="absolute left-3 top-2.5 text-ui-secondary" />
-                                            <input
-                                                type="text"
-                                                placeholder="Szukaj wyrobu..."
-                                                value={planSearch}
-                                                onChange={(e) => setPlanSearch(e.target.value)}
-                                                className="text-xs pl-8 pr-3 py-1.5 rounded-xl border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-secondary w-48 sm:w-64"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* 5. TABELA SUGEROWANEGO PLANU PRODUKCJI */}
-                                    <div className="border border-ui-accent rounded-2xl overflow-hidden shadow-2xs">
-                                        <table className="w-full text-left text-xs border-collapse">
-                                            <thead>
-                                                <tr className="bg-ui-accent/15 text-ui-secondary font-bold text-[10px] uppercase border-b border-ui-accent">
-                                                    <th className="p-3">Wyrób</th>
-                                                    <th className="p-3">Kategoria</th>
-                                                    <th className="p-3 text-right">Cena</th>
-                                                    <th className="p-3 text-right ">
-                                                        Sugerowana produkcja
-                                                    </th>
-                                                    <th className="p-3 text-right">Szacowany utarg</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-ui-accent/30 font-medium">
-                                                {filteredPlanSuggestions.map((prod) => {
-                                                    const isExpanded = !!expandedPlanProducts[prod.id];
-                                                    const cat = CATEGORY_MAP[prod.type];
-                                                    const prodRevenue = prod.suggestedAmount * prod.sellingPrice;
-
-                                                    return (
-                                                        <React.Fragment key={prod.id}>
-                                                            <tr
-                                                                onClick={() => togglePlanProduct(prod.id)}
-                                                                className={`hover:bg-ui-accent/5 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
-                                                                    }`}
-                                                            >
-                                                                <td className="p-3 font-bold text-ui-black text-sm">
-                                                                    {prod.name}
-                                                                </td>
-                                                                <td className="p-3">
-                                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-ui-accent/15 text-ui-primary">
-                                                                        {cat?.label || prod.type}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="p-3 text-right text-ui-secondary">
-                                                                    {prod.sellingPrice.toFixed(2)} zł
-                                                                </td>
-                                                                <td className="p-3 text-right">
-                                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-950 font-black text-sm rounded-xl border border-emerald-300">
-                                                                        {prod.suggestedAmount} szt.
-                                                                    </span>
-                                                                </td>
-                                                                <td className="p-3 text-right font-black text-ui-primary text-sm">
-                                                                    {formatCurrency(prodRevenue)}
-                                                                </td>
-                                                                <td className="p-3 text-center">
-                                                                    <div className="inline-flex items-center gap-1 text-[11px] font-bold text-ui-secondary">
-                                                                        <span>{prod.rawDemand.toFixed(1)}</span>
-                                                                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-
-                                                            {/* ROZWINIĘCIE SZCZEGÓŁÓW KALKULACJI DLA PRODUKTU */}
-                                                            {isExpanded && (
-                                                                <tr className="bg-ui-accent/5">
-                                                                    <td colSpan={6} className="p-4 border-b border-ui-accent/30">
-                                                                        <div className="space-y-2">
-                                                                            <div className="text-[11px] font-bold text-ui-secondary uppercase flex items-center justify-between">
-                                                                                <span>Szczegóły kalkulacji popytu dla: {prod.name}</span>
-                                                                                <span className="text-ui-primary font-bold">
-                                                                                    Średnia ważona: {prod.rawDemand} → Zaokrąglono do: {prod.suggestedAmount} szt.
-                                                                                </span>
-                                                                            </div>
-
-                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                                                                                {prod.history.map((hItem) => (
-                                                                                    <div
-                                                                                        key={hItem.weekLabel}
-                                                                                        className={`p-3 rounded-xl border text-xs bg-white ${hItem.unmetMultiplier > 1
-                                                                                            ? "border-emerald-300 bg-emerald-50/20"
-                                                                                            : "border-ui-accent/50"
-                                                                                            }`}
-                                                                                    >
-                                                                                        <div className="flex items-center justify-between font-bold text-ui-primary">
-                                                                                            <span>{hItem.weekLabel} ({formatDate(hItem.dateStr)})</span>
-                                                                                            <span className="text-[10px] text-ui-secondary">
-                                                                                                waga: {(hItem.weight * 100).toFixed(0)}%
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div className="mt-1 text-[11px] space-y-0.5">
-                                                                                            <div className="flex justify-between">
-                                                                                                <span className="text-ui-secondary">Sprzedano:</span>
-                                                                                                <strong>{hItem.soldAmount} szt.</strong>
-                                                                                            </div>
-                                                                                            <div className="flex justify-between">
-                                                                                                <span className="text-ui-secondary">Wyprzedano o:</span>
-                                                                                                <strong>{hItem.soldOutTime || "— (zostały)"}</strong>
-                                                                                            </div>
-                                                                                            {hItem.unmetMultiplier > 1 && (
-                                                                                                <div className="flex justify-between text-emerald-800 font-bold">
-                                                                                                    <span>Korekta popytu:</span>
-                                                                                                    <span>+{Math.round((hItem.unmetMultiplier - 1) * 100)}%</span>
-                                                                                                </div>
-                                                                                            )}
-                                                                                            <div className="flex justify-between border-t border-ui-accent/30 pt-1 font-bold">
-                                                                                                <span>Popyt skorygowany:</span>
-                                                                                                <span>{hItem.adjustedDemand} szt.</span>
-                                                                                            </div>
-                                                                                            <div className="flex justify-between text-[10px] text-ui-secondary">
-                                                                                                <span>Wkład do planu:</span>
-                                                                                                <span>+{hItem.contribution} szt.</span>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            )}
-                                                        </React.Fragment>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                        <label className="block text-xs font-bold text-ui-secondary uppercase mb-1.5">
+                                            Własny powód / notatka:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={closedDayModal.reason}
+                                            onChange={(e) =>
+                                                setClosedDayModal((prev) => (prev ? { ...prev, reason: e.target.value } : null))
+                                            }
+                                            placeholder="np. Remont pieca"
+                                            className="w-full bg-white border border-ui-accent rounded-xl px-3.5 py-2 text-sm text-ui-black font-medium focus:outline-none focus:border-slate-800 shadow-2xs"
+                                        />
                                     </div>
                                 </>
-                            ) : null}
-                        </div>
+                            ) : (
+                                <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 text-xs text-blue-950 leading-relaxed">
+                                    <p>
+                                        Piekarnia zostanie oznaczona jako <strong>czynna</strong> w dniu {formatDate(closedDayModal.date)}. Wymagany będzie standardowy raport produkcji/sprzedaży.
+                                    </p>
+                                </div>
+                            )}
 
-                        {/* Stopka Modala Planu */}
-                        <div className="p-5 border-t border-ui-accent bg-ui-accent/10 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-ui-accent">
                                 <button
-                                    onClick={handleCopyPlanToClipboard}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-ui-accent bg-white text-ui-primary hover:bg-ui-accent/20 font-bold text-xs transition-colors cursor-pointer"
+                                    type="button"
+                                    onClick={() => setClosedDayModal(null)}
+                                    className="px-4 py-2 text-xs font-bold text-ui-secondary hover:text-ui-black border border-ui-accent rounded-xl transition-colors cursor-pointer"
                                 >
-                                    {isPlanCopied ? (
-                                        <>
-                                            <Check size={14} className="text-emerald-600" />
-                                            Skopiowano do schowka!
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Copy size={14} />
-                                            Kopiuj listę planu
-                                        </>
-                                    )}
+                                    Anuluj
                                 </button>
-                            </div>
-
-                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setIsPlanModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl border border-ui-accent text-ui-secondary hover:text-ui-primary font-semibold text-xs transition-colors cursor-pointer"
+                                    type="button"
+                                    disabled={closedDayModal.isSaving}
+                                    onClick={() =>
+                                        handleSaveClosedDay(
+                                            closedDayModal.date,
+                                            closedDayModal.isClosed,
+                                            closedDayModal.reason
+                                        )
+                                    }
+                                    className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-black rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"
                                 >
-                                    Zamknij
+                                    {closedDayModal.isSaving && <Loader2 size={13} className="animate-spin" />}
+                                    {closedDayModal.isClosed ? "Zatwierdź zamknięcie dnia" : "Przywróć jako dzień otwarty"}
                                 </button>
-
-                                {planData && !planData.isClosed && (
-                                    <button
-                                        onClick={handleApplyPlanToReport}
-                                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all cursor-pointer"
-                                    >
-                                        <ArrowRight size={15} />
-                                        Wprowadź plan do raportu dziennego
-                                    </button>
-                                )}
                             </div>
                         </div>
                     </div>

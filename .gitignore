@@ -43,4 +43,5 @@ next-env.d.ts
 /creds/
 
 # Backups
+/sql-backups/*
 *.sql

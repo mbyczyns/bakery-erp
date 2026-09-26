@@ -1,9 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User, Sliders, Save, ShieldCheck, Droplet, Loader2, CheckCircle2 } from "lucide-react";
+import { User, Sliders, Save, ShieldCheck, Droplet, Loader2, CheckCircle2, Coins, Clock, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ZespolSection from "@/components/ZespolSection";
+import { PRICE_ROUNDING_OPTIONS, PriceRoundingOption } from "@/lib/price-rounding";
+import {
+    DEFAULT_OPENING_HOURS,
+    WeekdayKey,
+    WEEKDAY_KEYS,
+    WEEKDAY_LABELS,
+    DayOpeningHours,
+} from "@/lib/settings-types";
 
 export default function KonfiguracjaPage() {
     const { user } = useAuth();
@@ -15,6 +23,18 @@ export default function KonfiguracjaPage() {
     const [isSavingWater, setIsSavingWater] = useState<boolean>(false);
     const [waterSaveSuccess, setWaterSaveSuccess] = useState<boolean>(false);
 
+    // Stan konfiguracji zaokrąglania cen
+    const [priceRounding, setPriceRounding] = useState<PriceRoundingOption>("none");
+    const [isLoadingRounding, setIsLoadingRounding] = useState<boolean>(true);
+    const [isSavingRounding, setIsSavingRounding] = useState<boolean>(false);
+    const [roundingSaveSuccess, setRoundingSaveSuccess] = useState<boolean>(false);
+
+    // Stan konfiguracji godzin otwarcia piekarni
+    const [openingHours, setOpeningHours] = useState<Record<WeekdayKey, DayOpeningHours>>(DEFAULT_OPENING_HOURS);
+    const [isLoadingOpeningHours, setIsLoadingOpeningHours] = useState<boolean>(true);
+    const [isSavingOpeningHours, setIsSavingOpeningHours] = useState<boolean>(false);
+    const [openingHoursSaveSuccess, setOpeningHoursSaveSuccess] = useState<boolean>(false);
+
     useEffect(() => {
         const fetchConfig = async () => {
             try {
@@ -24,11 +44,19 @@ export default function KonfiguracjaPage() {
                     if (data.waterPricePerLiter !== undefined) {
                         setWaterPrice(String(data.waterPricePerLiter));
                     }
+                    if (data.priceRounding !== undefined) {
+                        setPriceRounding(data.priceRounding as PriceRoundingOption);
+                    }
+                    if (data.openingHours) {
+                        setOpeningHours(data.openingHours);
+                    }
                 }
             } catch (err) {
                 console.error("Błąd pobierania konfiguracji:", err);
             } finally {
                 setIsLoadingWater(false);
+                setIsLoadingRounding(false);
+                setIsLoadingOpeningHours(false);
             }
         };
 
@@ -67,6 +95,83 @@ export default function KonfiguracjaPage() {
         }
     };
 
+    const handleSavePriceRounding = async (selectedOption: PriceRoundingOption) => {
+        setPriceRounding(selectedOption);
+        setIsSavingRounding(true);
+        setRoundingSaveSuccess(false);
+        try {
+            const res = await fetch("/api/konfiguracja", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ priceRounding: selectedOption }),
+            });
+
+            if (res.ok) {
+                setRoundingSaveSuccess(true);
+                setTimeout(() => setRoundingSaveSuccess(false), 3000);
+            } else {
+                const data = await res.json();
+                alert(`Błąd zapisu zaokrąglenia cen: ${data.error || "Nie udało się zapisać"}`);
+            }
+        } catch (err) {
+            console.error("Błąd zapisu zaokrąglenia cen:", err);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            setIsSavingRounding(false);
+        }
+    };
+
+    const handleOpeningHourChange = (
+        day: WeekdayKey,
+        field: keyof DayOpeningHours,
+        value: boolean | string
+    ) => {
+        setOpeningHours((prev) => ({
+            ...prev,
+            [day]: {
+                ...prev[day],
+                [field]: value,
+            },
+        }));
+    };
+
+    const handleSaveOpeningHours = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSavingOpeningHours(true);
+        setOpeningHoursSaveSuccess(false);
+        try {
+            const res = await fetch("/api/konfiguracja", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ openingHours }),
+            });
+
+            if (res.ok) {
+                setOpeningHoursSaveSuccess(true);
+                setTimeout(() => setOpeningHoursSaveSuccess(false), 3500);
+            } else {
+                const data = await res.json();
+                alert(`Błąd zapisu: ${data.error || "Nie udało się zapisać godzin otwarcia"}`);
+            }
+        } catch (err) {
+            console.error("Błąd zapisu godzin otwarcia:", err);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            setIsSavingOpeningHours(false);
+        }
+    };
+
+    const handleApplyWeekdayPreset = (openTime: string, closeTime: string) => {
+        setOpeningHours((prev) => ({
+            ...prev,
+            monday: { ...prev.monday, isOpen: true, openTime, closeTime },
+            tuesday: { ...prev.tuesday, isOpen: true, openTime, closeTime },
+            wednesday: { ...prev.wednesday, isOpen: true, openTime, closeTime },
+            thursday: { ...prev.thursday, isOpen: true, openTime, closeTime },
+            friday: { ...prev.friday, isOpen: true, openTime, closeTime },
+        }));
+    };
+
     return (
         <div className="min-h-screen bg-ui-white text-ui-primary pb-20 relative">
 
@@ -80,7 +185,79 @@ export default function KonfiguracjaPage() {
             {/* Kontener na sekcje ustawień */}
             <div className="space-y-6 w-full">
 
-                {/* SEKCJA 1: Stawka wody i surowce specjalne */}
+                {/* SEKCJA 1: Zaokrąglanie cen sprzedaży */}
+                <div className="bg-ui-white rounded-2xl p-4 sm:p-6 shadow-xs border border-ui-accent hover:border-ui-secondary transition-all duration-300">
+                    <div className="flex items-center justify-between mb-4 sm:mb-6 border-b border-ui-accent/30 pb-3">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-50 p-2 rounded-lg text-ui-secondary">
+                                <Coins size={20} />
+                            </div>
+                            <div>
+                                <h2 className="text-lg sm:text-xl font-bold text-ui-black">Zaokrąglanie cen sprzedaży</h2>
+                            </div>
+                        </div>
+
+                        {roundingSaveSuccess && (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 animate-fade-in">
+                                <CheckCircle2 size={15} />
+                                Zapisano ustawienie!
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-blue-50/50 border border-blue-200/70 rounded-xl p-4 text-xs text-blue-950 leading-relaxed">
+                            <p>
+                                Wybrana opcja zaokrąglenia cen jest stosowana w całym systemie (w kalkulatorze cen w przepisach) oraz <strong>determinuje powiadomienia o podwyżkach surowców</strong>. Sugestie wzrostu cen wyrobów pojawią się tylko wtedy, gdy wzrost kosztu produkcji wymusza podwyżkę ceny sprzedaży o co najmniej wybraną kwotę zaokrąglenia.
+                            </p>
+                        </div>
+
+                        {/* Siatka wyboru reguły zaokrąglenia */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 pt-1">
+                            {PRICE_ROUNDING_OPTIONS.map((opt) => {
+                                const isSelected = priceRounding === opt.id;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        disabled={isSavingRounding || isLoadingRounding}
+                                        onClick={() => handleSavePriceRounding(opt.id)}
+                                        className={`relative p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer group ${isSelected
+                                            ? "bg-amber-50/80 border-amber-500 shadow-sm ring-1 ring-amber-500"
+                                            : "bg-ui-white border-ui-accent hover:border-amber-400/80 hover:bg-amber-50/20"
+                                            }`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`text-sm font-bold ${isSelected ? "text-amber-950" : "text-ui-black"}`}>
+                                                    {opt.label}
+                                                </span>
+                                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${isSelected
+                                                    ? "border-amber-600 bg-amber-600"
+                                                    : "border-ui-accent bg-white group-hover:border-amber-400"
+                                                    }`}>
+                                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] text-ui-secondary leading-snug mb-3">
+                                                {opt.description}
+                                            </p>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-ui-accent/40 flex items-center justify-between text-[11px]">
+                                            <span className="text-ui-secondary font-medium">Przykład:</span>
+                                            <span className="font-bold text-ui-black bg-white px-2 py-0.5 rounded border border-ui-accent/60">
+                                                {opt.example}
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* SEKCJA 2: Stawka wody i surowce specjalne */}
                 <div className="bg-ui-white rounded-2xl p-4 sm:p-6 shadow-xs border border-ui-accent hover:border-ui-secondary transition-all duration-300">
                     <div className="flex items-center gap-3 mb-4 sm:mb-6 border-b border-ui-accent/30 pb-3">
                         <div className="bg-blue-50 p-2 rounded-lg text-ui-secondary">
@@ -88,7 +265,6 @@ export default function KonfiguracjaPage() {
                         </div>
                         <div>
                             <h2 className="text-lg sm:text-xl font-bold text-ui-black">Koszt wody</h2>
-
                         </div>
                     </div>
 
@@ -145,6 +321,115 @@ export default function KonfiguracjaPage() {
                                     <>
                                         <Save size={14} />
                                         Zapisz cenę wody
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {/* SEKCJA: Godziny otwarcia piekarni */}
+                <div className="bg-ui-white rounded-2xl p-4 sm:p-6 shadow-xs border border-ui-accent hover:border-ui-secondary transition-all duration-300">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6 border-b border-ui-accent/30 pb-3">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-50 p-2 rounded-lg text-ui-secondary">
+                                <Clock size={20} />
+                            </div>
+                            <div>
+                                <h2 className="text-lg sm:text-xl font-bold text-ui-black">Godziny otwarcia piekarni</h2>
+                            </div>
+                        </div>
+
+                        {openingHoursSaveSuccess && (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 animate-fade-in">
+                                <CheckCircle2 size={15} />
+                                Zapisano godziny otwarcia!
+                            </span>
+                        )}
+                    </div>
+
+                    <form onSubmit={handleSaveOpeningHours} className="space-y-5">
+
+                        {/* Tabela / Lista dni tygodnia */}
+                        <div className="border border-ui-accent rounded-xl overflow-hidden divide-y divide-ui-accent/40">
+                            {WEEKDAY_KEYS.map((key) => {
+                                const config = openingHours[key] || DEFAULT_OPENING_HOURS[key];
+                                const label = WEEKDAY_LABELS[key];
+                                const isSunday = key === "sunday";
+                                const isSaturday = key === "saturday";
+
+                                return (
+                                    <div
+                                        key={key}
+                                        className={`p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${config.isOpen ? "bg-white" : "bg-ui-accent/10 opacity-75"
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-[160px]">
+                                            <input
+                                                type="checkbox"
+                                                id={`open-${key}`}
+                                                checked={config.isOpen}
+                                                onChange={(e) => handleOpeningHourChange(key, "isOpen", e.target.checked)}
+                                                className="w-4 h-4 text-ui-primary rounded border-ui-accent focus:ring-ui-secondary cursor-pointer"
+                                            />
+                                            <label
+                                                htmlFor={`open-${key}`}
+                                                className={`text-sm font-bold cursor-pointer select-none ${config.isOpen ? "text-ui-black" : "text-ui-secondary line-through"
+                                                    }`}
+                                            >
+                                                {label}
+                                            </label>
+
+                                        </div>
+
+                                        {config.isOpen ? (
+                                            <div className="flex items-center gap-2 sm:gap-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs text-ui-secondary font-medium">Od:</span>
+                                                    <input
+                                                        type="time"
+                                                        value={config.openTime}
+                                                        onChange={(e) => handleOpeningHourChange(key, "openTime", e.target.value)}
+                                                        className="px-2.5 py-1.5 rounded-lg border border-ui-accent bg-white text-xs font-bold text-ui-black focus:outline-none focus:ring-2 focus:ring-ui-secondary shadow-2xs"
+                                                    />
+                                                </div>
+                                                <span className="text-ui-secondary text-xs">—</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs text-ui-secondary font-medium">Do (zamknięcie):</span>
+                                                    <input
+                                                        type="time"
+                                                        value={config.closeTime}
+                                                        onChange={(e) => handleOpeningHourChange(key, "closeTime", e.target.value)}
+                                                        className="px-2.5 py-1.5 rounded-lg border border-ui-primary/60 bg-amber-50/50 text-xs font-black text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary shadow-2xs"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs font-semibold text-ui-secondary italic">
+                                                Piekarnia nieczynna w ten dzień
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Przycisk zapisu */}
+                        <div className="flex justify-end pt-2">
+                            <button
+                                type="submit"
+                                disabled={isSavingOpeningHours || isLoadingOpeningHours}
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl text-xs font-semibold shadow-xs transition-colors duration-200 cursor-pointer"
+                            >
+                                {isSavingOpeningHours ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        Zapisywanie...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={14} />
+                                        Zapisz godziny otwarcia
                                     </>
                                 )}
                             </button>
