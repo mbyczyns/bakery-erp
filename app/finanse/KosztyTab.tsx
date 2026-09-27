@@ -1243,7 +1243,7 @@ export default function KosztyTab() {
                                 <BarChart data={costData?.monthlyChartData || []} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                     <XAxis dataKey="month" tick={{ fill: "#6B7280", fontSize: 11 }} />
-                                    <YAxis tick={{ fill: "#6B7280", fontSize: 11 }} tickFormatter={(val) => `${val / 1000}k`} />
+                                    <YAxis tick={{ fill: "#6B7280", fontSize: 11 }} tickFormatter={(val) => `${val / 1000} tys.`} />
                                     <Tooltip
                                         formatter={(val: number) => formatCurrency(val)}
                                         contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}

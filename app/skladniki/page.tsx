@@ -26,6 +26,8 @@ interface Ingredient {
     lastSupplierName?: string | null;
     lastPurchaseDate?: string | null;
     lastPurchasePrice?: number | string | null;
+    lastPurchasePriceNet?: number | string | null;
+    lastPurchasePriceGross?: number | string | null;
 }
 
 const TYPE_CONFIG: Record<IngredientType, { label: string; badge: string }> = {
@@ -216,30 +218,32 @@ export default function SkladnikiPage() {
                 </div>
             </div>
 
-            {/* Tabela składników z kolumną Typ, Ceną i Akcjami edycji */}
+            {/* Tabela składników z kolumną Typ, Cenami netto i brutto oraz Akcjami edycji */}
             <div className="bg-ui-white border border-ui-accent rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[850px] text-left border-collapse table-fixed">
+                    <table className="w-full min-w-[950px] text-left border-collapse table-fixed">
                         <colgroup>
-                            <col style={{ width: "25%" }} />
-                            <col style={{ width: "20%" }} />
-                            <col style={{ width: "30%" }} />
-                            <col style={{ width: "15%" }} />
-                            <col style={{ width: "10%" }} />
+                            <col style={{ width: "26%" }} />
+                            <col style={{ width: "18%" }} />
+                            <col style={{ width: "24%" }} />
+                            <col style={{ width: "12%" }} />
+                            <col style={{ width: "12%" }} />
+                            <col style={{ width: "8%" }} />
                         </colgroup>
                         <thead>
                             <tr className="bg-ui-accent/10 text-ui-secondary text-xs font-bold uppercase tracking-wider border-b border-ui-accent">
                                 <th className="p-4">Nazwa</th>
                                 <th className="p-4">Typ</th>
                                 <th className="p-4">Ostatni Dostawca</th>
-                                <th className="p-4 text-right">Cena</th>
+                                <th className="p-4 text-right">Cena netto</th>
+                                <th className="p-4 text-right">Cena brutto</th>
                                 <th className="p-4 text-center">Akcje</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-ui-accent/40 text-sm">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={5} className="p-12 text-center text-ui-secondary">
+                                    <td colSpan={6} className="p-12 text-center text-ui-secondary">
                                         <div className="flex items-center justify-center gap-2">
                                             <Loader2 size={18} className="animate-spin text-emerald-600" />
                                             Pobieranie składników...
@@ -248,13 +252,15 @@ export default function SkladnikiPage() {
                                 </tr>
                             ) : filteredIngredients.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-ui-secondary italic">
+                                    <td colSpan={6} className="p-8 text-center text-ui-secondary italic">
                                         Nie znaleziono składników.
                                     </td>
                                 </tr>
                             ) : (
                                 filteredIngredients.map((item) => {
                                     const typeInfo = TYPE_CONFIG[item.type] || TYPE_CONFIG.OTHER;
+                                    const priceNet = item.lastPurchasePriceNet ?? item.lastPurchasePrice;
+                                    const priceGross = item.lastPurchasePriceGross;
 
                                     return (
                                         <tr
@@ -290,10 +296,24 @@ export default function SkladnikiPage() {
                                             </td>
 
                                             <td className="p-4 text-right">
-                                                {item.lastPurchasePrice ? (
+                                                {priceNet ? (
                                                     <div>
-                                                        <div className="font-bold text-ui-black whitespace-nowrap">
-                                                            {Number(item.lastPurchasePrice).toFixed(2)} zł / {item.unit}
+                                                        <div className="font-semibold text-ui-black whitespace-nowrap">
+                                                            {Number(priceNet).toFixed(2)} zł{" "}
+                                                            <span className="text-xs font-normal text-ui-secondary">/ {item.unit}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-ui-secondary">—</span>
+                                                )}
+                                            </td>
+
+                                            <td className="p-4 text-right">
+                                                {priceGross ? (
+                                                    <div>
+                                                        <div className="font-semibold text-ui-black whitespace-nowrap">
+                                                            {Number(priceGross).toFixed(2)} zł{" "}
+                                                            <span className="text-xs font-normal text-ui-secondary">/ {item.unit}</span>
                                                         </div>
                                                     </div>
                                                 ) : (

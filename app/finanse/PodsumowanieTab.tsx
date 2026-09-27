@@ -152,12 +152,14 @@ function formatPLN(val: number): string {
 
 function formatCompactPLN(val: number): string {
     if (Math.abs(val) >= 1_000_000) {
-        return (val / 1_000_000).toFixed(1) + "M zł";
+        const mln = Math.round((val / 1_000_000) * 10) / 10;
+        return `${mln.toLocaleString("pl-PL")} mln zł`;
     }
     if (Math.abs(val) >= 1_000) {
-        return (val / 1_000).toFixed(1) + "k zł";
+        const tys = Math.round((val / 1_000) * 10) / 10;
+        return `${tys.toLocaleString("pl-PL")} tys. zł`;
     }
-    return val.toFixed(0) + " zł";
+    return Math.round(val).toLocaleString("pl-PL") + " zł";
 }
 
 export default function PodsumowanieTab() {
@@ -517,27 +519,43 @@ export default function PodsumowanieTab() {
                                             if (active && payload && payload.length) {
                                                 const item = payload[0].payload;
                                                 return (
-                                                    <div className="bg-ui-black text-white p-3.5 rounded-xl shadow-xl text-xs font-bold space-y-1.5 border border-white/10 min-w-[200px]">
-                                                        <div className="font-extrabold text-sm border-b border-white/20 pb-1 text-ui-accent">
-                                                            {item.monthName || label}
+                                                    <div className="bg-white text-ui-black p-3.5 rounded-2xl shadow-xl border border-ui-accent/60 text-xs font-bold space-y-2 min-w-[220px]">
+                                                        <div className="font-black text-sm border-b border-ui-accent/40 pb-1.5 text-ui-primary flex items-center justify-between">
+                                                            <span>{item.monthName || label}</span>
+                                                            {item.isCurrentMonth && (
+                                                                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                                                                    Bieżący
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        <div className="flex justify-between items-center text-emerald-400">
-                                                            <span>Przychody:</span>
-                                                            <span className="font-extrabold">{formatPLN(item.totalRevenue || 0)}</span>
+                                                        <div className="space-y-1 text-xs">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-ui-secondary flex items-center gap-1.5 font-semibold">
+                                                                    <span className="w-2 h-2 rounded-xs bg-emerald-500 inline-block" />
+                                                                    Przychody:
+                                                                </span>
+                                                                <span className="font-extrabold text-emerald-600">{formatPLN(item.totalRevenue || 0)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-ui-secondary flex items-center gap-1.5 font-semibold">
+                                                                    <span className="w-2 h-2 rounded-xs bg-rose-500 inline-block" />
+                                                                    Koszty:
+                                                                </span>
+                                                                <span className="font-extrabold text-rose-600">{formatPLN(item.totalCost || 0)}</span>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex justify-between items-center text-rose-400">
-                                                            <span>Koszty:</span>
-                                                            <span className="font-extrabold">{formatPLN(item.totalCost || 0)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center pt-1 border-t border-white/20 text-white">
-                                                            <span>Wynik (Zysk):</span>
-                                                            <span className={`font-black ${(item.netProfit || 0) >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
-                                                                {formatPLN(item.netProfit || 0)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center text-amber-300 text-[11px]">
-                                                            <span>Marża:</span>
-                                                            <span className="font-extrabold">{item.profitMargin || 0}%</span>
+                                                        <div className="pt-1.5 border-t border-ui-accent/30 space-y-1 text-xs">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-ui-primary font-bold">Wynik netto:</span>
+                                                                <span className={`font-black ${(item.netProfit || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                                                                    {(item.netProfit || 0) >= 0 ? "+" : ""}
+                                                                    {formatPLN(item.netProfit || 0)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-[11px]">
+                                                                <span className="text-ui-secondary font-semibold">Marża:</span>
+                                                                <span className="font-extrabold text-amber-700">{item.profitMargin || 0}%</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
@@ -597,7 +615,15 @@ export default function PodsumowanieTab() {
                                             </Pie>
                                             <Tooltip
                                                 formatter={(value: any) => [formatPLN(Number(value)), "Przychód"]}
-                                                contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", color: "#fff", fontWeight: 700, fontSize: "12px" }}
+                                                contentStyle={{
+                                                    backgroundColor: "#ffffff",
+                                                    borderRadius: "14px",
+                                                    border: "1px solid rgba(226, 232, 240, 0.8)",
+                                                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)",
+                                                    fontWeight: 700,
+                                                    fontSize: "12px",
+                                                    color: "#0f172a"
+                                                }}
                                             />
                                         </PieChart>
                                     </ResponsiveContainer>
@@ -681,7 +707,15 @@ export default function PodsumowanieTab() {
                                             </Pie>
                                             <Tooltip
                                                 formatter={(value: any) => [formatPLN(Number(value)), "Koszt"]}
-                                                contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", color: "#fff", fontWeight: 700, fontSize: "12px" }}
+                                                contentStyle={{
+                                                    backgroundColor: "#ffffff",
+                                                    borderRadius: "14px",
+                                                    border: "1px solid rgba(226, 232, 240, 0.8)",
+                                                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)",
+                                                    fontWeight: 700,
+                                                    fontSize: "12px",
+                                                    color: "#0f172a"
+                                                }}
                                             />
                                         </PieChart>
                                     </ResponsiveContainer>
@@ -716,7 +750,7 @@ export default function PodsumowanieTab() {
                             <div>
                                 <h3 className="text-base sm:text-lg font-black text-ui-black flex items-center gap-2">
                                     <Receipt size={20} className="text-ui-primary" />
-                                    Rachunek Zysków i Strat (P&L) w rozbiciu miesięcznym
+                                    Bilans zysków i strat
                                 </h3>
                             </div>
                         </div>

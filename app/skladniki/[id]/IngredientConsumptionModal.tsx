@@ -636,48 +636,49 @@ export default function IngredientConsumptionModal({
                                             content={({ active, payload, label }) => {
                                                 if (active && payload && payload.length) {
                                                     const dataPoint = payload[0].payload;
+                                                    const tooltipTitle = dataPoint.fullLabel
+                                                        ? dataPoint.fullLabel
+                                                        : (dataPoint.dayOfWeek && dataPoint.fullDate)
+                                                            ? `${dataPoint.dayOfWeek}, ${formatDate(dataPoint.fullDate)}`
+                                                            : (dataPoint.label || label);
+
                                                     return (
-                                                        <div className="bg-white border border-ui-accent/80 rounded-2xl p-3.5 shadow-xl text-xs max-w-xs">
-                                                            <div className="font-black text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2">
-                                                                {dataPoint.fullLabel || dataPoint.dayOfWeek
-                                                                    ? `${dataPoint.dayOfWeek}, ${formatDate(dataPoint.fullDate || "")}`
-                                                                    : label}
+                                                        <div className="bg-white border border-ui-accent/80 rounded-2xl p-3.5 shadow-xl text-xs min-w-[240px] max-w-sm">
+                                                            <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2">
+                                                                {tooltipTitle}
                                                             </div>
                                                             {dataPoint.purchased > 0 && (
                                                                 <div className="flex items-center justify-between text-ui-primary font-bold mb-1">
                                                                     <span>Zakupiono:</span>
-                                                                    <span>
+                                                                    <span className="font-semibold">
                                                                         {dataPoint.purchased} {unit}
                                                                     </span>
                                                                 </div>
                                                             )}
-                                                            <div className="flex items-center justify-between text-emerald-700 font-bold mb-1">
+                                                            <div className="flex items-center justify-between text-emerald-700 font-semibold mb-1">
                                                                 <span>Zużyto:</span>
-                                                                <span>
+                                                                <span className="font-bold">
                                                                     {dataPoint.consumed} {unit}
                                                                 </span>
                                                             </div>
                                                             {dataPoint.products && dataPoint.products.length > 0 && (
-                                                                <div className="mt-2 pt-2 border-t border-ui-accent/30 space-y-1">
-                                                                    <div className="text-[10px] text-ui-secondary font-bold uppercase">
+                                                                <div className="mt-2.5 pt-2 border-t border-ui-accent/30 space-y-1">
+                                                                    <div className="text-[10px] text-ui-secondary font-bold uppercase tracking-wider mb-1">
                                                                         Wyroby ({dataPoint.products.length}):
                                                                     </div>
-                                                                    {dataPoint.products.slice(0, 4).map((p: ProductUsage) => (
-                                                                        <div
-                                                                            key={p.productId}
-                                                                            className="flex items-center justify-between text-[11px] text-ui-primary"
-                                                                        >
-                                                                            <span className="truncate max-w-[170px]">{p.productName}</span>
-                                                                            <span className="font-semibold ml-2">
-                                                                                {p.consumedAmount} {unit}
-                                                                            </span>
-                                                                        </div>
-                                                                    ))}
-                                                                    {dataPoint.products.length > 4 && (
-                                                                        <div className="text-[10px] text-ui-secondary italic text-right">
-                                                                            + {dataPoint.products.length - 4} więcej
-                                                                        </div>
-                                                                    )}
+                                                                    <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                                                                        {dataPoint.products.map((p: ProductUsage) => (
+                                                                            <div
+                                                                                key={p.productId}
+                                                                                className="flex items-center justify-between text-[11px] text-ui-primary py-0.5"
+                                                                            >
+                                                                                <span className="truncate max-w-[190px]" title={p.productName}>{p.productName}</span>
+                                                                                <span className="font-bold ml-2 shrink-0 text-ui-black">
+                                                                                    {p.consumedAmount} {unit}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </div>

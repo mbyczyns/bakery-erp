@@ -22,6 +22,7 @@ export function getSystemSettings(): SystemSettings {
                 priceRounding: "none",
                 openingHours: { ...DEFAULT_OPENING_HOURS },
                 closedDays: {},
+                favoriteRecipeIds: [],
             };
         }
         const raw = fs.readFileSync(SETTINGS_FILE, "utf-8");
@@ -38,6 +39,7 @@ export function getSystemSettings(): SystemSettings {
             priceRounding: (parsed.priceRounding as PriceRoundingOption) || "none",
             openingHours: mergedOpeningHours,
             closedDays: parsed.closedDays || {},
+            favoriteRecipeIds: Array.isArray(parsed.favoriteRecipeIds) ? parsed.favoriteRecipeIds : [],
         };
     } catch {
         return {
@@ -45,6 +47,7 @@ export function getSystemSettings(): SystemSettings {
             priceRounding: "none",
             openingHours: { ...DEFAULT_OPENING_HOURS },
             closedDays: {},
+            favoriteRecipeIds: [],
         };
     }
 }
@@ -63,6 +66,9 @@ export function saveSystemSettings(settings: Partial<SystemSettings>): SystemSet
                 ...current.closedDays,
                 ...(settings.closedDays || {}),
             },
+            favoriteRecipeIds: settings.favoriteRecipeIds !== undefined
+                ? settings.favoriteRecipeIds
+                : (current.favoriteRecipeIds || []),
         };
         const dir = path.dirname(SETTINGS_FILE);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -75,6 +81,7 @@ export function saveSystemSettings(settings: Partial<SystemSettings>): SystemSet
             priceRounding: "none",
             openingHours: { ...DEFAULT_OPENING_HOURS },
             closedDays: {},
+            favoriteRecipeIds: [],
         };
     }
 }

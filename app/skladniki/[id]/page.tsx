@@ -31,6 +31,8 @@ function formatDate(dateStr?: string | Date | null): string {
     return `${day}-${month}-${year}`;
 }
 
+const POLISH_MONTHS = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+
 export default function SkladnikDetailPage({
     params
 }: {
@@ -56,6 +58,58 @@ export default function SkladnikDetailPage({
     const [editUnit, setEditUnit] = useState("kg");
     const [editType, setEditType] = useState<string>("OTHER");
     const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+    // Oś czasu dla wykresu cen z etykietami miesięcy
+    const priceChartTimeline = React.useMemo(() => {
+        if (!data?.priceHistory || data.priceHistory.length === 0) {
+            return { chartData: [], ticks: [], minTime: 0, maxTime: 0 };
+        }
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+
+        let startYear = currentYear;
+        let startMonth = currentMonth - 5;
+        if (startMonth < 0) {
+            startMonth += 12;
+            startYear -= 1;
+        }
+
+        // Sprawdź czy najstarszy zakup nie jest wcześniejszy
+        const oldestTimestamp = Math.min(...data.priceHistory.map((p: any) => new Date(p.date).getTime()));
+        const oldestDate = new Date(oldestTimestamp);
+        const sixMonthsAgoTime = new Date(startYear, startMonth, 1).getTime();
+        if (oldestDate.getTime() < sixMonthsAgoTime) {
+            startYear = oldestDate.getFullYear();
+            startMonth = oldestDate.getMonth();
+        }
+
+        const minTime = new Date(startYear, startMonth, 1).getTime();
+        const maxTime = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).getTime();
+
+        const ticks: number[] = [];
+        let currY = startYear;
+        let currM = startMonth;
+        while (currY < currentYear || (currY === currentYear && currM <= currentMonth)) {
+            ticks.push(new Date(currY, currM, 15).getTime());
+            currM++;
+            if (currM > 11) {
+                currM = 0;
+                currY++;
+            }
+        }
+
+        const chartData = data.priceHistory.map((p: any) => {
+            const d = new Date(p.date);
+            return {
+                ...p,
+                timestamp: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0).getTime(),
+            };
+        }).sort((a: any, b: any) => a.timestamp - b.timestamp);
+
+        return { chartData, ticks, minTime, maxTime };
+    }, [data?.priceHistory]);
 
     const handleOpenInvoiceModal = async (invoiceId: string) => {
         if (!invoiceId) return;
@@ -241,7 +295,7 @@ export default function SkladnikDetailPage({
                                             Ost. zakup: {sup.lastBuy && sup.lastBuy !== "Brak zakupów" ? formatDate(sup.lastBuy) : "Brak zakupów"}
                                         </div>
                                     </div>
-                                    <div className={`font-bold ${sup.isBest ? "text-emerald-600 text-lg" : "text-ui-primary text-base"}`}>
+                                    <div className={`font-bold ${sup.isBest ? "text-emerald-600 text-sm" : "text-ui-primary text-base"}`}>
                                         {sup.lastPrice.toFixed(2)} <span className="text-xs font-semibold opacity-70">zł</span>
                                     </div>
                                 </div>
@@ -273,38 +327,49 @@ export default function SkladnikDetailPage({
                                     <th className="p-4">Dostawca</th>
                                     <th className="p-4 text-center">Ilość</th>
                                     <th className="p-4 text-right">Cena Netto</th>
+                                    <th className="p-4 text-right">Cena Brutto</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-ui-accent/40">
                                 {data.deliveriesHistory && data.deliveriesHistory.length > 0 ? (
-                                    (showAllHistory ? data.deliveriesHistory : data.deliveriesHistory.slice(0, 5)).map((del: any) => (
-                                        <tr key={del.id} className="hover:bg-ui-accent/5 transition-colors">
-                                            <td className="p-4 font-semibold text-ui-black">{formatDate(del.date)}</td>
-                                            <td className="p-4 text-ui-primary">
-                                                <div className="truncate max-w-[250px]" title={del.supplier}>
-                                                    {del.supplier}
-                                                </div>
-                                                {del.invoiceId ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenInvoiceModal(del.invoiceId)}
-                                                        className="inline-flex items-center gap-1.5 text-[11px] text-ui-primary hover:ui-secondary font-mono font-bold mt-1 px-2 py-0.5 rounded-lg bg-ui-accent/15 hover:bg-ui-accent/30 border border-ui-accent/50 transition-colors cursor-pointer group shadow-2xs text-left"
-                                                        title="Kliknij, aby otworzyć podgląd faktury"
-                                                    >
-                                                        <FileText size={12} className="text-ui-secondary group-hover:text-ui-secondary shrink-0" />
-                                                        <span>{del.doc}</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="text-[10px] text-ui-secondary font-mono mt-0.5">{del.doc}</div>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-center text-ui-black whitespace-nowrap">{del.quantity} {data.unit}</td>
-                                            <td className="p-4 text-right font-bold text-ui-black whitespace-nowrap">{del.price.toFixed(2)} zł</td>
-                                        </tr>
-                                    ))
+                                    (showAllHistory ? data.deliveriesHistory : data.deliveriesHistory.slice(0, 5)).map((del: any) => {
+                                        const priceNet = del.priceNet ?? del.price;
+                                        const priceGross = del.priceGross ?? (del.price ? del.price * (1 + (del.vatRate ?? 0) / 100) : 0);
+
+                                        return (
+                                            <tr key={del.id} className="hover:bg-ui-accent/5 transition-colors">
+                                                <td className="p-4 text-ui-black whitespace-nowrap">{formatDate(del.date)}</td>
+                                                <td className="p-4 text-ui-primary">
+                                                    <div className="truncate max-w-[200px]" title={del.supplier}>
+                                                        {del.supplier}
+                                                    </div>
+                                                    {del.invoiceId ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenInvoiceModal(del.invoiceId)}
+                                                            className="inline-flex items-center gap-1.5 text-[11px] text-ui-primary hover:ui-secondary font-mono font-bold mt-1 px-2 py-0.5 rounded-lg bg-ui-accent/15 hover:bg-ui-accent/30 border border-ui-accent/50 transition-colors cursor-pointer group shadow-2xs text-left"
+                                                            title="Kliknij, aby otworzyć podgląd faktury"
+                                                        >
+                                                            <FileText size={12} className="text-ui-secondary group-hover:text-ui-secondary shrink-0" />
+                                                            <span>{del.doc}</span>
+                                                        </button>
+                                                    ) : (
+                                                        <div className="text-[10px] text-ui-secondary font-mono mt-0.5">{del.doc}</div>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-center text-ui-black whitespace-nowrap">{del.quantity} {data.unit}</td>
+                                                <td className="p-4 text-right  font-semibold text-ui-black whitespace-nowrap">
+                                                    {typeof priceNet === "number" ? `${priceNet.toFixed(2)} zł` : "—"}
+                                                </td>
+                                                <td className="p-4 text-right font-semibold text-ui-black whitespace-nowrap">
+                                                    {typeof priceGross === "number" && priceGross > 0 ? `${priceGross.toFixed(2)} zł` : "—"}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="p-8 text-center text-xs text-ui-secondary italic">
+                                        <td colSpan={5} className="p-8 text-center text-xs text-ui-secondary italic">
                                             Brak historii zakupów dla tego składnika
                                         </td>
                                     </tr>
@@ -338,33 +403,103 @@ export default function SkladnikDetailPage({
             {/* SEKCJA WYKRESÓW (1/3 i 2/3 szerokości) */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
-                {/* Uproszczony wykres cen (1/3 szerokości) */}
-                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-sm lg:col-span-1">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2 mb-6">
-                        <TrendingUp size={16} /> Średni trend cen
-                    </h3>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={data.priceHistory} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(value) => `${value.toFixed(2)}`} />
-
-                                <Tooltip
-                                    formatter={(value: number) => [`${value.toFixed(2)} zł`, "Średnia cena"]}
-                                    contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB', fontWeight: 'bold', fontSize: '12px' }}
-                                />
-
-                                <Line
-                                    type="monotone"
-                                    dataKey="avgPrice"
-                                    stroke="#265ff0ff"
-                                    strokeWidth={3}
-                                    dot={{ r: 3, fill: '#265ff0ff', strokeWidth: 2, stroke: '#fff' }}
-                                    activeDot={{ r: 5 }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
+                {/* Wykres historii cen zakupu (1/3 szerokości) */}
+                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-sm lg:col-span-1 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
+                                <TrendingUp size={16} /> Historia cen zakupu
+                            </h3>
+                            {data.priceHistory && data.priceHistory.length > 0 && (
+                                <span className="text-[11px] font-semibold text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-full">
+                                    {data.priceHistory.length} {data.priceHistory.length === 1 ? "zakup" : data.priceHistory.length < 5 ? "zakupy" : "zakupów"}
+                                </span>
+                            )}
+                        </div>
+                        {data.priceHistory && data.priceHistory.length > 0 ? (
+                            <div className="h-[250px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={priceChartTimeline.chartData} margin={{ top: 10, right: 15, left: -15, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                        <XAxis
+                                            type="number"
+                                            dataKey="timestamp"
+                                            domain={[priceChartTimeline.minTime, priceChartTimeline.maxTime]}
+                                            ticks={priceChartTimeline.ticks}
+                                            tickFormatter={(ts) => {
+                                                const d = new Date(ts);
+                                                return POLISH_MONTHS[d.getMonth()];
+                                            }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fontSize: 11, fill: '#6B7280' }}
+                                            dy={10}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fontSize: 11, fill: '#6B7280' }}
+                                            tickFormatter={(value) => `${Number(value).toFixed(2)}`}
+                                            domain={['auto', 'auto']}
+                                        />
+                                        <Tooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const point = payload[0].payload;
+                                                    return (
+                                                        <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-lg text-xs">
+                                                            <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-1.5 flex items-center justify-between gap-3">
+                                                                <span>{point.displayDate || formatDate(point.date)}</span>
+                                                                {point.doc && (
+                                                                    <span className="text-[10px] font-mono text-ui-secondary font-normal">
+                                                                        {point.doc}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {point.supplier && (
+                                                                <div className="text-ui-primary text-[11px] font-medium mb-1 truncate max-w-[200px]" title={point.supplier}>
+                                                                    {point.supplier}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-center justify-between gap-4 text-ui-black mb-0.5">
+                                                                <span>Cena netto:</span>
+                                                                <span className="font-semibold text-[#265ff0]">{Number(point.priceNet ?? point.price).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">/ {data.unit}</span></span>
+                                                            </div>
+                                                            {point.priceGross ? (
+                                                                <div className="flex items-center justify-between gap-4 text-ui-black mb-0.5">
+                                                                    <span>Cena brutto:</span>
+                                                                    <span className="font-semibold">{Number(point.priceGross).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">/ {data.unit}</span></span>
+                                                                </div>
+                                                            ) : null}
+                                                            {point.quantity ? (
+                                                                <div className="flex items-center justify-between gap-4 text-ui-secondary text-[11px] mt-1 pt-1 border-t border-ui-accent/30">
+                                                                    <span>Ilość:</span>
+                                                                    <span className="font-medium text-ui-black">{point.quantity} {data.unit}</span>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="priceNet"
+                                            name="Cena netto"
+                                            stroke="#265ff0"
+                                            strokeWidth={2.5}
+                                            dot={{ r: 4.5, fill: '#265ff0', strokeWidth: 2, stroke: '#fff' }}
+                                            activeDot={{ r: 6.5, fill: '#265ff0', strokeWidth: 2, stroke: '#fff' }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-[250px] flex items-center justify-center text-xs text-ui-secondary italic">
+                                Brak historii zakupów dla tego składnika
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -401,13 +536,13 @@ export default function SkladnikDetailPage({
                                                         <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-1.5">
                                                             {label}
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-4 text-[#3B82F6] font-bold mb-1">
+                                                        <div className="flex items-center justify-between gap-4 text-[#3B82F6] mb-1">
                                                             <span>Zakupiono:</span>
-                                                            <span>{dataPoint?.purchased ?? 0} {data.unit}</span>
+                                                            <span className="font-semibold">{dataPoint?.purchased ?? 0} {data.unit}</span>
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-4 text-[#059669] font-bold">
+                                                        <div className="flex items-center justify-between gap-4 text-[#059669] mb-1">
                                                             <span>Zużyto:</span>
-                                                            <span>{dataPoint?.consumed ?? 0} {data.unit}</span>
+                                                            <span className="font-semibold">{dataPoint?.consumed ?? 0} {data.unit}</span>
                                                         </div>
                                                     </div>
                                                 );

@@ -34,6 +34,7 @@ import {
     Circle,
     CircleCheck,
     ChevronDown,
+    Star,
 } from "lucide-react";
 import {
     BarChart,
@@ -109,6 +110,18 @@ export default function PrzepisSzczegolyPage({
     const { id } = React.use(params);
 
     const [data, setData] = useState<RecipeData | null>(null);
+    const [isFavorite, setIsFavorite] = useState<boolean>(() => {
+        if (typeof window !== "undefined") {
+            try {
+                const saved = localStorage.getItem("bakery_favorite_recipes");
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    return Array.isArray(parsed) && parsed.includes(id);
+                }
+            } catch {}
+        }
+        return false;
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -125,6 +138,32 @@ export default function PrzepisSzczegolyPage({
     // Zapisywanie ceny
     const [isSavingPrice, setIsSavingPrice] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const handleToggleFavorite = async () => {
+        const nextState = !isFavorite;
+        setIsFavorite(nextState);
+
+        try {
+            const saved = localStorage.getItem("bakery_favorite_recipes");
+            let list: string[] = saved ? JSON.parse(saved) : [];
+            if (nextState) {
+                if (!list.includes(id)) list.push(id);
+            } else {
+                list = list.filter((favId) => favId !== id);
+            }
+            localStorage.setItem("bakery_favorite_recipes", JSON.stringify(list));
+        } catch {}
+
+        try {
+            await fetch("/api/przepisy/favorites", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, isFavorite: nextState }),
+            });
+        } catch (err) {
+            console.error("Błąd zapisu ulubionego:", err);
+        }
+    };
 
     // -------------------------------------------------------------
     // STAN MODALU EDYCJI PRZEPISU
@@ -169,10 +208,21 @@ export default function PrzepisSzczegolyPage({
         setIsLoading(true);
         setError(null);
         try {
-            const [res, configRes] = await Promise.all([
+            const [res, configRes, favRes] = await Promise.all([
                 fetch(`/api/przepisy/${id}`),
                 fetch("/api/konfiguracja"),
+                fetch("/api/przepisy/favorites"),
             ]);
+
+            if (favRes.ok) {
+                const favData = await favRes.json();
+                if (Array.isArray(favData.favoriteIds)) {
+                    setIsFavorite(favData.favoriteIds.includes(id));
+                    try {
+                        localStorage.setItem("bakery_favorite_recipes", JSON.stringify(favData.favoriteIds));
+                    } catch {}
+                }
+            }
 
             if (configRes.ok) {
                 const configData = await configRes.json();
@@ -554,9 +604,26 @@ export default function PrzepisSzczegolyPage({
             {/* NAGŁÓWEK RECEPTURY */}
             <div className="bg-ui-white border border-ui-accent rounded-2xl p-6 sm:p-7 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">
-                        {recipe.name}
-                    </h1>
+                    <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={handleToggleFavorite}
+                            className={`p-1.5 rounded-xl transition-colors cursor-pointer shrink-0 border ${
+                                isFavorite
+                                    ? "bg-amber-50 border-amber-300 text-amber-500 shadow-2xs"
+                                    : "border-ui-accent bg-ui-white text-ui-secondary/40 hover:text-amber-500 hover:border-amber-300"
+                            }`}
+                            title={isFavorite ? "Usuń z wyróżnionych" : "Oznacz gwiazdką"}
+                        >
+                            <Star
+                                size={18}
+                                className={isFavorite ? "fill-amber-400 text-amber-500" : "transition-transform hover:scale-110"}
+                            />
+                        </button>
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black">
+                            {recipe.name}
+                        </h1>
+                    </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleOpenEditModal}

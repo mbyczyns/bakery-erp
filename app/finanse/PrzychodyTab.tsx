@@ -865,7 +865,7 @@ export default function PrzychodyTab() {
                                         axisLine={false}
                                         tickLine={false}
                                         tick={{ fontSize: 11, fill: "#6B7280" }}
-                                        tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
+                                        tickFormatter={(val) => `${(val / 1000).toFixed(0)} tys.`}
                                     />
                                     <Tooltip
                                         cursor={{ fill: "rgba(229, 231, 235, 0.4)" }}

@@ -451,7 +451,7 @@ export default function KonfiguracjaPage() {
                                                 </div>
                                                 <span className="text-ui-secondary text-xs">—</span>
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs text-ui-secondary font-medium">Do (zamknięcie):</span>
+                                                    <span className="text-xs text-ui-secondary font-medium">Do:</span>
                                                     <input
                                                         type="time"
                                                         value={config.closeTime}
@@ -462,7 +462,7 @@ export default function KonfiguracjaPage() {
                                             </div>
                                         ) : (
                                             <div className="text-xs font-semibold text-ui-secondary italic">
-                                                Piekarnia nieczynna w ten dzień
+                                                Piekarnia nieczynna
                                             </div>
                                         )}
                                     </div>

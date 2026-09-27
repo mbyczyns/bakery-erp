@@ -33,15 +33,27 @@ export async function GET() {
             for (const prod of ing.products) {
                 if (prod.invoicePositions && prod.invoicePositions.length > 0) {
                     const pos = prod.invoicePositions[0];
+                    if (pos.invoice?.status === 'REJECTED') continue;
 
                     if (!lastPurchase || new Date(pos.invoice.issuedDate) > new Date(lastPurchase.date)) {
-                        // Obliczamy rzeczywistą cenę za 1 jednostkę bazową (np. za 1 kg, używając mnożnika)
-                        const realUnitPrice = Number(pos.netPrice) / Number(prod.multiplier || 1);
+                        const multiplier = Number(prod.multiplier || 1) || 1;
+                        // Obliczamy rzeczywistą cenę netto za 1 jednostkę bazową (np. za 1 kg)
+                        const realUnitPriceNet = Number(pos.netPrice) / multiplier;
+                        const vatRate = Number(pos.vatRate ?? 0);
+                        
+                        let realUnitPriceGross = 0;
+                        if (Number(pos.grossAmount) > 0 && Number(pos.quantity) > 0) {
+                            realUnitPriceGross = (Number(pos.grossAmount) / Number(pos.quantity)) / multiplier;
+                        } else {
+                            realUnitPriceGross = realUnitPriceNet * (1 + vatRate / 100);
+                        }
 
                         lastPurchase = {
                             supplierName: prod.supplier.name,
                             date: pos.invoice.issuedDate,
-                            price: realUnitPrice
+                            price: realUnitPriceNet,
+                            priceNet: realUnitPriceNet,
+                            priceGross: realUnitPriceGross
                         };
                     }
                 }
@@ -56,7 +68,9 @@ export async function GET() {
                 calculatedPrice: ing.calculatedPrice,
                 lastSupplierName: lastPurchase ? lastPurchase.supplierName : null,
                 lastPurchaseDate: lastPurchase ? lastPurchase.date : null,
-                lastPurchasePrice: lastPurchase ? lastPurchase.price : null
+                lastPurchasePrice: lastPurchase ? lastPurchase.price : null,
+                lastPurchasePriceNet: lastPurchase ? lastPurchase.priceNet : null,
+                lastPurchasePriceGross: lastPurchase ? lastPurchase.priceGross : null
             };
         });
 

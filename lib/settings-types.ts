@@ -56,6 +56,7 @@ export interface SystemSettings {
     priceRounding: PriceRoundingOption;
     openingHours: Record<WeekdayKey, DayOpeningHours>;
     closedDays?: Record<string, ClosedDayInfo>;
+    favoriteRecipeIds?: string[];
 }
 
 /**

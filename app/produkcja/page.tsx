@@ -38,7 +38,8 @@ import {
     BarChart3,
     TrendingUp,
     Info,
-    RotateCcw
+    RotateCcw,
+    Hamburger
 } from "lucide-react";
 import {
     BarChart,
@@ -175,7 +176,7 @@ const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ReactNode; 
     },
     ROLL: {
         label: "Bułki",
-        icon: <Layers size={16} className="text-sky-600" />,
+        icon: <Hamburger size={16} className="text-sky-600" />,
         color: "text-sky-700 bg-sky-50 border-sky-200",
         badge: "bg-sky-100 text-sky-800 border-sky-300",
     },
@@ -232,7 +233,7 @@ function formatDate(dateStr: string): string {
     if (!dateStr) return "";
     const parts = dateStr.split("-");
     if (parts.length === 3) {
-        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
     return dateStr;
 }
@@ -1103,7 +1104,7 @@ export default function ProdukcjaPage() {
                             <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                                 <span className="flex items-center gap-1.5">
                                     <Coins size={15} className="text-ui-secondary" />
-                                    Utarg ze sprzedaży wypieków ({POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]})
+                                    Utarg ze sprzedaży ({POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]})
                                 </span>
                             </div>
                             <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
@@ -1224,14 +1225,15 @@ export default function ProdukcjaPage() {
                                 return (
                                     <div
                                         key={`empty-${idx}`}
-                                        className="h-28 sm:h-32 rounded-xl bg-ui-accent/5 border border-dashed border-ui-accent/30 opacity-30"
+                                        className="h-20 sm:h-24 rounded-2xl bg-ui-accent/5 border border-dashed border-ui-accent/20 opacity-30"
                                     />
                                 );
                             }
 
                             const isClosed = Boolean(cell.dayData && cell.dayData.isClosed);
-                            const hasData = Boolean(cell.dayData && cell.dayData.hasReport);
+                            const hasData = Boolean(cell.dayData && (cell.dayData.hasReport || (cell.dayData.fiscalIncome || 0) > 0 || (cell.dayData.bakerySalesIncome || 0) > 0));
                             const isMissing = !hasData && cell.isPastOrToday && !cell.isSunday && !isClosed;
+                            const income = Number(cell.dayData?.fiscalIncome || cell.dayData?.bakerySalesIncome || 0);
 
                             return (
                                 <div
@@ -1245,14 +1247,14 @@ export default function ProdukcjaPage() {
                                             openProductionPlanModal(cell.dateStr);
                                         }
                                     }}
-                                    className={`h-28 sm:h-32 rounded-2xl p-2.5 border transition-all flex flex-col justify-between cursor-pointer ${isClosed
-                                        ? "bg-slate-50/80 border-slate-200/80 hover:border-slate-400"
+                                    className={`h-20 sm:h-24 rounded-2xl p-2.5 border transition-all flex flex-col justify-between cursor-pointer ${isClosed
+                                        ? "bg-slate-100/70 border-slate-200 text-slate-500 hover:border-slate-300"
                                         : hasData
-                                            ? "bg-white border-ui-accent hover:border-ui-primary hover:shadow-md ring-1 ring-ui-accent/20"
+                                            ? "bg-emerald-50/40 border-emerald-300/80 hover:border-emerald-500 hover:shadow-md ring-1 ring-emerald-200/50"
                                             : isMissing
-                                                ? "bg-rose-50/40 border-rose-200 hover:border-rose-400"
+                                                ? "bg-rose-50/50 border-rose-300 hover:border-rose-400 hover:shadow-xs"
                                                 : cell.isSunday
-                                                    ? "bg-ui-accent/5 border-ui-accent/20 opacity-50 cursor-default"
+                                                    ? "bg-slate-100/50 border-slate-200/60 opacity-40 cursor-default"
                                                     : "bg-ui-white border-ui-accent/30 hover:border-amber-400"
                                         }`}
                                 >
@@ -1260,56 +1262,31 @@ export default function ProdukcjaPage() {
                                         <span
                                             className={`text-xs font-black px-2 py-0.5 rounded-lg ${cell.dateStr === todayStr
                                                 ? "bg-ui-primary text-white"
-                                                : isClosed
+                                                : isClosed || cell.isSunday
                                                     ? "text-slate-600 bg-slate-200/70"
-                                                    : "text-ui-black bg-ui-accent/15"
+                                                    : hasData
+                                                        ? "text-emerald-900 bg-emerald-100"
+                                                        : isMissing
+                                                            ? "text-rose-900 bg-rose-100"
+                                                            : "text-ui-black bg-ui-accent/15"
                                                 }`}
                                         >
                                             {cell.dayNumber}
                                         </span>
-                                        {isClosed ? (
-                                            <span className="text-[10px] font-bold text-slate-700 bg-slate-200/80 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                                                <DoorClosed size={10} className="text-slate-600" /> Zamknięte
+                                        {isClosed && (
+                                            <span className="text-[10px] font-bold text-slate-500">
+                                                Zamknięte
                                             </span>
-                                        ) : hasData ? (
-                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                                {cell.dayData?.productsCount || 0} poz.
-                                            </span>
-                                        ) : isMissing ? (
-                                            <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-md">
-                                                Brak raportu
-                                            </span>
-                                        ) : !cell.isSunday ? (
-                                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-                                                <Sparkles size={10} /> Plan
-                                            </span>
-                                        ) : null}
+                                        )}
                                     </div>
 
-                                    {isClosed ? (
-                                        <div className="text-center py-1">
-                                            <div className="text-[11px] font-bold text-slate-700 line-clamp-1">
-                                                {cell.dayData?.closedReason || "Dzień wolny"}
+                                    <div className="text-right">
+                                        {income > 0 ? (
+                                            <div className="text-xs sm:text-sm font-black text-ui-primary">
+                                                {formatCurrency(income)}
                                             </div>
-                                            <div className="text-[9px] text-slate-400 mt-0.5">
-                                                Kliknij, aby otworzyć
-                                            </div>
-                                        </div>
-                                    ) : hasData ? (
-                                        <div className="space-y-0.5 text-right">
-                                            <div className="text-xs font-black text-ui-primary">
-                                                {formatCurrency(cell.dayData?.bakerySalesIncome || 0)}
-                                            </div>
-                                        </div>
-                                    ) : isMissing ? (
-                                        <div className="text-center text-[10px] font-bold text-rose-600">
-                                            Kliknij aby wpisać raport
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-[10px] text-ui-secondary/60">
-                                            {cell.isSunday ? "Nieczynne" : "Zaplanuj dzień"}
-                                        </div>
-                                    )}
+                                        ) : null}
+                                    </div>
                                 </div>
                             );
                         })}
@@ -1386,7 +1363,11 @@ export default function ProdukcjaPage() {
                         <div className="bg-white/95 backdrop-blur-md border border-ui-accent rounded-2xl p-4 shadow-xl text-xs min-w-[280px] max-w-[340px] z-50">
                             <div className="border-b border-ui-accent/40 pb-2 mb-2.5">
                                 <div className="font-extrabold text-sm text-ui-black">{itemData.label}</div>
-                                <div className="text-[11px] text-ui-secondary">{itemData.subLabel || `${itemData.startDate} - ${itemData.endDate}`}</div>
+                                <div className="text-[11px] text-ui-secondary">
+                                    {itemData.startDate === itemData.endDate
+                                        ? formatDate(itemData.startDate)
+                                        : `${formatDate(itemData.startDate)} - ${formatDate(itemData.endDate)}`}
+                                </div>
                             </div>
 
                             {/* Podsumowanie ogólne okresu */}
@@ -1452,7 +1433,7 @@ export default function ProdukcjaPage() {
                                     </h2>
                                     <div className="text-xs text-ui-secondary font-medium">
                                         {currentAnalytics?.startDate && currentAnalytics?.endDate
-                                            ? `Zakres: ${currentAnalytics.startDate} do ${currentAnalytics.endDate}`
+                                            ? `Zakres: ${formatDate(currentAnalytics.startDate)} do ${formatDate(currentAnalytics.endDate)}`
                                             : "Analiza słupkowa produkcji i sprzedaży"}
                                     </div>
                                 </div>
@@ -1544,7 +1525,7 @@ export default function ProdukcjaPage() {
                                         </div>
                                         <div>
                                             <div className="text-xs font-extrabold text-sky-900 flex items-center gap-1">
-                                                <Layers size={13} className="text-sky-700" /> Bułki
+                                                <Hamburger size={13} className="text-sky-700" /> Bułki
                                             </div>
                                         </div>
                                     </div>
@@ -1725,7 +1706,7 @@ export default function ProdukcjaPage() {
                                                             setPeriodPreviewModal({
                                                                 isOpen: true,
                                                                 title: b.label,
-                                                                subtitle: b.subLabel || `${b.startDate} do ${b.endDate}`,
+                                                                subtitle: b.startDate === b.endDate ? formatDate(b.startDate) : `${formatDate(b.startDate)} do ${formatDate(b.endDate)}`,
                                                                 products: b.products || [],
                                                                 totalProduced: b.totalProduced,
                                                                 totalSold: b.totalSold,
@@ -1738,7 +1719,9 @@ export default function ProdukcjaPage() {
                                                 >
                                                     <td className="py-3 px-3.5 font-bold text-ui-black">
                                                         <div className="text-sm">{b.label}</div>
-                                                        <div className="text-[11px] text-ui-secondary font-normal">{b.subLabel || `${b.startDate} do ${b.endDate}`}</div>
+                                                        <div className="text-[11px] text-ui-secondary font-normal">
+                                                            {b.startDate === b.endDate ? formatDate(b.startDate) : `${formatDate(b.startDate)} do ${formatDate(b.endDate)}`}
+                                                        </div>
                                                     </td>
 
                                                     {/* Chleby */}
@@ -2065,12 +2048,9 @@ export default function ProdukcjaPage() {
                                     {/* Pole Utargu z Kasy Fiskalnej */}
                                     <div className="bg-ui-accent/15 border border-ui-accent rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
                                         <div>
-                                            <div className="text-xs font-black text-ui-black flex items-center gap-1.5">
+                                            <div className="text-xs font-bold text-ui-black flex items-center gap-1.5">
                                                 <Receipt size={16} className="text-ui-primary" />
-                                                Utarg z kasy fiskalnej (Raport dobowy):
-                                            </div>
-                                            <div className="text-[11px] text-ui-secondary">
-                                                Opcjonalna kwota z raportu fiskalnego na koniec dnia w celu porównania ze sprzedażą wypieków.
+                                                Utarg z kasy fiskalnej:
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">

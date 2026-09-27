@@ -88,6 +88,9 @@ export async function GET(
             doc: string;
             quantity: number;
             price: number;
+            priceNet: number;
+            priceGross: number;
+            vatRate: number;
         }> = [];
 
         for (const prod of ingredient.products) {
@@ -99,7 +102,14 @@ export async function GET(
                 if (!pos.invoice.issuedDate) continue;
 
                 const rawDate = new Date(pos.invoice.issuedDate);
-                const unitPrice = Number(pos.netPrice) / multiplier;
+                const unitPriceNet = Number(pos.netPrice) / multiplier;
+                const vatRate = Number(pos.vatRate ?? 0);
+                let unitPriceGross = 0;
+                if (Number(pos.grossAmount) > 0 && Number(pos.quantity) > 0) {
+                    unitPriceGross = (Number(pos.grossAmount) / Number(pos.quantity)) / multiplier;
+                } else {
+                    unitPriceGross = unitPriceNet * (1 + vatRate / 100);
+                }
                 const quantity = Number(pos.quantity) * multiplier;
 
                 allPositions.push({
@@ -111,7 +121,10 @@ export async function GET(
                     supplierId: pos.invoice.contractorId || prod.supplierId,
                     doc: pos.invoice.invoiceNumber,
                     quantity: Math.round(quantity * 100) / 100,
-                    price: Math.round(unitPrice * 100) / 100,
+                    price: Math.round(unitPriceNet * 100) / 100,
+                    priceNet: Math.round(unitPriceNet * 100) / 100,
+                    priceGross: Math.round(unitPriceGross * 100) / 100,
+                    vatRate,
                 });
             }
         }
@@ -127,6 +140,9 @@ export async function GET(
             doc: pos.doc,
             quantity: pos.quantity,
             price: pos.price,
+            priceNet: pos.priceNet,
+            priceGross: pos.priceGross,
+            vatRate: pos.vatRate,
         }));
 
         // 2. Ranking dostawców (Suppliers Ranking)
@@ -209,39 +225,28 @@ export async function GET(
             });
         }
 
-        // 4. Historia cen (Price History)
-        const initialPrice = deliveriesHistory.length > 0
-            ? deliveriesHistory[deliveriesHistory.length - 1].price
-            : Number(ingredient.calculatedPrice || 0);
+        // 4. Historia cen (Price History) - tylko rzeczywiste zakupy posortowane chronologicznie (od najstarszego do najnowszego)
+        const chronologicalPositions = [...allPositions].sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
 
-        let runningPrice = initialPrice;
-        const priceHistory: Array<{ month: string; avgPrice: number }> = [];
+        const priceHistory = chronologicalPositions.map((p) => {
+            const day = String(p.rawDate.getDate()).padStart(2, "0");
+            const month = String(p.rawDate.getMonth() + 1).padStart(2, "0");
+            const year = p.rawDate.getFullYear();
+            const formattedDate = `${day}-${month}-${year}`;
 
-        for (const m of monthsRange) {
-            const monthPositions = allPositions.filter((p) => {
-                return (
-                    p.rawDate.getFullYear() === m.year &&
-                    p.rawDate.getMonth() === m.monthIndex
-                );
-            });
-
-            let monthPurchasedQty = 0;
-            let monthPurchasedTotalCost = 0;
-
-            for (const p of monthPositions) {
-                monthPurchasedQty += p.quantity;
-                monthPurchasedTotalCost += p.quantity * p.price;
-            }
-
-            if (monthPurchasedQty > 0) {
-                runningPrice = Math.round((monthPurchasedTotalCost / monthPurchasedQty) * 100) / 100;
-            }
-
-            priceHistory.push({
-                month: m.label,
-                avgPrice: runningPrice,
-            });
-        }
+            return {
+                id: p.id,
+                date: p.date,
+                displayDate: formattedDate,
+                price: p.priceNet,
+                priceNet: p.priceNet,
+                priceGross: p.priceGross,
+                supplier: p.supplier,
+                doc: p.doc,
+                quantity: p.quantity,
+                unit: ingredient.unit,
+            };
+        });
 
         // 5. SZCZEGÓŁOWA ANALIZA ZUŻYCIA (DZIENNA, TYGODNIOWA, MIESIĘCZNA, WG PRODUKTÓW)
         const POLISH_WEEKDAYS = ["Niedziela", "Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota"];
@@ -597,6 +602,10 @@ export async function GET(
             }
         }
 
+        const currentPrice = deliveriesHistory.length > 0
+            ? deliveriesHistory[0].price
+            : Number(ingredient.calculatedPrice || 0);
+
         const monthlyHistory = Array.from(monthlyMap.values()).map((m) => ({
             key: m.key,
             year: m.year,
@@ -606,7 +615,7 @@ export async function GET(
             monthDate: m.monthDate,
             totalConsumed: Math.round(m.totalConsumed * 100) / 100,
             totalPurchased: Math.round(m.totalPurchased * 100) / 100,
-            estimatedCost: Math.round(m.totalConsumed * runningPrice * 100) / 100,
+            estimatedCost: Math.round(m.totalConsumed * currentPrice * 100) / 100,
             daysWithProduction: m.daysWithProduction,
             products: Array.from(m.productsMap.values()).map((p) => ({
                 ...p,
@@ -673,18 +682,15 @@ export async function GET(
         });
 
         // H. Statystyki podsumowujące (Stats)
-        const currentPrice = deliveriesHistory.length > 0
-            ? deliveriesHistory[0].price
-            : Number(ingredient.calculatedPrice || 0);
-
-        const prevMonthAvg = priceHistory.length >= 2 ? priceHistory[priceHistory.length - 2].avgPrice : currentPrice;
-        const currMonthAvg = priceHistory.length >= 1 ? priceHistory[priceHistory.length - 1].avgPrice : currentPrice;
-
         let priceTrend: "up" | "down" | "stable" = "stable";
-        if (currMonthAvg > prevMonthAvg * 1.005) {
-            priceTrend = "up";
-        } else if (currMonthAvg < prevMonthAvg * 0.995) {
-            priceTrend = "down";
+        if (priceHistory.length >= 2) {
+            const lastPrice = priceHistory[priceHistory.length - 1].priceNet;
+            const prevPrice = priceHistory[priceHistory.length - 2].priceNet;
+            if (lastPrice > prevPrice * 1.005) {
+                priceTrend = "up";
+            } else if (lastPrice < prevPrice * 0.995) {
+                priceTrend = "down";
+            }
         }
 
         const totalConsumed6m = volumeHistory.reduce((acc, v) => acc + v.consumed, 0);

@@ -19,7 +19,8 @@ import {
     Sparkles,
     CheckCircle2,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    Star
 } from "lucide-react";
 
 type ProductType = "BREAD" | "ROLL" | "SWEET" | "SAVORY";
@@ -81,11 +82,18 @@ export default function PrzepisyPage() {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [semiFinishedList, setSemiFinishedList] = useState<SemiFinishedItem[]>([]);
     const [dbIngredients, setDbIngredients] = useState<DictionaryIngredient[]>([]);
+    const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<string[]>(() => {
+        if (typeof window !== "undefined") {
+            try {
+                const saved = localStorage.getItem("bakery_favorite_recipes");
+                if (saved) return JSON.parse(saved);
+            } catch {}
+        }
+        return [];
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<MainTab>("ALL");
-
-    // Modal podglądu półproduktu
 
     // Modal podglądu półproduktu
     const [selectedSemiFinished, setSelectedSemiFinished] = useState<SemiFinishedItem | null>(null);
@@ -129,10 +137,11 @@ export default function PrzepisyPage() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [resRecipes, resSemi, resDict] = await Promise.all([
+            const [resRecipes, resSemi, resDict, resFavs] = await Promise.all([
                 fetch("/api/przepisy"),
                 fetch("/api/polprodukty"),
                 fetch("/api/dictionaries"),
+                fetch("/api/przepisy/favorites"),
             ]);
 
             if (resRecipes.ok) {
@@ -147,10 +156,42 @@ export default function PrzepisyPage() {
                 const data = await resDict.json();
                 setDbIngredients(data.ingredients || []);
             }
+            if (resFavs.ok) {
+                const data = await resFavs.json();
+                if (Array.isArray(data.favoriteIds)) {
+                    setFavoriteRecipeIds(data.favoriteIds);
+                    try {
+                        localStorage.setItem("bakery_favorite_recipes", JSON.stringify(data.favoriteIds));
+                    } catch {}
+                }
+            }
         } catch (error) {
             console.error("Błąd pobierania danych:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleToggleFavorite = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const isCurrentlyFav = favoriteRecipeIds.includes(id);
+        const updated = isCurrentlyFav
+            ? favoriteRecipeIds.filter((favId) => favId !== id)
+            : [...favoriteRecipeIds, id];
+
+        setFavoriteRecipeIds(updated);
+        try {
+            localStorage.setItem("bakery_favorite_recipes", JSON.stringify(updated));
+        } catch {}
+
+        try {
+            await fetch("/api/przepisy/favorites", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, isFavorite: !isCurrentlyFav }),
+            });
+        } catch (err) {
+            console.error("Błąd zapisu ulubionego przepisu:", err);
         }
     };
 
@@ -507,14 +548,30 @@ export default function PrzepisyPage() {
         }
     };
 
-    // Filtry list
+    // Filtry i sortowanie list (ulubione na samej górze)
     const filteredRecipes = recipes
         .filter((r) => activeTab === "ALL" || r.type === activeTab)
         .filter((r) => matchesSearch(r.name, searchTerm));
 
+    const sortedRecipes = [...filteredRecipes].sort((a, b) => {
+        const aFav = favoriteRecipeIds.includes(a.id);
+        const bFav = favoriteRecipeIds.includes(b.id);
+        if (aFav && !bFav) return -1;
+        if (!aFav && bFav) return 1;
+        return a.name.localeCompare(b.name, "pl");
+    });
+
     const filteredSemiFinished = semiFinishedList.filter((s) =>
         matchesSearch(s.name, searchTerm)
     );
+
+    const sortedSemiFinished = [...filteredSemiFinished].sort((a, b) => {
+        const aFav = favoriteRecipeIds.includes(a.id);
+        const bFav = favoriteRecipeIds.includes(b.id);
+        if (aFav && !bFav) return -1;
+        if (!aFav && bFav) return 1;
+        return a.name.localeCompare(b.name, "pl");
+    });
 
     // Wyszukiwarka elementów w modalu (surowce + ewentualnie inne półprodukty)
     const availableIngredients = dbIngredients
@@ -636,53 +693,142 @@ export default function PrzepisyPage() {
                                 </td>
                             </tr>
                         ) : activeTab === "SEMI_FINISHED" ? (
-                            filteredSemiFinished.length === 0 ? (
+                            sortedSemiFinished.length === 0 ? (
                                 <tr>
                                     <td colSpan={3} className="p-8 text-center text-ui-secondary italic">
                                         Nie znaleziono półproduktów.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredSemiFinished.map((semi) => (
+                                sortedSemiFinished.map((semi) => {
+                                    const isFav = favoriteRecipeIds.includes(semi.id);
+                                    return (
+                                        <tr
+                                            key={semi.id}
+                                            onClick={() => {
+                                                setSelectedSemiFinished(semi);
+                                                setPreviewSemiBatch(1);
+                                            }}
+                                            className="hover:bg-ui-accent/10 transition-colors cursor-pointer group"
+                                        >
+                                            <td className="p-4 text-ui-black group-hover:text-ui-primary transition-colors">
+                                                <div className="flex items-center gap-2.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleToggleFavorite(semi.id, e)}
+                                                        className={`p-1 -ml-1 rounded-md transition-colors cursor-pointer shrink-0 ${
+                                                            isFav
+                                                                ? "text-amber-500 hover:text-amber-600"
+                                                                : "text-ui-secondary/30 hover:text-amber-400 opacity-60 group-hover:opacity-100"
+                                                        }`}
+                                                        title={isFav ? "Usuń z wyróżnionych" : "Oznacz gwiazdką"}
+                                                    >
+                                                        <Star
+                                                            size={15}
+                                                            className={isFav ? "fill-amber-400 text-amber-500" : "transition-transform hover:scale-110"}
+                                                        />
+                                                    </button>
+                                                    <span className="font-semibold">{semi.name}</span>
+                                                    <span className="text-xs text-ui-secondary font-normal">
+                                                        ({semi.unit})
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-right text-ui-black font-medium">
+                                                {Number(semi.cost || 0).toFixed(2)} zł / {semi.unit}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedSemiFinished(semi);
+                                                            setPreviewSemiBatch(1);
+                                                        }}
+                                                        className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                                    >
+                                                        Receptura
+                                                        <ChevronRight size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openEditSemiFinished(semi);
+                                                        }}
+                                                        className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                                        title="Edytuj recepturę"
+                                                    >
+                                                        <Pencil size={13} />
+                                                        Edytuj
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )
+                        ) : sortedRecipes.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} className="p-8 text-center text-ui-secondary italic">
+                                    Nie znaleziono przepisów.
+                                </td>
+                            </tr>
+                        ) : (
+                            sortedRecipes.map((recipe) => {
+                                const isFav = favoriteRecipeIds.includes(recipe.id);
+                                return (
                                     <tr
-                                        key={semi.id}
-                                        onClick={() => {
-                                            setSelectedSemiFinished(semi);
-                                            setPreviewSemiBatch(1);
-                                        }}
+                                        key={recipe.id}
+                                        onClick={() => router.push(`/przepisy/${recipe.id}`)}
                                         className="hover:bg-ui-accent/10 transition-colors cursor-pointer group"
                                     >
                                         <td className="p-4 text-ui-black group-hover:text-ui-primary transition-colors">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-semibold">{semi.name}</span>
-                                                <span className="text-xs text-ui-secondary font-normal">
-                                                    ({semi.unit})
-                                                </span>
+                                            <div className="flex items-center gap-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleToggleFavorite(recipe.id, e)}
+                                                    className={`p-1 -ml-1 rounded-md transition-colors cursor-pointer shrink-0 ${
+                                                        isFav
+                                                            ? "text-amber-500 hover:text-amber-600"
+                                                            : "text-ui-secondary/30 hover:text-amber-400 opacity-60 group-hover:opacity-100"
+                                                    }`}
+                                                    title={isFav ? "Usuń z wyróżnionych" : "Oznacz gwiazdką"}
+                                                >
+                                                    <Star
+                                                        size={15}
+                                                        className={isFav ? "fill-amber-400 text-amber-500" : "transition-transform hover:scale-110"}
+                                                    />
+                                                </button>
+                                                <span className="font-semibold">{recipe.name}</span>
+                                                {activeTab === "ALL" && (
+                                                    <span className="text-[10px] bg-ui-accent/20 text-ui-secondary border border-ui-accent/40 px-2 py-0.5 rounded-md font-bold">
+                                                        {PRODUCT_TYPE_LABELS[recipe.type] || recipe.type}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="p-4 text-right text-ui-black font-medium">
-                                            {Number(semi.cost || 0).toFixed(2)} zł / {semi.unit}
+                                            {Number(recipe.sellingPrice || 0).toFixed(2)} zł
                                         </td>
                                         <td className="p-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setSelectedSemiFinished(semi);
-                                                        setPreviewSemiBatch(1);
+                                                        router.push(`/przepisy/${recipe.id}`);
                                                     }}
                                                     className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                                                 >
-                                                    Receptura
+                                                    Foodcost
                                                     <ChevronRight size={14} />
                                                 </button>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        openEditSemiFinished(semi);
+                                                        openEditRecipe(recipe);
                                                     }}
                                                     className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                                                    title="Edytuj recepturę"
+                                                    title="Edytuj przepis"
                                                 >
                                                     <Pencil size={13} />
                                                     Edytuj
@@ -690,61 +836,8 @@ export default function PrzepisyPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))
-                            )
-                        ) : filteredRecipes.length === 0 ? (
-                            <tr>
-                                <td colSpan={3} className="p-8 text-center text-ui-secondary italic">
-                                    Nie znaleziono przepisów.
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredRecipes.map((recipe) => (
-                                <tr
-                                    key={recipe.id}
-                                    onClick={() => router.push(`/przepisy/${recipe.id}`)}
-                                    className="hover:bg-ui-accent/10 transition-colors cursor-pointer group"
-                                >
-                                    <td className="p-4 text-ui-black group-hover:text-ui-primary transition-colors">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold">{recipe.name}</span>
-                                            {activeTab === "ALL" && (
-                                                <span className="text-[10px] bg-ui-accent/20 text-ui-secondary border border-ui-accent/40 px-2 py-0.5 rounded-md font-bold">
-                                                    {PRODUCT_TYPE_LABELS[recipe.type] || recipe.type}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="p-4 text-right text-ui-black font-medium">
-                                        {Number(recipe.sellingPrice || 0).toFixed(2)} zł
-                                    </td>
-                                    <td className="p-4 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    router.push(`/przepisy/${recipe.id}`);
-                                                }}
-                                                className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                                            >
-                                                Foodcost
-                                                <ChevronRight size={14} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    openEditRecipe(recipe);
-                                                }}
-                                                className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                                                title="Edytuj przepis"
-                                            >
-                                                <Pencil size={13} />
-                                                Edytuj
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

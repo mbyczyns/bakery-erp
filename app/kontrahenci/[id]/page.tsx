@@ -716,7 +716,7 @@ export default function ContractorDetailPage() {
                                     axisLine={false}
                                     tickLine={false}
                                     tick={{ fontSize: 11, fill: '#6B7280' }}
-                                    tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k zł` : `${val} zł`}
+                                    tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)} tys. zł` : `${val} zł`}
                                 />
                                 <Tooltip
                                     cursor={{ fill: 'rgba(229, 231, 235, 0.4)' }}

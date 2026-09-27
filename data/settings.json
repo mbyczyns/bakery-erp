@@ -38,5 +38,6 @@
       "closeTime": "13:00"
     }
   },
-  "closedDays": {}
+  "closedDays": {},
+  "favoriteRecipeIds": []
 }

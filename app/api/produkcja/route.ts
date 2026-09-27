@@ -364,12 +364,13 @@ export async function GET(request: NextRequest) {
                     const dayOfWeek = currentD.getUTCDay();
                     const dayNum = String(currentD.getUTCDate()).padStart(2, "0");
                     const monthNum = String(currentD.getUTCMonth() + 1).padStart(2, "0");
-                    const label = `${POLISH_DAYS_SHORT[dayOfWeek]} ${dayNum}.${monthNum}`;
+                    const yearNum = currentD.getUTCFullYear();
+                    const label = `${POLISH_DAYS_SHORT[dayOfWeek]} ${dayNum}-${monthNum}`;
 
                     buckets.push({
                         id: dStr,
                         label,
-                        subLabel: dStr,
+                        subLabel: `${dayNum}-${monthNum}-${yearNum}`,
                         startDate: dStr,
                         endDate: dStr,
                         BREAD: { produced: 0, sold: 0, unsold: 0, income: 0 },
@@ -395,12 +396,18 @@ export async function GET(request: NextRequest) {
                     const sun = new Date(mon.getTime() + (6 * 86400000));
                     const monStr = mon.toISOString().split("T")[0];
                     const sunStr = sun.toISOString().split("T")[0];
-                    const label = `${String(mon.getUTCDate()).padStart(2, "0")}.${String(mon.getUTCMonth() + 1).padStart(2, "0")} - ${String(sun.getUTCDate()).padStart(2, "0")}.${String(sun.getUTCMonth() + 1).padStart(2, "0")}`;
+                    const monDay = String(mon.getUTCDate()).padStart(2, "0");
+                    const monMonth = String(mon.getUTCMonth() + 1).padStart(2, "0");
+                    const monYear = mon.getUTCFullYear();
+                    const sunDay = String(sun.getUTCDate()).padStart(2, "0");
+                    const sunMonth = String(sun.getUTCMonth() + 1).padStart(2, "0");
+                    const sunYear = sun.getUTCFullYear();
+                    const label = `${monDay}-${monMonth} - ${sunDay}-${sunMonth}`;
 
                     buckets.push({
                         id: `W_${monStr}`,
                         label,
-                        subLabel: `${monStr} do ${sunStr}`,
+                        subLabel: `${monDay}-${monMonth}-${monYear} do ${sunDay}-${sunMonth}-${sunYear}`,
                         startDate: monStr,
                         endDate: sunStr,
                         BREAD: { produced: 0, sold: 0, unsold: 0, income: 0 },
