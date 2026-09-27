@@ -6,7 +6,8 @@ import {
     ArrowLeft, Loader2, Package, TrendingUp,
     ShoppingCart, Medal, History, Truck, Scale,
     ChevronDown, ChevronUp, CalendarDays, BarChart3,
-    Sparkles, ArrowRight, Pencil, X, CheckCircle2
+    Sparkles, ArrowRight, Pencil, X, CheckCircle2,
+    FileText, ExternalLink, Receipt
 } from "lucide-react";
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -44,12 +45,39 @@ export default function SkladnikDetailPage({
     const [showAllHistory, setShowAllHistory] = useState(false);
     const [isConsumptionModalOpen, setIsConsumptionModalOpen] = useState(false);
 
+    // Stan modalu podglądu faktury
+    const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+    const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
+    const [loadingInvoiceId, setLoadingInvoiceId] = useState<string | null>(null);
+
     // Stan edycji składnika
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editName, setEditName] = useState("");
     const [editUnit, setEditUnit] = useState("kg");
     const [editType, setEditType] = useState<string>("OTHER");
     const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+    const handleOpenInvoiceModal = async (invoiceId: string) => {
+        if (!invoiceId) return;
+        setLoadingInvoiceId(invoiceId);
+        setIsLoadingInvoice(true);
+        try {
+            const res = await fetch(`/api/faktury/${invoiceId}/details`);
+            if (res.ok) {
+                const json = await res.json();
+                setSelectedInvoice(json.invoice);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(`Błąd pobierania faktury: ${err.error || "Nie udało się pobrać szczegółów faktury"}`);
+            }
+        } catch (err) {
+            console.error("Błąd pobierania faktury:", err);
+            alert("Wystąpił błąd podczas pobierania danych faktury.");
+        } finally {
+            setIsLoadingInvoice(false);
+            setLoadingInvoiceId(null);
+        }
+    };
 
     const fetchIngredientDetails = async () => {
         setIsLoading(true);
@@ -256,7 +284,19 @@ export default function SkladnikDetailPage({
                                                 <div className="truncate max-w-[250px]" title={del.supplier}>
                                                     {del.supplier}
                                                 </div>
-                                                <div className="text-[10px] text-ui-secondary font-mono mt-0.5">{del.doc}</div>
+                                                {del.invoiceId ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenInvoiceModal(del.invoiceId)}
+                                                        className="inline-flex items-center gap-1.5 text-[11px] text-ui-primary hover:ui-secondary font-mono font-bold mt-1 px-2 py-0.5 rounded-lg bg-ui-accent/15 hover:bg-ui-accent/30 border border-ui-accent/50 transition-colors cursor-pointer group shadow-2xs text-left"
+                                                        title="Kliknij, aby otworzyć podgląd faktury"
+                                                    >
+                                                        <FileText size={12} className="text-ui-secondary group-hover:text-ui-secondary shrink-0" />
+                                                        <span>{del.doc}</span>
+                                                    </button>
+                                                ) : (
+                                                    <div className="text-[10px] text-ui-secondary font-mono mt-0.5">{del.doc}</div>
+                                                )}
                                             </td>
                                             <td className="p-4 text-center text-ui-black whitespace-nowrap">{del.quantity} {data.unit}</td>
                                             <td className="p-4 text-right font-bold text-ui-black whitespace-nowrap">{del.price.toFixed(2)} zł</td>
@@ -508,6 +548,173 @@ export default function SkladnikDetailPage({
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PODGLĄDU FAKTURY */}
+            {selectedInvoice && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
+                    onClick={() => setSelectedInvoice(null)}
+                >
+                    <div
+                        className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Nagłówek modalu faktury */}
+                        <div className="border-b border-ui-accent p-4 sm:p-5 flex items-start justify-between bg-ui-accent/10 shrink-0">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2.5 bg-white rounded-xl text-ui-primary border border-ui-accent/50 shadow-2xs mt-0.5">
+                                    <FileText size={22} className="text-ui-primary" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h2 className="text-lg sm:text-xl font-bold text-ui-black">
+                                            {selectedInvoice.invoiceNumber}
+                                        </h2>
+                                        {selectedInvoice.isSales && (
+                                            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
+                                                Sprzedaż
+                                            </span>
+                                        )}
+                                        {selectedInvoice.status === "VERIFIED" && (
+                                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
+                                                Zweryfikowana
+                                            </span>
+                                        )}
+                                        {selectedInvoice.status === "NEW" && (
+                                            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
+                                                Nowa (Do weryfikacji)
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-ui-secondary mt-1 font-medium">
+                                        Dostawca: <strong className="text-ui-black">{selectedInvoice.contractor?.name || "Nieznany"}</strong>
+                                        {selectedInvoice.contractor?.nip && (
+                                            <span className="ml-1 text-ui-secondary">(NIP: {selectedInvoice.contractor.nip})</span>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedInvoice(null)}
+                                className="p-1.5 hover:bg-ui-accent/30 text-ui-secondary hover:text-ui-black rounded-full transition-colors cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Ciało modalu */}
+                        <div className="p-4 sm:p-6 space-y-5 text-sm flex-1 bg-white overflow-y-auto min-h-0">
+                            {/* Karty podsumowania faktury */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-ui-accent/10 p-3.5 rounded-xl border border-ui-accent/40 text-xs">
+                                <div>
+                                    <span className="text-[10px] text-ui-secondary uppercase font-bold block">Data wystawienia:</span>
+                                    <span className="text-ui-black font-extrabold text-sm">{formatDate(selectedInvoice.issuedDate)}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-ui-secondary uppercase font-bold block">Wartość Netto:</span>
+                                    <span className="text-ui-black font-extrabold text-sm">{Number(selectedInvoice.netAmount || 0).toFixed(2)} zł</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-ui-secondary uppercase font-bold block">Wartość VAT:</span>
+                                    <span className="text-ui-secondary font-bold text-sm">{Number(selectedInvoice.vatAmount || 0).toFixed(2)} zł</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-ui-secondary uppercase font-bold block">Wartość Brutto:</span>
+                                    <span className="text-ui-primary font-black text-sm">{Number(selectedInvoice.grossAmount || 0).toFixed(2)} zł</span>
+                                </div>
+                            </div>
+
+                            {/* Tabela pozycji na fakturze */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary">
+                                        Pozycje na fakturze ({selectedInvoice.positions?.length || 0})
+                                    </h3>
+                                    <span className="text-[11px] text-ui-secondary">
+                                        Podgląd dla składnika: <strong className="text-ui-black">{data.name}</strong>
+                                    </span>
+                                </div>
+
+                                <div className="border border-ui-accent rounded-xl overflow-hidden shadow-2xs">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-ui-accent/15 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent">
+                                                    <th className="py-2.5 px-3">Lp.</th>
+                                                    <th className="py-2.5 px-3 text-left">Nazwa artykułu z faktury</th>
+                                                    <th className="py-2.5 px-3 text-center whitespace-nowrap">Ilość</th>
+                                                    <th className="py-2.5 px-3 text-right whitespace-nowrap">Cena Netto</th>
+                                                    <th className="py-2.5 px-3 text-right whitespace-nowrap">Wartość Netto</th>
+                                                    <th className="py-2.5 px-3 text-center whitespace-nowrap">VAT</th>
+                                                    <th className="py-2.5 px-3 text-right whitespace-nowrap">Wartość Brutto</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-ui-accent/30">
+                                                {selectedInvoice.positions && selectedInvoice.positions.length > 0 ? (
+                                                    selectedInvoice.positions.map((pos: any, idx: number) => {
+                                                        const isMatchingThisIngredient = pos.product?.ingredientId === id;
+                                                        return (
+                                                            <tr
+                                                                key={pos.id || idx}
+                                                                className={`transition-colors ${isMatchingThisIngredient
+                                                                    ? "bg-amber-50/90 font-medium"
+                                                                    : "hover:bg-ui-accent/5"
+                                                                    }`}
+                                                            >
+                                                                <td className="py-2.5 px-3 text-ui-secondary font-mono text-[11px]">{idx + 1}</td>
+                                                                <td className="py-2.5 px-3 text-ui-black font-semibold">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span>{pos.name}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2.5 px-3 text-center font-bold text-ui-black whitespace-nowrap">
+                                                                    {pos.quantity} {pos.unit || "szt"}
+                                                                </td>
+                                                                <td className="py-2.5 px-3 text-right text-ui-secondary whitespace-nowrap">
+                                                                    {Number(pos.netPrice || 0).toFixed(2)} zł
+                                                                </td>
+                                                                <td className="py-2.5 px-3 text-right font-medium text-ui-black whitespace-nowrap">
+                                                                    {Number(pos.netAmount || (Number(pos.quantity || 0) * Number(pos.netPrice || 0))).toFixed(2)} zł
+                                                                </td>
+                                                                <td className="py-2.5 px-3 text-center text-ui-secondary whitespace-nowrap">
+                                                                    {pos.vatRate ? `${pos.vatRate}%` : "—"}
+                                                                </td>
+                                                                <td className="py-2.5 px-3 text-right font-black text-ui-primary whitespace-nowrap">
+                                                                    {Number(pos.grossAmount || 0).toFixed(2)} zł
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={7} className="p-6 text-center text-xs text-ui-secondary italic">
+                                                            Brak szczegółowych pozycji na fakturze.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Stopka modalu */}
+                        <div className="p-3.5 px-5 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between shrink-0">
+                            <div className="text-xs text-ui-secondary font-mono truncate max-w-md">
+                                {selectedInvoice.ksefNumber ? `KSeF: ${selectedInvoice.ksefNumber}` : "Faktura wprowadzona ręcznie"}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedInvoice(null)}
+                                className="px-4 py-2 text-xs font-bold text-ui-secondary hover:text-ui-black border border-ui-accent bg-white rounded-xl transition-colors cursor-pointer"
+                            >
+                                Zamknij
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

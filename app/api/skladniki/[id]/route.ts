@@ -80,6 +80,7 @@ export async function GET(
         // 1. Historia zakupów (Deliveries History)
         const allPositions: Array<{
             id: string;
+            invoiceId: string;
             date: string;
             rawDate: Date;
             supplier: string;
@@ -103,6 +104,7 @@ export async function GET(
 
                 allPositions.push({
                     id: pos.id,
+                    invoiceId: pos.invoice.id,
                     date: rawDate.toISOString().split("T")[0],
                     rawDate,
                     supplier: pos.invoice.contractor?.name || prod.supplier?.name || "Nieznany dostawca",
@@ -119,6 +121,7 @@ export async function GET(
 
         const deliveriesHistory = allPositions.map((pos) => ({
             id: pos.id,
+            invoiceId: pos.invoiceId,
             date: pos.date,
             supplier: pos.supplier,
             doc: pos.doc,

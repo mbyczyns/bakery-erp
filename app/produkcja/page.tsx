@@ -162,8 +162,8 @@ interface PlanApiResponse {
 const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
     BREAD: "Chleby",
     ROLL: "Bułki",
-    SWEET: "Słodkie",
-    SAVORY: "Słone / Przekąski",
+    SWEET: "Wypieki słodkie",
+    SAVORY: "Wypieki słone",
 };
 
 const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ReactNode; color: string; badge: string }> = {
@@ -180,13 +180,13 @@ const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ReactNode; 
         badge: "bg-sky-100 text-sky-800 border-sky-300",
     },
     SWEET: {
-        label: "Słodkie",
+        label: "Wypieki słodkie",
         icon: <Croissant size={16} className="text-pink-600" />,
         color: "text-pink-700 bg-pink-50 border-pink-200",
         badge: "bg-pink-100 text-pink-800 border-pink-300",
     },
     SAVORY: {
-        label: "Słone / Przekąski",
+        label: "Wypieki słone",
         icon: <Pizza size={16} className="text-emerald-600" />,
         color: "text-emerald-700 bg-emerald-50 border-emerald-200",
         badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
@@ -1378,8 +1378,8 @@ export default function ProdukcjaPage() {
                     const categories = [
                         { key: "BREAD", label: "Chleby", color: "#D97706", lightColor: "#FDE68A", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-900" },
                         { key: "ROLL", label: "Bułki", color: "#0284C7", lightColor: "#BAE6FD", bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-900" },
-                        { key: "SWEET", label: "Słodkie", color: "#DB2777", lightColor: "#FBCFE8", bg: "bg-pink-50", border: "border-pink-200", text: "text-pink-900" },
-                        { key: "SAVORY", label: "Słone", color: "#059669", lightColor: "#A7F3D0", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900" },
+                        { key: "SWEET", label: "Wypieki słodkie", color: "#DB2777", lightColor: "#FBCFE8", bg: "bg-pink-50", border: "border-pink-200", text: "text-pink-900" },
+                        { key: "SAVORY", label: "Wypieki słone", color: "#059669", lightColor: "#A7F3D0", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900" },
                     ];
 
                     return (
@@ -1515,76 +1515,72 @@ export default function ProdukcjaPage() {
                             </div>
                         </div>
 
-                        {/* 2. LEGENDA KATEGORII I ODCIENI */}
-                        <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                {/* Chleby */}
-                                <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 flex items-center gap-3">
-                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-amber-400/50 shrink-0 shadow-xs">
-                                        <div className="flex-1 bg-[#FDE68A]" title="Niesprzedane (jaśniejszy)" />
-                                        <div className="h-5 bg-[#D97706]" title="Sprzedane (ciemniejszy)" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
-                                            <Wheat size={13} className="text-amber-700" /> Chleby
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Bułki */}
-                                <div className="p-2.5 rounded-xl bg-sky-50/60 border border-sky-200/80 flex items-center gap-3">
-                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-sky-400/50 shrink-0 shadow-xs">
-                                        <div className="flex-1 bg-[#BAE6FD]" title="Niesprzedane (jaśniejszy)" />
-                                        <div className="h-5 bg-[#0284C7]" title="Sprzedane (ciemniejszy)" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-extrabold text-sky-900 flex items-center gap-1">
-                                            <Layers size={13} className="text-sky-700" /> Bułki
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Słodkie */}
-                                <div className="p-2.5 rounded-xl bg-pink-50/60 border border-pink-200/80 flex items-center gap-3">
-                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-pink-400/50 shrink-0 shadow-xs">
-                                        <div className="flex-1 bg-[#FBCFE8]" title="Niesprzedane (jaśniejszy)" />
-                                        <div className="h-5 bg-[#DB2777]" title="Sprzedane (ciemniejszy)" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-extrabold text-pink-900 flex items-center gap-1">
-                                            <Croissant size={13} className="text-pink-700" /> Słodkie
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Słone */}
-                                <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center gap-3">
-                                    <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-emerald-400/50 shrink-0 shadow-xs">
-                                        <div className="flex-1 bg-[#A7F3D0]" title="Niesprzedane (jaśniejszy)" />
-                                        <div className="h-5 bg-[#059669]" title="Sprzedane (ciemniejszy)" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-extrabold text-emerald-900 flex items-center gap-1">
-                                            <Pizza size={13} className="text-emerald-700" /> Słone
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         {/* 3. GŁÓWNY WYKRES SŁUPKOWY */}
                         <div className="bg-white border border-ui-accent rounded-2xl p-5 sm:p-6 shadow-xs">
-                            <div className="flex items-center justify-center mb-4">
-                                <h3 className="text-xs sm:text-sm font-extrabold text-ui-primary">
-                                    Produkcja i sprzedaż
-                                </h3>
-                                {isLoadingCurrent && (
-                                    <div className="flex items-center gap-1.5 text-xs text-ui-primary font-bold">
-                                        <Loader2 size={14} className="animate-spin" /> Ładowanie danych...
+                            <div className="flex items-center justify-center">
+                                {/* 2. LEGENDA KATEGORII I ODCIENI */}
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {/* Chleby */}
+                                    <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 flex items-center gap-3">
+                                        <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-amber-400/50 shrink-0 shadow-xs">
+                                            <div className="flex-1 bg-[#FDE68A]" title="Niesprzedane (jaśniejszy)" />
+                                            <div className="h-5 bg-[#D97706]" title="Sprzedane (ciemniejszy)" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
+                                                <Wheat size={13} className="text-amber-700" /> Chleby
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+
+                                    {/* Bułki */}
+                                    <div className="p-2.5 rounded-xl bg-sky-50/60 border border-sky-200/80 flex items-center gap-3">
+                                        <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-sky-400/50 shrink-0 shadow-xs">
+                                            <div className="flex-1 bg-[#BAE6FD]" title="Niesprzedane (jaśniejszy)" />
+                                            <div className="h-5 bg-[#0284C7]" title="Sprzedane (ciemniejszy)" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-extrabold text-sky-900 flex items-center gap-1">
+                                                <Layers size={13} className="text-sky-700" /> Bułki
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Słodkie */}
+                                    <div className="p-2.5 rounded-xl bg-pink-50/60 border border-pink-200/80 flex items-center gap-3">
+                                        <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-pink-400/50 shrink-0 shadow-xs">
+                                            <div className="flex-1 bg-[#FBCFE8]" title="Niesprzedane (jaśniejszy)" />
+                                            <div className="h-5 bg-[#DB2777]" title="Sprzedane (ciemniejszy)" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-extrabold text-pink-900 flex items-center gap-1">
+                                                <Croissant size={13} className="text-pink-700" /> Wypieki słodkie
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Słone */}
+                                    <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center gap-3">
+                                        <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-emerald-400/50 shrink-0 shadow-xs">
+                                            <div className="flex-1 bg-[#A7F3D0]" title="Niesprzedane (jaśniejszy)" />
+                                            <div className="h-5 bg-[#059669]" title="Sprzedane (ciemniejszy)" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-extrabold text-emerald-900 flex items-center gap-1">
+                                                <Pizza size={13} className="text-emerald-700" /> Wypieki słone
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                            {isLoadingCurrent && (
+                                <div className="flex items-center gap-1.5 text-xs text-ui-primary font-bold">
+                                    <Loader2 size={14} className="animate-spin" /> Ładowanie danych...
+                                </div>
+                            )}
 
                             {chartData.length === 0 ? (
                                 <div className="p-16 text-center text-ui-secondary text-sm">
@@ -1705,10 +1701,10 @@ export default function ProdukcjaPage() {
                                                 <span className="text-sky-800">Bułki</span>
                                             </th>
                                             <th className="py-3 px-2 text-right">
-                                                <span className="text-pink-800">Słodkie</span>
+                                                <span className="text-pink-800">Wypieki słodkie</span>
                                             </th>
                                             <th className="py-3 px-2 text-right">
-                                                <span className="text-emerald-800">Słone</span>
+                                                <span className="text-emerald-800">Wypieki słone</span>
                                             </th>
                                             <th className="py-3 px-3 text-right">Produkcja</th>
                                             <th className="py-3 px-3 text-right">Sprzedaż</th>
@@ -1858,12 +1854,8 @@ export default function ProdukcjaPage() {
                         <div className="p-4 sm:p-5 border-b border-ui-accent bg-ui-accent/10 flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h2 className="text-base sm:text-lg font-extrabold text-ui-black flex items-center gap-2">
-                                    <FileText size={20} className="text-ui-primary" />
-                                    Wprowadzanie raportu dziennego
+                                    Raport: <span className="font-bold text-ui-black">{formatDate(formDate)}</span>
                                 </h2>
-                                <p className="text-xs text-ui-secondary">
-                                    Data raportu: <span className="font-bold text-ui-black">{formatDate(formDate)}</span>
-                                </p>
                             </div>
 
                             <div className="flex items-center gap-2">
@@ -1878,7 +1870,7 @@ export default function ProdukcjaPage() {
                                     ) : (
                                         <Copy size={13} />
                                     )}
-                                    <span>Skopiuj prod. z wczoraj</span>
+                                    <span>Skopiuj produkcję z wczoraj</span>
                                 </button>
 
                                 <button

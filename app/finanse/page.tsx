@@ -2,18 +2,25 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale } from "lucide-react";
+import PodsumowanieTab from "./PodsumowanieTab";
 import PrzychodyTab from "./PrzychodyTab";
 import KosztyTab from "./KosztyTab";
 
-type FinanceTab = "PRZYCHODY" | "KOSZTY";
+type FinanceTab = "PODSUMOWANIE" | "PRZYCHODY" | "KOSZTY";
 
 function FinanseContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    const initialTab: FinanceTab = (searchParams.get("tab")?.toUpperCase() === "KOSZTY") ? "KOSZTY" : "PRZYCHODY";
-    const [activeTab, setActiveTab] = useState<FinanceTab>(initialTab);
+    const getInitialTab = (): FinanceTab => {
+        const tabParam = searchParams.get("tab")?.toUpperCase();
+        if (tabParam === "KOSZTY") return "KOSZTY";
+        if (tabParam === "PRZYCHODY") return "PRZYCHODY";
+        return "PODSUMOWANIE";
+    };
+
+    const [activeTab, setActiveTab] = useState<FinanceTab>(getInitialTab);
 
     useEffect(() => {
         const tabParam = searchParams.get("tab")?.toUpperCase();
@@ -21,6 +28,8 @@ function FinanseContent() {
             setActiveTab("KOSZTY");
         } else if (tabParam === "PRZYCHODY") {
             setActiveTab("PRZYCHODY");
+        } else if (tabParam === "PODSUMOWANIE") {
+            setActiveTab("PODSUMOWANIE");
         }
     }, [searchParams]);
 
@@ -41,11 +50,22 @@ function FinanseContent() {
                     </h1>
                 </div>
 
-                {/* ---------------- GŁÓWNY PRZEŁĄCZNIK ZAKŁADEK (PRZYCHODY / KOSZTY) ---------------- */}
+                {/* ---------------- GŁÓWNY PRZEŁĄCZNIK ZAKŁADEK (PODSUMOWANIE / PRZYCHODY / KOSZTY) ---------------- */}
                 <div className="flex items-center p-1 sm:p-1.5 bg-ui-accent/15 rounded-2xl border border-ui-accent/40 shadow-xs w-full sm:w-auto">
                     <button
+                        onClick={() => handleTabChange("PODSUMOWANIE")}
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                            activeTab === "PODSUMOWANIE"
+                                ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
+                                : "text-ui-secondary hover:text-ui-primary"
+                        }`}
+                    >
+                        <Scale size={16} className={activeTab === "PODSUMOWANIE" ? "text-ui-primary" : ""} />
+                        <span>Podsumowanie</span>
+                    </button>
+                    <button
                         onClick={() => handleTabChange("PRZYCHODY")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                             activeTab === "PRZYCHODY"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
@@ -56,7 +76,7 @@ function FinanseContent() {
                     </button>
                     <button
                         onClick={() => handleTabChange("KOSZTY")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
                             activeTab === "KOSZTY"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
@@ -69,6 +89,7 @@ function FinanseContent() {
             </div>
 
             {/* ---------------- ZAWARTOŚĆ AKTYWNEJ ZAKŁADKI ---------------- */}
+            {activeTab === "PODSUMOWANIE" && <PodsumowanieTab />}
             {activeTab === "PRZYCHODY" && <PrzychodyTab />}
             {activeTab === "KOSZTY" && <KosztyTab />}
         </div>
