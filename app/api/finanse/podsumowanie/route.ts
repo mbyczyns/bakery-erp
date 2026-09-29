@@ -369,14 +369,14 @@ export async function GET(request: NextRequest) {
             },
             {
                 id: "other_retail",
-                name: "Pozostały utarg sklepu",
+                name: "Przychody z pozostałych produktów i wczorajszego pieczywa",
                 value: grandOtherRevenue,
                 sharePercent: grandTotalRevenue > 0 ? Math.round((grandOtherRevenue / grandTotalRevenue) * 1000) / 10 : 0,
                 color: "#06b6d4", // cyan-500
             },
             {
                 id: "sales_invoices",
-                name: "Faktury wystawione",
+                name: "Sprzedaż na faktury (przelewy)",
                 value: grandSalesInvGross,
                 sharePercent: grandTotalRevenue > 0 ? Math.round((grandSalesInvGross / grandTotalRevenue) * 1000) / 10 : 0,
                 color: "#8b5cf6", // purple-500
@@ -391,7 +391,7 @@ export async function GET(request: NextRequest) {
 
         const bakeryCategoriesBreakdown = [
             { id: "BREAD", name: "Chleby", value: grandCategoryBread, color: "#d97706" },
-            { id: "ROLL", name: "Bułki", value: grandCategoryRoll, color: "#f59e0b" },
+            { id: "ROLL", name: "Bułki", value: grandCategoryRoll, color: "#9333ea" },
             { id: "SWEET", name: "Słodkie wypieki", value: grandCategorySweet, color: "#ec4899" },
             { id: "SAVORY", name: "Słone wypieki", value: grandCategorySavory, color: "#6366f1" },
         ].filter((c) => c.value > 0);

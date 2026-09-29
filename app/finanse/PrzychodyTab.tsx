@@ -183,8 +183,8 @@ interface ProductRankingItem {
 }
 
 const CATEGORY_MAP: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-    BREAD: { label: "Chleby", color: "#0c8ac9", icon: Wheat },
-    ROLL: { label: "Bułki", color: "#38bdf8", icon: Layers },
+    BREAD: { label: "Chleby", color: "#d97706", icon: Wheat },
+    ROLL: { label: "Bułki", color: "#9333ea", icon: Layers },
     SWEET: { label: "Wypieki słodkie", color: "#f59e0b", icon: Croissant },
     SAVORY: { label: "Wypieki słone", color: "#10b981", icon: Pizza },
 };
@@ -621,7 +621,7 @@ export default function PrzychodyTab() {
                         >
                             <ChevronLeft size={16} />
                         </button>
-                        <span className="px-3 text-xs font-black text-ui-primary min-w-[90px] text-center">
+                        <span className="px-3 text-xs font-bold text-ui-primary min-w-[90px] text-center">
                             {selectedMonth}
                         </span>
                         <button
@@ -766,14 +766,14 @@ export default function PrzychodyTab() {
                 <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                     <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                            <DollarSign size={15} className="text-ui-primary" />
-                            {view === "MONTHLY" ? "Łączny przychód (z fakturami)" : "Utarg dzienny (sklep)"}
+                            {view === "MONTHLY" ? "Łączny przychód (z fakturami) " : "Utarg z kasy "}
+                            ({view === "INVOICES" ? `${filteredSalesInvoices.length} faktur` : `${activeStats.daysCount} dni`})
                         </span>
-                        <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
-                            {view === "INVOICES" ? `${filteredSalesInvoices.length} faktur` : `${activeStats.daysCount} dni`}
-                        </span>
+
+                        <DollarSign size={15} className="text-ui-secondary" />
+
                     </div>
-                    <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                    <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
                         {formatCurrency(activeStats.totalIncome)}
                     </div>
                 </div>
@@ -783,14 +783,12 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Wheat size={15} className="text-ui-primary" />
+
                                 Sprzedaż pieczywa
                             </span>
-                            <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
-                                {activeStats.bakerySharePercent}%
-                            </span>
+                            <Wheat size={15} className="text-ui-secondary" />
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
                             {formatCurrency(activeStats.bakerySalesIncome)}
                         </div>
                     </div>
@@ -801,32 +799,27 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <ShoppingBag size={15} className="text-ui-primary" />
+
                                 Inne (kasa)
                             </span>
-                            <span className="text-[11px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md border border-ui-accent/10">
-                                {activeStats.otherSharePercent}%
-                            </span>
+                            <ShoppingBag size={15} className="text-ui-secondary" />
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
                             {formatCurrency(activeStats.otherIncome)}
                         </div>
                     </div>
                 </div>
 
                 {/* KARTA 4: FAKTURY SPRZEDAŻOWE (MIESIĘCZNE) */}
-                <div className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between bg-emerald-50/20">
+                <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                     <div>
-                        <div className="text-[11px] uppercase font-bold text-emerald-800 tracking-wider flex items-center justify-between">
+                        <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Receipt size={15} className="text-emerald-600" />
                                 Faktury (B2B)
                             </span>
-                            <span className="text-[11px] font-black text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
-                                {view === "DAILY" ? `${currentMonthInvoices.length} w ${selectedMonth}` : `${data?.salesInvoices?.length || 0} łącznie`}
-                            </span>
+                            <Receipt size={15} className="text-ui-secondary" />
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-950 tracking-tight">
                             {formatCurrency(view === "DAILY" ? currentMonthInvoicesGross : activeStats.salesInvoicesGross)}
                         </div>
                     </div>
@@ -840,14 +833,11 @@ export default function PrzychodyTab() {
                     <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs lg:col-span-2">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <BarChart3 size={15} className="text-ui-primary" />
+                                <BarChart3 size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                 {view === "DAILY" && "Dzienny utarg ze sklepu (Pieczywo + Inne z kasy)"}
                                 {view === "WEEKLY" && "Tygodniowy utarg ze sklepu (Pieczywo + Inne)"}
                                 {view === "MONTHLY" && "Miesięczny przychód (Sklep + Faktury sprzedażowe B2B)"}
                             </h3>
-                            <span className="text-[11px] font-bold text-ui-secondary bg-ui-accent/15 px-2.5 py-0.5 rounded-full">
-                                {chartData.length} punktów
-                            </span>
                         </div>
 
                         <div className="h-[280px] w-full">
@@ -874,11 +864,11 @@ export default function PrzychodyTab() {
                                                 const pt = payload[0].payload;
                                                 return (
                                                     <div className="bg-white border border-ui-accent/80 rounded-2xl p-4 shadow-xl text-xs min-w-[240px]">
-                                                        <div className="font-black text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2.5">
+                                                        <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2.5">
                                                             {pt.fullLabel || (pt.dayOfWeek ? `${pt.dayOfWeek}, ${formatDate(pt.fullDate || "")}` : label)}
                                                         </div>
                                                         <div className="space-y-1.5">
-                                                            <div className="flex items-center justify-between text-ui-black font-black text-sm border-b border-ui-accent/20 pb-1">
+                                                            <div className="flex items-center justify-between text-ui-black font-bold text-sm border-b border-ui-accent/20 pb-1">
                                                                 <span>Przychód łączny:</span>
                                                                 <span>{formatCurrency(pt.total)}</span>
                                                             </div>
@@ -948,7 +938,7 @@ export default function PrzychodyTab() {
                     <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <PieIcon size={15} className="text-ui-primary" />
+                                <PieIcon size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                 Struktura źródeł przychodu
                             </h3>
                         </div>
@@ -980,18 +970,18 @@ export default function PrzychodyTab() {
                         <div className={`grid ${view === "MONTHLY" ? "grid-cols-3" : "grid-cols-2"} gap-1.5 pt-2 border-t border-ui-accent/30 text-xs`}>
                             <div className="p-2 rounded-xl bg-ui-accent/10">
                                 <div className="text-[10px] text-ui-secondary font-bold">Pieczywo:</div>
-                                <div className="font-black text-ui-primary text-xs sm:text-sm">{activeStats.bakerySharePercent}%</div>
+                                <div className="font-bold text-ui-primary text-xs sm:text-sm">{activeStats.bakerySharePercent}%</div>
                                 <div className="text-[9px] sm:text-[10px] text-ui-secondary truncate">{formatCurrency(activeStats.bakerySalesIncome)}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-blue-50">
                                 <div className="text-[10px] text-blue-900 font-bold">Inne detal:</div>
-                                <div className="font-black text-blue-900 text-xs sm:text-sm">{activeStats.otherSharePercent}%</div>
+                                <div className="font-bold text-blue-900 text-xs sm:text-sm">{activeStats.otherSharePercent}%</div>
                                 <div className="text-[9px] sm:text-[10px] text-blue-700 truncate">{formatCurrency(activeStats.otherIncome)}</div>
                             </div>
                             {view === "MONTHLY" && (
                                 <div className="p-2 rounded-xl bg-emerald-50">
                                     <div className="text-[10px] text-emerald-900 font-bold">Faktury B2B:</div>
-                                    <div className="font-black text-emerald-950 text-xs sm:text-sm">{activeStats.salesInvoicesSharePercent}%</div>
+                                    <div className="font-bold text-emerald-950 text-xs sm:text-sm">{activeStats.salesInvoicesSharePercent}%</div>
                                     <div className="text-[9px] sm:text-[10px] text-emerald-800 truncate">{formatCurrency(activeStats.salesInvoicesGross)}</div>
                                 </div>
                             )}
@@ -1008,7 +998,7 @@ export default function PrzychodyTab() {
                     <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                         <div>
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Calendar size={14} /> Dzienny rejestr utargu i sprzedaży w sklepie
+                                <Calendar size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Dzienny rejestr utargu i sprzedaży w sklepie
                             </h3>
 
                         </div>
@@ -1057,7 +1047,7 @@ export default function PrzychodyTab() {
                                                     <td className="p-3.5 text-right font-bold text-blue-600">
                                                         {formatCurrency(d.otherIncome)}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-black text-ui-black text-sm">
+                                                    <td className="p-3.5 text-right font-bold text-ui-black text-sm">
                                                         {formatCurrency(d.totalIncome)}
                                                     </td>
                                                     <td className="p-3.5 text-center">
@@ -1112,7 +1102,7 @@ export default function PrzychodyTab() {
                                                                                 <Icon size={14} className="text-ui-secondary" />
                                                                                 <span className="text-[11px] font-bold text-ui-black">{catInfo?.label}</span>
                                                                             </div>
-                                                                            <span className="text-xs font-black text-ui-primary">{formatCurrency(val)}</span>
+                                                                            <span className="text-xs font-bold text-ui-primary">{formatCurrency(val)}</span>
                                                                         </div>
                                                                     );
                                                                 })}
@@ -1140,7 +1130,7 @@ export default function PrzychodyTab() {
                                                                             </div>
                                                                             <div className="mt-2 pt-1 border-t border-ui-accent/20 flex items-center justify-between text-xs">
                                                                                 <span className="text-ui-secondary text-[10px]">Przychód:</span>
-                                                                                <span className="font-black text-ui-primary">
+                                                                                <span className="font-bold text-ui-primary">
                                                                                     {formatCurrency(prod.salesIncome)}
                                                                                 </span>
                                                                             </div>
@@ -1219,7 +1209,7 @@ export default function PrzychodyTab() {
                                             <td className="p-3.5 text-right font-bold text-blue-600">
                                                 {formatCurrency(w.otherIncome)}
                                             </td>
-                                            <td className="p-3.5 text-right font-black text-ui-black text-sm">
+                                            <td className="p-3.5 text-right font-bold text-ui-black text-sm">
                                                 {formatCurrency(w.totalIncome)}
                                             </td>
                                             <td className="p-3.5 text-right font-bold text-ui-secondary">
@@ -1315,7 +1305,7 @@ export default function PrzychodyTab() {
                                                         {m.salesInvoicesGross > 0 ? (
                                                             <div className="flex items-center justify-end gap-1.5 font-bold text-emerald-800">
                                                                 <span>{formatCurrency(m.salesInvoicesGross)}</span>
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-950 font-black">
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-950 font-bold">
                                                                     {m.salesInvoicesCount}
                                                                 </span>
                                                             </div>
@@ -1323,7 +1313,7 @@ export default function PrzychodyTab() {
                                                             <span className="text-ui-secondary/40 font-normal">—</span>
                                                         )}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-black text-ui-black text-sm">
+                                                    <td className="p-3.5 text-right font-bold text-ui-black text-sm">
                                                         {formatCurrency(m.totalIncome)}
                                                     </td>
                                                     <td className="p-3.5 text-right font-bold text-ui-secondary">
@@ -1350,7 +1340,7 @@ export default function PrzychodyTab() {
                                                                     <Receipt size={14} className="text-emerald-700" />
                                                                     Faktury sprzedażowe w miesiącu {m.label}:
                                                                 </span>
-                                                                <span className="bg-emerald-100 text-emerald-950 px-2 py-0.5 rounded-md font-black">
+                                                                <span className="bg-emerald-100 text-emerald-950 px-2 py-0.5 rounded-md font-bold">
                                                                     Suma brutto: {formatCurrency(m.salesInvoicesGross)} (netto: {formatCurrency(m.salesInvoicesNet)})
                                                                 </span>
                                                             </div>
@@ -1372,7 +1362,7 @@ export default function PrzychodyTab() {
                                                                                 </div>
                                                                             </div>
                                                                             <div className="text-right">
-                                                                                <div className="font-black text-emerald-950 text-xs">
+                                                                                <div className="font-bold text-emerald-950 text-xs">
                                                                                     {formatCurrency(inv.grossAmount)}
                                                                                 </div>
                                                                                 <div className="text-[9px] text-ui-secondary">
@@ -1421,7 +1411,7 @@ export default function PrzychodyTab() {
                                         </span>
                                         <span className="font-bold text-ui-primary">{share}%</span>
                                     </div>
-                                    <div className="mt-2 text-xl font-black text-ui-black">
+                                    <div className="mt-2 text-xl font-bold text-ui-black">
                                         {formatCurrency(totalRev)}
                                     </div>
                                 </div>
@@ -1460,7 +1450,7 @@ export default function PrzychodyTab() {
                                             const catInfo = CATEGORY_MAP[p.productType];
                                             return (
                                                 <tr key={p.productId} className="hover:bg-ui-accent/5 transition-colors">
-                                                    <td className="p-3.5 text-center font-black text-ui-secondary">
+                                                    <td className="p-3.5 text-center font-bold text-ui-secondary">
                                                         {idx + 1}
                                                     </td>
                                                     <td className="p-3.5 font-bold text-ui-black">
@@ -1485,7 +1475,7 @@ export default function PrzychodyTab() {
                                                             {p.sellThroughRate}%
                                                         </span>
                                                     </td>
-                                                    <td className="p-3.5 text-right font-black text-ui-black text-sm">
+                                                    <td className="p-3.5 text-right font-bold text-ui-black text-sm">
                                                         {formatCurrency(p.totalRevenue)}
                                                     </td>
                                                 </tr>
@@ -1525,12 +1515,12 @@ export default function PrzychodyTab() {
                                             <span className="font-bold text-ui-black text-xs truncate" title={c.contractorName}>
                                                 {idx + 1}. {c.contractorName}
                                             </span>
-                                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-950 whitespace-nowrap">
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-950 whitespace-nowrap">
                                                 {c.sharePercent}%
                                             </span>
                                         </div>
                                         <div className="mt-3">
-                                            <div className="text-lg font-black text-emerald-950">
+                                            <div className="text-lg font-bold text-emerald-950">
                                                 {formatCurrency(c.totalGross)}
                                             </div>
                                             <div className="text-[10px] text-ui-secondary mt-0.5 flex justify-between">
@@ -1583,7 +1573,7 @@ export default function PrzychodyTab() {
                                                         <td className="p-3.5 font-bold text-ui-black">
                                                             {formatDate(inv.issuedDate)}
                                                         </td>
-                                                        <td className="p-3.5 font-black text-ui-primary">
+                                                        <td className="p-3.5 font-bold text-ui-primary">
                                                             {inv.invoiceNumber}
                                                         </td>
                                                         <td className="p-3.5 font-bold text-ui-black">
@@ -1603,7 +1593,7 @@ export default function PrzychodyTab() {
                                                         <td className="p-3.5 text-right font-semibold text-ui-secondary">
                                                             {formatCurrency(inv.vatAmount)}
                                                         </td>
-                                                        <td className="p-3.5 text-right font-black text-emerald-950 text-sm">
+                                                        <td className="p-3.5 text-right font-bold text-emerald-950 text-sm">
                                                             {formatCurrency(inv.grossAmount)}
                                                         </td>
                                                         <td className="p-3.5 text-center text-ui-secondary">
@@ -1648,7 +1638,7 @@ export default function PrzychodyTab() {
                                                                                         <td className="p-2.5 text-right font-semibold text-ui-secondary">
                                                                                             {formatCurrency(p.netAmount)}
                                                                                         </td>
-                                                                                        <td className="p-2.5 text-right font-black text-ui-primary">
+                                                                                        <td className="p-2.5 text-right font-bold text-ui-primary">
                                                                                             {formatCurrency(p.grossAmount)}
                                                                                         </td>
                                                                                     </tr>

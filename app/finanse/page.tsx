@@ -45,7 +45,7 @@ function FinanseContent() {
             {/* ---------------- GŁÓWNY NAGŁÓWEK STRONY FINANSE ---------------- */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ui-black flex items-center gap-2.5 sm:gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ui-black flex items-center gap-2.5 sm:gap-3">
                         Finanse
                     </h1>
                 </div>
@@ -54,33 +54,30 @@ function FinanseContent() {
                 <div className="flex items-center p-1 sm:p-1.5 bg-ui-accent/15 rounded-2xl border border-ui-accent/40 shadow-xs w-full sm:w-auto">
                     <button
                         onClick={() => handleTabChange("PODSUMOWANIE")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
-                            activeTab === "PODSUMOWANIE"
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "PODSUMOWANIE"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                            }`}
                     >
                         <Scale size={16} className={activeTab === "PODSUMOWANIE" ? "text-ui-primary" : ""} />
                         <span>Podsumowanie</span>
                     </button>
                     <button
                         onClick={() => handleTabChange("PRZYCHODY")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
-                            activeTab === "PRZYCHODY"
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "PRZYCHODY"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                            }`}
                     >
                         <TrendingUp size={16} className={activeTab === "PRZYCHODY" ? "text-emerald-600" : ""} />
                         <span>Przychody</span>
                     </button>
                     <button
                         onClick={() => handleTabChange("KOSZTY")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
-                            activeTab === "KOSZTY"
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "KOSZTY"
                                 ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
                                 : "text-ui-secondary hover:text-ui-primary"
-                        }`}
+                            }`}
                     >
                         <TrendingDown size={16} className={activeTab === "KOSZTY" ? "text-rose-600" : ""} />
                         <span>Koszty</span>

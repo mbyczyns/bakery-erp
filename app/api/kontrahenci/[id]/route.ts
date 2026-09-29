@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getCustomNamesMap, saveCustomName } from "@/lib/contractor-names";
+import { getContractorNotesMap, saveContractorNote } from "@/lib/contractor-notes";
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,9 @@ export async function GET(
 
         const customNamesMap = getCustomNamesMap();
         const customName = (contractor as any).customName || customNamesMap[contractor.id] || null;
+
+        const notesMap = getContractorNotesMap();
+        const notes = (contractor as any).notes || notesMap[contractor.id] || null;
 
         // 1. Podsumowanie wydatków (stats)
         let totalGross = 0;
@@ -131,7 +135,7 @@ export async function GET(
                 email: contractor.email,
                 phone: contractor.phone,
                 contactPerson: contractor.contactPerson,
-                notes: contractor.notes,
+                notes,
                 createdAt: contractor.createdAt,
             },
             stats: {
@@ -174,7 +178,7 @@ export async function GET(
     }
 }
 
-// PATCH: Aktualizacja własnej nazwy kontrahenta
+// PATCH: Aktualizacja danych kontrahenta (własna nazwa, notatki / uwagi)
 export async function PATCH(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
@@ -186,28 +190,44 @@ export async function PATCH(
         }
 
         const body = await request.json();
-        const { customName } = body;
+        const { customName, notes } = body;
 
-        const trimmed = customName !== undefined && customName !== null ? String(customName).trim() : null;
-        saveCustomName(id, trimmed);
+        const updateData: Record<string, any> = {};
 
-        // Próba zapisu do bazy danych PostgreSQL jeśli kolumna customName już istnieje
+        let trimmedName: string | null = null;
+        if (customName !== undefined) {
+            trimmedName = customName !== null && String(customName).trim().length > 0 ? String(customName).trim() : null;
+            saveCustomName(id, trimmedName);
+            updateData.customName = trimmedName;
+        }
+
+        let trimmedNotes: string | null = null;
+        if (notes !== undefined) {
+            trimmedNotes = notes !== null && String(notes).trim().length > 0 ? String(notes).trim() : null;
+            saveContractorNote(id, trimmedNotes);
+            updateData.notes = trimmedNotes;
+        }
+
+        // Próba zapisu do bazy danych PostgreSQL
         try {
-            await (prisma.contractor as any).update({
-                where: { id },
-                data: { customName: trimmed },
-            });
-        } catch {
-            // Kolumna może czekać na restart kontenera / push
+            if (Object.keys(updateData).length > 0) {
+                await (prisma.contractor as any).update({
+                    where: { id },
+                    data: updateData,
+                });
+            }
+        } catch (dbErr) {
+            console.warn("Błąd zapisu danych do bazy (użyto fallbacku JSON):", dbErr);
         }
 
         return NextResponse.json({
             success: true,
-            customName: trimmed,
-            message: "Własna nazwa kontrahenta została zaktualizowana",
+            customName: trimmedName,
+            notes: trimmedNotes,
+            message: "Dane kontrahenta zostały zaktualizowane",
         });
     } catch (error: any) {
-        console.error("Błąd aktualizacji własnej nazwy kontrahenta:", error);
+        console.error("Błąd aktualizacji kontrahenta:", error);
         return NextResponse.json(
             { error: "Błąd serwera", details: error.message },
             { status: 500 }

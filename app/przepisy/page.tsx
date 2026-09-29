@@ -87,13 +87,14 @@ export default function PrzepisyPage() {
             try {
                 const saved = localStorage.getItem("bakery_favorite_recipes");
                 if (saved) return JSON.parse(saved);
-            } catch {}
+            } catch { }
         }
         return [];
     });
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<MainTab>("ALL");
+    const [onlyFavoritesFilter, setOnlyFavoritesFilter] = useState(false);
 
     // Modal podglądu półproduktu
     const [selectedSemiFinished, setSelectedSemiFinished] = useState<SemiFinishedItem | null>(null);
@@ -162,7 +163,7 @@ export default function PrzepisyPage() {
                     setFavoriteRecipeIds(data.favoriteIds);
                     try {
                         localStorage.setItem("bakery_favorite_recipes", JSON.stringify(data.favoriteIds));
-                    } catch {}
+                    } catch { }
                 }
             }
         } catch (error) {
@@ -182,7 +183,7 @@ export default function PrzepisyPage() {
         setFavoriteRecipeIds(updated);
         try {
             localStorage.setItem("bakery_favorite_recipes", JSON.stringify(updated));
-        } catch {}
+        } catch { }
 
         try {
             await fetch("/api/przepisy/favorites", {
@@ -551,7 +552,8 @@ export default function PrzepisyPage() {
     // Filtry i sortowanie list (ulubione na samej górze)
     const filteredRecipes = recipes
         .filter((r) => activeTab === "ALL" || r.type === activeTab)
-        .filter((r) => matchesSearch(r.name, searchTerm));
+        .filter((r) => matchesSearch(r.name, searchTerm))
+        .filter((r) => !onlyFavoritesFilter || favoriteRecipeIds.includes(r.id));
 
     const sortedRecipes = [...filteredRecipes].sort((a, b) => {
         const aFav = favoriteRecipeIds.includes(a.id);
@@ -561,9 +563,9 @@ export default function PrzepisyPage() {
         return a.name.localeCompare(b.name, "pl");
     });
 
-    const filteredSemiFinished = semiFinishedList.filter((s) =>
-        matchesSearch(s.name, searchTerm)
-    );
+    const filteredSemiFinished = semiFinishedList
+        .filter((s) => matchesSearch(s.name, searchTerm))
+        .filter((s) => !onlyFavoritesFilter || favoriteRecipeIds.includes(s.id));
 
     const sortedSemiFinished = [...filteredSemiFinished].sort((a, b) => {
         const aFav = favoriteRecipeIds.includes(a.id);
@@ -615,7 +617,7 @@ export default function PrzepisyPage() {
             </div>
 
             {/* Zakładki */}
-            <div className="flex border-b border-ui-accent mb-6 gap-1.5 sm:gap-2 overflow-x-auto pb-0.5">
+            <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
                 {(
                     [
                         { id: "ALL", label: "Wszystkie" },
@@ -638,14 +640,17 @@ export default function PrzepisyPage() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${isActive
-                                ? "border-amber-600 text-amber-900 bg-amber-50/70 rounded-t-xl font-bold"
-                                : "border-transparent text-ui-secondary hover:text-ui-primary"
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${isActive
+                                ? "border-ui-secondary text-ui-secondary font-bold"
+                                : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >
                             {tab.icon && <tab.icon size={15} />}
                             {tab.label}
-                            <span className="bg-amber-200/80 text-amber-950 text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold ml-1">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${isActive
+                                ? "bg-ui-secondary text-ui-white"
+                                : "bg-ui-accent/25 text-ui-primary/70"
+                                }`}>
                                 {count}
                             </span>
                         </button>
@@ -653,16 +658,38 @@ export default function PrzepisyPage() {
                 })}
             </div>
 
-            {/* Wyszukiwarka */}
-            <div className="relative mb-6">
-                <Search className="absolute left-4 top-3.5 text-ui-secondary" size={20} />
-                <input
-                    type="text"
-                    placeholder="Szukaj po nazwie..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-ui-white pl-12 pr-4 py-3 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary transition-all text-sm"
-                />
+            {/* Wyszukiwarka i filtr oznaczonych */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+                <div className="relative flex-1">
+                    <Search className="absolute left-4 top-3.5 text-ui-secondary" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Szukaj po nazwie..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-ui-white pl-12 pr-4 py-3 rounded-xl border border-ui-accent text-ui-primary shadow-sm focus:outline-none focus:border-ui-secondary transition-all text-sm"
+                    />
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => setOnlyFavoritesFilter((prev) => !prev)}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border font-semibold text-xs sm:text-sm transition-all shadow-xs cursor-pointer shrink-0 ${onlyFavoritesFilter
+                        ? "bg-amber-50 text-amber-900 border-amber-300 font-bold"
+                        : "bg-ui-white text-ui-primary border-ui-accent hover:bg-ui-accent/20"
+                        }`}
+                    title="Pokaż tylko przepisy oznaczone gwiazdką (wyświetlane domyślnie w raporcie)"
+                >
+                    <Star
+                        size={16}
+                        className={onlyFavoritesFilter ? "text-amber-500 fill-amber-400" : "text-ui-secondary"}
+                    />
+                    <span>
+                        {onlyFavoritesFilter
+                            ? `Tylko oznaczone (${favoriteRecipeIds.length})`
+                            : "Wszystkie"}
+                    </span>
+                </button>
             </div>
 
             {/* TABELA GŁÓWNA */}
@@ -702,6 +729,8 @@ export default function PrzepisyPage() {
                             ) : (
                                 sortedSemiFinished.map((semi) => {
                                     const isFav = favoriteRecipeIds.includes(semi.id);
+                                    const costNet = Number(semi.cost || 0);
+                                    const costGross = costNet * 1.05;
                                     return (
                                         <tr
                                             key={semi.id}
@@ -716,11 +745,10 @@ export default function PrzepisyPage() {
                                                     <button
                                                         type="button"
                                                         onClick={(e) => handleToggleFavorite(semi.id, e)}
-                                                        className={`p-1 -ml-1 rounded-md transition-colors cursor-pointer shrink-0 ${
-                                                            isFav
-                                                                ? "text-amber-500 hover:text-amber-600"
-                                                                : "text-ui-secondary/30 hover:text-amber-400 opacity-60 group-hover:opacity-100"
-                                                        }`}
+                                                        className={`p-1 -ml-1 rounded-md transition-colors cursor-pointer shrink-0 ${isFav
+                                                            ? "text-amber-500 hover:text-amber-600"
+                                                            : "text-ui-secondary/30 hover:text-amber-400 opacity-60 group-hover:opacity-100"
+                                                            }`}
                                                         title={isFav ? "Usuń z wyróżnionych" : "Oznacz gwiazdką"}
                                                     >
                                                         <Star
@@ -734,8 +762,13 @@ export default function PrzepisyPage() {
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="p-4 text-right text-ui-black font-medium">
-                                                {Number(semi.cost || 0).toFixed(2)} zł / {semi.unit}
+                                            <td className="p-4 text-right">
+                                                <div className="font-semibold text-ui-black">
+                                                    {costNet.toFixed(2)} zł <span className="text-xs font-normal text-ui-secondary">netto</span>
+                                                </div>
+                                                <div className="text-xs text-ui-secondary">
+                                                    {costGross.toFixed(2)} zł brutto / {semi.unit}
+                                                </div>
                                             </td>
                                             <td className="p-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
@@ -787,11 +820,10 @@ export default function PrzepisyPage() {
                                                 <button
                                                     type="button"
                                                     onClick={(e) => handleToggleFavorite(recipe.id, e)}
-                                                    className={`p-1 -ml-1 rounded-md transition-colors cursor-pointer shrink-0 ${
-                                                        isFav
-                                                            ? "text-amber-500 hover:text-amber-600"
-                                                            : "text-ui-secondary/30 hover:text-amber-400 opacity-60 group-hover:opacity-100"
-                                                    }`}
+                                                    className={`p-1 -ml-1 rounded-md transition-colors cursor-pointer shrink-0 ${isFav
+                                                        ? "text-amber-500 hover:text-amber-600"
+                                                        : "text-ui-secondary/30 hover:text-amber-400 opacity-60 group-hover:opacity-100"
+                                                        }`}
                                                     title={isFav ? "Usuń z wyróżnionych" : "Oznacz gwiazdką"}
                                                 >
                                                     <Star
@@ -807,8 +839,13 @@ export default function PrzepisyPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-4 text-right text-ui-black font-medium">
-                                            {Number(recipe.sellingPrice || 0).toFixed(2)} zł
+                                        <td className="p-4 text-right">
+                                            <div className="font-semibold text-ui-black">
+                                                {Number(recipe.sellingPrice || 0).toFixed(2)} zł <span className="text-xs font-normal text-ui-secondary">brutto</span>
+                                            </div>
+                                            <div className="text-xs text-ui-secondary">
+                                                {(Number(recipe.sellingPrice || 0) / 1.05).toFixed(2)} zł netto
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
@@ -831,7 +868,6 @@ export default function PrzepisyPage() {
                                                     title="Edytuj przepis"
                                                 >
                                                     <Pencil size={13} />
-                                                    Edytuj
                                                 </button>
                                             </div>
                                         </td>
@@ -860,7 +896,7 @@ export default function PrzepisyPage() {
                                     <h2 className="text-xl font-bold text-ui-black">{selectedSemiFinished.name}</h2>
                                 </div>
                                 <p className="text-xs text-ui-secondary mt-0.5">
-                                    Koszt jednostkowy: <b>{Number(selectedSemiFinished.cost || 0).toFixed(2)} zł / {selectedSemiFinished.unit}</b>
+                                    Koszt jednostkowy: <b>{Number(selectedSemiFinished.cost || 0).toFixed(2)} zł netto</b> <span className="text-ui-secondary">({(Number(selectedSemiFinished.cost || 0) * 1.05).toFixed(2)} zł brutto) / {selectedSemiFinished.unit}</span>
                                 </p>
                             </div>
                             <button
@@ -1173,7 +1209,7 @@ export default function PrzepisyPage() {
                                         <button
                                             type="button"
                                             onClick={() => setIsCreateIngredientOpen(true)}
-                                            className="flex items-center gap-1 mx-auto text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                            className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                                         >
                                             <Plus size={13} />
                                             Nowy składnik

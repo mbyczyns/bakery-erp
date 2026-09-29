@@ -20,13 +20,37 @@ export async function GET(
                 ingredients: {
                     orderBy: { order: "asc" },
                     include: {
-                        ingredient: true,
+                        ingredient: {
+                            include: {
+                                products: {
+                                    include: {
+                                        invoicePositions: {
+                                            include: { invoice: true },
+                                            orderBy: { invoice: { issuedDate: "desc" } },
+                                            take: 1,
+                                        },
+                                    },
+                                },
+                            },
+                        },
                         semiFinished: {
                             include: {
                                 ingredients: {
                                     orderBy: { order: "asc" },
                                     include: {
-                                        ingredient: true,
+                                        ingredient: {
+                                            include: {
+                                                products: {
+                                                    include: {
+                                                        invoicePositions: {
+                                                            include: { invoice: true },
+                                                            orderBy: { invoice: { issuedDate: "desc" } },
+                                                            take: 1,
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
                                         childSemiFinished: true,
                                     },
                                 },
@@ -36,7 +60,6 @@ export async function GET(
                 },
                 productions: {
                     orderBy: { date: "desc" },
-                    take: 30,
                 },
             },
         });
@@ -45,18 +68,67 @@ export async function GET(
             return NextResponse.json({ error: "Nie znaleziono przepisu" }, { status: 404 });
         }
 
+        const extractPrices = (ing: any) => {
+            if (!ing) return { priceNet: 0, priceGross: 0 };
+            let lastPurchase: { date: any; priceNet: number; priceGross: number } | null = null;
+            if (ing.products && Array.isArray(ing.products)) {
+                for (const prod of ing.products) {
+                    if (prod.invoicePositions && prod.invoicePositions.length > 0) {
+                        const pos = prod.invoicePositions[0];
+                        if (pos.invoice?.status === "REJECTED") continue;
+                        if (!lastPurchase || (pos.invoice?.issuedDate && new Date(pos.invoice.issuedDate) > new Date(lastPurchase.date))) {
+                            const multiplier = Number(prod.multiplier || 1) || 1;
+                            const realUnitPriceNet = Number(pos.netPrice) / multiplier;
+                            const vatRate = Number(pos.vatRate ?? 0);
+                            let realUnitPriceGross = 0;
+                            if (Number(pos.grossAmount) > 0 && Number(pos.quantity) > 0) {
+                                realUnitPriceGross = (Number(pos.grossAmount) / Number(pos.quantity)) / multiplier;
+                            } else {
+                                realUnitPriceGross = realUnitPriceNet * (1 + vatRate / 100);
+                            }
+                            lastPurchase = {
+                                date: pos.invoice?.issuedDate,
+                                priceNet: realUnitPriceNet,
+                                priceGross: realUnitPriceGross,
+                            };
+                        }
+                    }
+                }
+            }
+            const fallbackNet = Number(ing.calculatedPrice || 0);
+            const priceNet = lastPurchase ? lastPurchase.priceNet : fallbackNet;
+            const priceGross = lastPurchase ? lastPurchase.priceGross : (priceNet > 0 ? priceNet * 1.05 : 0);
+            return { priceNet, priceGross };
+        };
+
         // Obliczamy dokładny koszt surowcowy (foodcost) na 1 sztukę wyrobu (składniki + koszt opakowania)
         let calculatedFoodCost = 0;
         const detailedIngredients = recipe.ingredients.map((item) => {
             const amountNum = Number(item.amount || 0);
             let unitPrice = 0;
+            let unitPriceNet = 0;
+            let unitPriceGross = 0;
             let source = "UNKNOWN";
 
             if (item.ingredient) {
-                unitPrice = Number(item.ingredient.calculatedPrice || 0);
+                const prices = extractPrices(item.ingredient);
+                unitPrice = prices.priceNet;
+                unitPriceNet = prices.priceNet;
+                unitPriceGross = prices.priceGross;
                 source = "INGREDIENT";
             } else if (item.semiFinished) {
                 unitPrice = Number(item.semiFinished.cost || 0);
+                unitPriceNet = unitPrice;
+                let semiGross = 0;
+                if (item.semiFinished.ingredients && item.semiFinished.ingredients.length > 0) {
+                    for (const sIng of item.semiFinished.ingredients) {
+                        if (sIng.ingredient) {
+                            const sp = extractPrices(sIng.ingredient);
+                            semiGross += Number(sIng.amount || 0) * sp.priceGross;
+                        }
+                    }
+                }
+                unitPriceGross = semiGross > 0 ? semiGross : unitPriceNet * 1.05;
                 source = "SEMI_FINISHED";
             }
 
@@ -70,6 +142,8 @@ export async function GET(
                 amount: amountNum,
                 unit: item.ingredientUnit,
                 unitPrice,
+                unitPriceNet,
+                unitPriceGross,
                 costContribution: itemCost,
                 ingredientDetails: item.ingredient,
                 semiFinishedDetails: item.semiFinished,
@@ -88,10 +162,17 @@ export async function GET(
             });
         }
 
-        // Statystyki produkcji i sprzedaży z ostatnich 30 wpisów
-        const totalProduced = recipe.productions.reduce((sum, p) => sum + (p.producedAmount || 0), 0);
-        const totalSold = recipe.productions.reduce((sum, p) => sum + (p.soldAmount || 0), 0);
-        const totalRevenue = recipe.productions.reduce((sum, p) => sum + (p.salesIncome || 0), 0);
+        const currentSellingPrice = Number(recipe.sellingPrice || 0);
+
+        // Statystyki produkcji i sprzedaży
+        const totalProduced = recipe.productions.reduce((sum, p) => sum + Number(p.producedAmount || 0), 0);
+        const totalSold = recipe.productions.reduce((sum, p) => sum + Number(p.soldAmount || 0), 0);
+        const totalRevenue = recipe.productions.reduce((sum, p) => {
+            const sold = Number(p.soldAmount || 0);
+            const dbIncome = Number(p.salesIncome || 0);
+            const inc = dbIncome > 0 ? dbIncome : Math.round(sold * currentSellingPrice * 100) / 100;
+            return sum + inc;
+        }, 0);
         const totalUnsold = Math.max(0, totalProduced - totalSold);
         const sellThroughRate = totalProduced > 0 ? (totalSold / totalProduced) * 100 : 0;
 
@@ -112,15 +193,21 @@ export async function GET(
                 sellThroughRate,
                 count: recipe.productions.length,
             },
-            productions: recipe.productions.map((p) => ({
-                id: p.id,
-                date: p.date.toISOString().split("T")[0],
-                producedAmount: p.producedAmount,
-                soldAmount: p.soldAmount,
-                salesIncome: p.salesIncome,
-                unsoldAmount: Math.max(0, p.producedAmount - p.soldAmount),
-                efficiencyRate: p.producedAmount > 0 ? (p.soldAmount / p.producedAmount) * 100 : 0,
-            })),
+            productions: recipe.productions.map((p) => {
+                const produced = Number(p.producedAmount || 0);
+                const sold = Number(p.soldAmount || 0);
+                const dbIncome = Number(p.salesIncome || 0);
+                const inc = dbIncome > 0 ? dbIncome : Math.round(sold * currentSellingPrice * 100) / 100;
+                return {
+                    id: p.id,
+                    date: p.date.toISOString().split("T")[0],
+                    producedAmount: produced,
+                    soldAmount: sold,
+                    salesIncome: inc,
+                    unsoldAmount: Math.max(0, produced - sold),
+                    efficiencyRate: produced > 0 ? (sold / produced) * 100 : 0,
+                };
+            }),
         });
     } catch (error: any) {
         console.error("Błąd pobierania przepisu:", error);

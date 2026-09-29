@@ -23,6 +23,7 @@ import {
     X,
     Loader2,
     Check,
+    Star,
     Sparkles,
     AlertTriangle,
     Search,
@@ -176,9 +177,9 @@ const CATEGORY_MAP: Record<ProductType, { label: string; icon: React.ReactNode; 
     },
     ROLL: {
         label: "Bułki",
-        icon: <Hamburger size={16} className="text-sky-600" />,
-        color: "text-sky-700 bg-sky-50 border-sky-200",
-        badge: "bg-sky-100 text-sky-800 border-sky-300",
+        icon: <Hamburger size={16} className="text-purple-600" />,
+        color: "text-purple-700 bg-purple-50 border-purple-200",
+        badge: "bg-purple-100 text-purple-800 border-purple-300",
     },
     SWEET: {
         label: "Wypieki słodkie",
@@ -251,21 +252,42 @@ export default function ProdukcjaPage() {
     // Główne 4 zakładki: "CALENDAR" (domyślny), "LAST_7_DAYS", "LAST_WEEKS", "LAST_MONTHS"
     const [activeTab, setActiveTab] = useState<ActiveReportTab>("CALENDAR");
 
-    // Stan analityki dla 7 dni (ostatni tydzień)
+    // Stan analityki dla dni (raporty dzienne)
     const [daysOffset, setDaysOffset] = useState<number>(0);
     const [daysCount, setDaysCount] = useState<number>(7);
+    const [daysCustomRange, setDaysCustomRange] = useState<{ startDate: string; endDate: string } | null>(null);
+    const [daysInputStart, setDaysInputStart] = useState<string>(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 6);
+        return d.toISOString().split("T")[0];
+    });
+    const [daysInputEnd, setDaysInputEnd] = useState<string>(todayStr);
     const [daysAnalytics, setDaysAnalytics] = useState<any>(null);
     const [isLoadingDaysAnalytics, setIsLoadingDaysAnalytics] = useState<boolean>(false);
 
-    // Stan analityki dla ostatnich tygodni
+    // Stan analityki dla ostatnich tygodni (raporty tygodniowe)
     const [weeksOffset, setWeeksOffset] = useState<number>(0);
     const [weeksCount, setWeeksCount] = useState<number>(6);
+    const [weeksCustomRange, setWeeksCustomRange] = useState<{ startDate: string; endDate: string } | null>(null);
+    const [weeksInputStart, setWeeksInputStart] = useState<string>(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 35);
+        return d.toISOString().split("T")[0];
+    });
+    const [weeksInputEnd, setWeeksInputEnd] = useState<string>(todayStr);
     const [weeksAnalytics, setWeeksAnalytics] = useState<any>(null);
     const [isLoadingWeeksAnalytics, setIsLoadingWeeksAnalytics] = useState<boolean>(false);
 
-    // Stan analityki dla ostatnich miesięcy
+    // Stan analityki dla ostatnich miesięcy (raporty miesięczne)
     const [monthsOffset, setMonthsOffset] = useState<number>(0);
     const [monthsCount, setMonthsCount] = useState<number>(6);
+    const [monthsCustomRange, setMonthsCustomRange] = useState<{ startDate: string; endDate: string } | null>(null);
+    const [monthsInputStart, setMonthsInputStart] = useState<string>(() => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 5);
+        return d.toISOString().split("T")[0].slice(0, 7);
+    });
+    const [monthsInputEnd, setMonthsInputEnd] = useState<string>(todayStr.slice(0, 7));
     const [monthsAnalytics, setMonthsAnalytics] = useState<any>(null);
     const [isLoadingMonthsAnalytics, setIsLoadingMonthsAnalytics] = useState<boolean>(false);
 
@@ -297,6 +319,28 @@ export default function ProdukcjaPage() {
     const [transferredProductIds, setTransferredProductIds] = useState<Record<string, boolean>>({});
     const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "info" | "error"; text: string } | null>(null);
     const [formDefaultClosingTime, setFormDefaultClosingTime] = useState<string>("18:00");
+    const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<string[]>([]);
+    const [showOnlyFavorites, setShowOnlyFavorites] = useState<boolean>(true);
+
+    const handleToggleFavorite = async (recipeId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const isCurrentlyFav = favoriteRecipeIds.includes(recipeId);
+        const updated = isCurrentlyFav
+            ? favoriteRecipeIds.filter((id) => id !== recipeId)
+            : [...favoriteRecipeIds, recipeId];
+
+        setFavoriteRecipeIds(updated);
+
+        try {
+            await fetch("/api/przepisy/favorites", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: recipeId }),
+            });
+        } catch (err) {
+            console.error("Błąd zapisu ulubionego przepisu:", err);
+        }
+    };
 
     // -------------------------------------------------------------
     // MODAL OZNACZANIA DNIA ZAMKNIĘTEGO (Remont, Święto itp.)
@@ -408,6 +452,9 @@ export default function ProdukcjaPage() {
                 if (data.products) {
                     setAllProducts(data.products);
                 }
+                if (data.favoriteRecipeIds) {
+                    setFavoriteRecipeIds(data.favoriteRecipeIds);
+                }
             }
         } catch (error) {
             console.error("Błąd ładowania podsumowania produkcji:", error);
@@ -446,13 +493,25 @@ export default function ProdukcjaPage() {
     // -------------------------------------------------------------
     // POBIERANIE DANYCH ANALITYCZNYCH (7 DNI / TYGODNIE / MIESIĄCE)
     // -------------------------------------------------------------
-    const fetchAnalytics = async (type: "days" | "weeks" | "months", count: number, offset: number) => {
+    const fetchAnalytics = async (
+        type: "days" | "weeks" | "months",
+        count: number,
+        offset: number,
+        customRange?: { startDate: string; endDate: string } | null
+    ) => {
         try {
             if (type === "days") setIsLoadingDaysAnalytics(true);
             if (type === "weeks") setIsLoadingWeeksAnalytics(true);
             if (type === "months") setIsLoadingMonthsAnalytics(true);
 
-            const res = await fetch(`/api/produkcja?mode=analytics&type=${type}&count=${count}&offset=${offset}`);
+            let url = `/api/produkcja?mode=analytics&type=${type}`;
+            if (customRange && customRange.startDate && customRange.endDate) {
+                url += `&startDate=${customRange.startDate}&endDate=${customRange.endDate}`;
+            } else {
+                url += `&count=${count}&offset=${offset}`;
+            }
+
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 if (type === "days") setDaysAnalytics(data);
@@ -470,23 +529,34 @@ export default function ProdukcjaPage() {
 
     const refreshActiveAnalytics = () => {
         if (activeTab === "LAST_7_DAYS") {
-            fetchAnalytics("days", daysCount, daysOffset);
+            fetchAnalytics("days", daysCount, daysOffset, daysCustomRange);
         } else if (activeTab === "LAST_WEEKS") {
-            fetchAnalytics("weeks", weeksCount, weeksOffset);
+            fetchAnalytics("weeks", weeksCount, weeksOffset, weeksCustomRange);
         } else if (activeTab === "LAST_MONTHS") {
-            fetchAnalytics("months", monthsCount, monthsOffset);
+            fetchAnalytics("months", monthsCount, monthsOffset, monthsCustomRange);
         }
     };
 
     useEffect(() => {
         if (activeTab === "LAST_7_DAYS") {
-            fetchAnalytics("days", daysCount, daysOffset);
+            fetchAnalytics("days", daysCount, daysOffset, daysCustomRange);
         } else if (activeTab === "LAST_WEEKS") {
-            fetchAnalytics("weeks", weeksCount, weeksOffset);
+            fetchAnalytics("weeks", weeksCount, weeksOffset, weeksCustomRange);
         } else if (activeTab === "LAST_MONTHS") {
-            fetchAnalytics("months", monthsCount, monthsOffset);
+            fetchAnalytics("months", monthsCount, monthsOffset, monthsCustomRange);
         }
-    }, [activeTab, daysCount, daysOffset, weeksCount, weeksOffset, monthsCount, monthsOffset]);
+    }, [
+        activeTab,
+        daysCount,
+        daysOffset,
+        daysCustomRange,
+        weeksCount,
+        weeksOffset,
+        weeksCustomRange,
+        monthsCount,
+        monthsOffset,
+        monthsCustomRange,
+    ]);
 
     // -------------------------------------------------------------
     // OBSŁUGA FORMULARZA RAPORTU DZIENNEGO
@@ -506,6 +576,9 @@ export default function ProdukcjaPage() {
             if (res.ok) {
                 const data = await res.json();
                 setAllProducts(data.products || []);
+                if (data.favoriteRecipeIds) {
+                    setFavoriteRecipeIds(data.favoriteRecipeIds);
+                }
 
                 setFormFiscalIncome(data.fiscalIncome > 0 ? String(data.fiscalIncome) : "");
 
@@ -836,8 +909,8 @@ export default function ProdukcjaPage() {
         }
     };
 
-    // Lista wszystkich produktów w kolejności wyświetlania w formularzu raportu
-    const formOrderedProducts = useMemo(() => {
+    // Lista wszystkich produktów posortowanych kategoriami
+    const allFormProducts = useMemo(() => {
         const list: BakeryProduct[] = [];
         Object.keys(CATEGORY_MAP).forEach((catKey) => {
             const prods = allProducts.filter((p) => p.type === catKey);
@@ -851,6 +924,29 @@ export default function ProdukcjaPage() {
         });
         return list;
     }, [allProducts]);
+
+    // Lista produktów widocznych w formularzu raportu (z uwzględnieniem filtra ulubionych z gwiazdką)
+    const formOrderedProducts = useMemo(() => {
+        if (!showOnlyFavorites || favoriteRecipeIds.length === 0) {
+            return allFormProducts;
+        }
+
+        return allFormProducts.filter((p) => {
+            if (favoriteRecipeIds.includes(p.id)) return true;
+            // Nie ukrywaj produktu, jeśli użytkownik wpisał w nim jakiekolwiek dane dla tego dnia
+            const it = formItems[p.id];
+            if (it) {
+                const pVal = parseFloat(String(it.producedAmount || "0").replace(",", ".")) || 0;
+                const cVal = parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0;
+                const sVal = parseFloat(String(it.soldAmount || "0").replace(",", ".")) || 0;
+                const lVal = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
+                if (pVal > 0 || cVal > 0 || sVal > 0 || lVal > 0 || (it.soldOutTime && it.soldOutTime.trim() !== "")) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }, [allFormProducts, showOnlyFavorites, favoriteRecipeIds, formItems]);
 
     // Obsługa nawigacji strzałkami (góra, dół, lewo, prawo) oraz Enter w tabeli raportu
     const handleGridKeyDown = (
@@ -1103,9 +1199,9 @@ export default function ProdukcjaPage() {
                         <div>
                             <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                                 <span className="flex items-center gap-1.5">
-                                    <Coins size={15} className="text-ui-secondary" />
                                     Utarg ze sprzedaży ({POLISH_MONTHS[parseInt(currentMonth.split("-")[1], 10) - 1]})
                                 </span>
+                                <Coins size={18} className="text-ui-secondary" />
                             </div>
                             <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                                 {formatCurrency(stats.monthBakeryIncome)}
@@ -1118,11 +1214,11 @@ export default function ProdukcjaPage() {
                         <div>
                             <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                                 <span className="flex items-center gap-1.5">
-                                    <CheckCircle2 size={15} className="text-ui-secondary" />
                                     Kompletność raportów
                                 </span>
+                                <CheckCircle2 size={18} className="text-ui-secondary" />
                             </div>
-                            <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-black tracking-tight">
+                            <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                                 {daysSummary.filter((d) => d.hasReport).length}{" "}
                                 <span className="text-sm font-semibold text-ui-secondary">dni z raportem</span>
                             </div>
@@ -1308,8 +1404,14 @@ export default function ProdukcjaPage() {
                 const setOffsetFn = isDays ? setDaysOffset : isWeeks ? setWeeksOffset : setMonthsOffset;
                 const countVal = isDays ? daysCount : isWeeks ? weeksCount : monthsCount;
                 const setCountFn = isDays ? setDaysCount : isWeeks ? setWeeksCount : setMonthsCount;
+                const customRange = isDays ? daysCustomRange : isWeeks ? weeksCustomRange : monthsCustomRange;
+                const setCustomRangeFn = isDays ? setDaysCustomRange : isWeeks ? setWeeksCustomRange : setMonthsCustomRange;
+                const inputStart = isDays ? daysInputStart : isWeeks ? weeksInputStart : monthsInputStart;
+                const setInputStartFn = isDays ? setDaysInputStart : isWeeks ? setWeeksInputStart : setMonthsInputStart;
+                const inputEnd = isDays ? daysInputEnd : isWeeks ? weeksInputEnd : monthsInputEnd;
+                const setInputEndFn = isDays ? setDaysInputEnd : isWeeks ? setWeeksInputEnd : setMonthsInputEnd;
 
-                const tabTitle = isDays ? "Ostatnie 7 dni" : isWeeks ? "Ostatnie tygodnie" : "Ostatnie miesiące";
+                const tabTitle = isDays ? "Raporty dzienne" : isWeeks ? "Raporty tygodniowe" : "Raporty miesięczne";
                 const buckets = currentAnalytics?.buckets || [];
                 const totalStats = currentAnalytics?.totalStats || {
                     totalProduced: 0,
@@ -1354,7 +1456,7 @@ export default function ProdukcjaPage() {
 
                     const categories = [
                         { key: "BREAD", label: "Chleby", color: "#D97706", lightColor: "#FDE68A", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-900" },
-                        { key: "ROLL", label: "Bułki", color: "#0284C7", lightColor: "#BAE6FD", bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-900" },
+                        { key: "ROLL", label: "Bułki", color: "#9333EA", lightColor: "#E9D5FF", bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-900" },
                         { key: "SWEET", label: "Wypieki słodkie", color: "#DB2777", lightColor: "#FBCFE8", bg: "bg-pink-50", border: "border-pink-200", text: "text-pink-900" },
                         { key: "SAVORY", label: "Wypieki słone", color: "#059669", lightColor: "#A7F3D0", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900" },
                     ];
@@ -1421,78 +1523,242 @@ export default function ProdukcjaPage() {
 
                 return (
                     <div className="space-y-6">
-                        {/* 1. PASEK NAWIGACJI PO OKRESACH */}
-                        <div className="bg-white border border-ui-accent rounded-2xl p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 rounded-xl bg-ui-primary/10 text-ui-primary">
-                                    <BarChart3 size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-sm sm:text-base font-extrabold text-ui-black">
-                                        {tabTitle}
-                                    </h2>
-                                    <div className="text-xs text-ui-secondary font-medium">
-                                        {currentAnalytics?.startDate && currentAnalytics?.endDate
-                                            ? `Zakres: ${formatDate(currentAnalytics.startDate)} do ${formatDate(currentAnalytics.endDate)}`
-                                            : "Analiza słupkowa produkcji i sprzedaży"}
+                        {/* 1. PASEK NAWIGACJI PO OKRESACH I WYBÓR ZAKRESU */}
+                        <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2.5 bg-ui-secondary/20 rounded-xl text-ui-secondary shadow-sm">
+                                        <BarChart3 size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm sm:text-base font-extrabold text-ui-black">
+                                            {tabTitle}
+                                        </h2>
+                                        <div className="text-xs text-ui-secondary font-medium flex items-center gap-1.5 flex-wrap">
+                                            {currentAnalytics?.startDate && currentAnalytics?.endDate ? (
+                                                <>
+                                                    <span>Zakres: <b>{formatDate(currentAnalytics.startDate)}</b> do <b>{formatDate(currentAnalytics.endDate)}</b></span>
+                                                    <span className="text-[10px] bg-ui-accent/30 text-ui-primary font-bold px-2 py-0.5 rounded-full">
+                                                        {buckets.length} {isDays ? (buckets.length === 1 ? "dzień" : buckets.length < 5 ? "dni" : "dni") : isWeeks ? (buckets.length === 1 ? "tydzień" : buckets.length < 5 ? "tygodnie" : "tygodni") : (buckets.length === 1 ? "miesiąc" : buckets.length < 5 ? "miesiące" : "miesięcy")}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                "Analiza słupkowa produkcji i sprzedaży"
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Kontrolki paginacji i liczby okresów */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                {(isWeeks || isMonths) && (
-                                    <div className="flex items-center gap-1 bg-ui-accent/15 p-1 rounded-xl border border-ui-accent/30 text-xs font-bold">
-                                        <span className="px-2 text-ui-secondary text-[11px]">Liczba:</span>
-                                        {(isWeeks ? [4, 6, 8, 12] : [4, 6, 12]).map((cnt) => (
+                                {/* Przyciski presetów & Własny zakres */}
+                                <div className="flex flex-wrap items-center gap-1.5 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40 text-xs font-bold">
+                                    {isDays && (
+                                        <>
+                                            {[7, 14, 30].map((cnt) => (
+                                                <button
+                                                    key={cnt}
+                                                    onClick={() => {
+                                                        setCustomRangeFn(null);
+                                                        setOffsetFn(0);
+                                                        setCountFn(cnt);
+                                                    }}
+                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!customRange && countVal === cnt
+                                                        ? "bg-white text-ui-primary shadow-xs font-black"
+                                                        : "text-ui-secondary hover:text-ui-primary"
+                                                        }`}
+                                                >
+                                                    {cnt} dni
+                                                </button>
+                                            ))}
                                             <button
-                                                key={cnt}
-                                                onClick={() => setCountFn(cnt)}
-                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${countVal === cnt
+                                                onClick={() => {
+                                                    const s = `${todayStr.slice(0, 7)}-01`;
+                                                    const e = todayStr;
+                                                    setInputStartFn(s);
+                                                    setInputEndFn(e);
+                                                    setCustomRangeFn({ startDate: s, endDate: e });
+                                                }}
+                                                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${customRange?.startDate === `${todayStr.slice(0, 7)}-01` && customRange?.endDate === todayStr
                                                     ? "bg-white text-ui-primary shadow-xs font-black"
                                                     : "text-ui-secondary hover:text-ui-primary"
                                                     }`}
                                             >
-                                                {cnt} {isWeeks ? "tyg." : "mies."}
+                                                Ten miesiąc
                                             </button>
-                                        ))}
-                                    </div>
-                                )}
+                                        </>
+                                    )}
 
-                                <div className="flex items-center gap-1.5 bg-ui-accent/15 p-1 rounded-xl border border-ui-accent/30">
-                                    <button
-                                        onClick={() => setOffsetFn(offsetVal + 1)}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-white text-ui-primary rounded-lg text-xs font-bold shadow-xs hover:bg-ui-accent/20 transition-all cursor-pointer border border-ui-accent/40"
-                                        title="Generuj wykres dla wcześniejszego okresu"
-                                    >
-                                        <ChevronLeft size={14} />
-                                        <span>Wcześniejsze</span>
-                                    </button>
+                                    {isWeeks && (
+                                        <>
+                                            {[4, 6, 8, 12].map((cnt) => (
+                                                <button
+                                                    key={cnt}
+                                                    onClick={() => {
+                                                        setCustomRangeFn(null);
+                                                        setOffsetFn(0);
+                                                        setCountFn(cnt);
+                                                    }}
+                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!customRange && countVal === cnt
+                                                        ? "bg-white text-ui-primary shadow-xs font-black"
+                                                        : "text-ui-secondary hover:text-ui-primary"
+                                                        }`}
+                                                >
+                                                    {cnt} tyg.
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
 
-                                    {offsetVal > 0 && (
-                                        <button
-                                            onClick={() => setOffsetFn(0)}
-                                            className="px-2.5 py-1.5 text-xs font-bold text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
-                                            title="Wróć do aktualnego okresu"
-                                        >
-                                            <RotateCcw size={13} className="inline mr-1" />
-                                            Bieżące
-                                        </button>
+                                    {isMonths && (
+                                        <>
+                                            {[3, 6, 12].map((cnt) => (
+                                                <button
+                                                    key={cnt}
+                                                    onClick={() => {
+                                                        setCustomRangeFn(null);
+                                                        setOffsetFn(0);
+                                                        setCountFn(cnt);
+                                                    }}
+                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!customRange && countVal === cnt
+                                                        ? "bg-white text-ui-primary shadow-xs font-black"
+                                                        : "text-ui-secondary hover:text-ui-primary"
+                                                        }`}
+                                                >
+                                                    {cnt} mies.
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => {
+                                                    const s = `${todayStr.slice(0, 4)}-01`;
+                                                    const e = `${todayStr.slice(0, 4)}-12`;
+                                                    setInputStartFn(s);
+                                                    setInputEndFn(e);
+                                                    setCustomRangeFn({ startDate: s, endDate: e });
+                                                }}
+                                                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${customRange?.startDate === `${todayStr.slice(0, 4)}-01` && customRange?.endDate === `${todayStr.slice(0, 4)}-12`
+                                                    ? "bg-white text-ui-primary shadow-xs font-black"
+                                                    : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                Ten rok
+                                            </button>
+                                        </>
                                     )}
 
                                     <button
-                                        onClick={() => setOffsetFn(Math.max(0, offsetVal - 1))}
-                                        disabled={offsetVal === 0}
-                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${offsetVal === 0
-                                            ? "text-ui-secondary/40 bg-transparent cursor-not-allowed"
-                                            : "bg-white text-ui-primary shadow-xs hover:bg-ui-accent/20 cursor-pointer border border-ui-accent/40"
+                                        onClick={() => {
+                                            if (!customRange) {
+                                                setCustomRangeFn({ startDate: inputStart, endDate: inputEnd });
+                                            }
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${customRange
+                                            ? "bg-white text-ui-primary shadow-xs font-black border border-ui-accent/40"
+                                            : "text-ui-secondary hover:text-ui-primary"
                                             }`}
-                                        title="Następny okres"
                                     >
-                                        <span>Późniejsze</span>
-                                        <ChevronRight size={14} />
+                                        <CalendarDays size={13} />
+                                        <span>Własny zakres</span>
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Wiersz drugorzędny: Kontrolki nawigacji paginacji lub selektor własnego zakresu dat */}
+                            <div className="pt-2.5 border-t border-ui-accent/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                {customRange ? (
+                                    <div className="flex flex-wrap items-center gap-2.5 w-full justify-between">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-bold text-ui-secondary">Zakres od:</span>
+                                            <input
+                                                type={isMonths ? "month" : "date"}
+                                                value={inputStart}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setInputStartFn(val);
+                                                    if (val && inputEnd && val <= inputEnd) {
+                                                        setCustomRangeFn({ startDate: val, endDate: inputEnd });
+                                                    }
+                                                }}
+                                                className="bg-ui-white border border-ui-accent rounded-lg px-2.5 py-1 font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
+                                            />
+                                            <span className="font-bold text-ui-secondary">do:</span>
+                                            <input
+                                                type={isMonths ? "month" : "date"}
+                                                value={inputEnd}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setInputEndFn(val);
+                                                    if (inputStart && val && inputStart <= val) {
+                                                        setCustomRangeFn({ startDate: inputStart, endDate: val });
+                                                    }
+                                                }}
+                                                className="bg-ui-white border border-ui-accent rounded-lg px-2.5 py-1 font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
+                                            />
+
+                                            <button
+                                                onClick={() => {
+                                                    if (inputStart && inputEnd && inputStart <= inputEnd) {
+                                                        setCustomRangeFn({ startDate: inputStart, endDate: inputEnd });
+                                                    } else {
+                                                        alert("Wprowadź poprawny zakres (data początkowa nie może być późniejsza niż końcowa).");
+                                                    }
+                                                }}
+                                                className="px-3 py-1 bg-ui-primary text-white font-bold rounded-lg hover:bg-ui-primary/90 transition-colors shadow-2xs cursor-pointer"
+                                            >
+                                                Zastosuj
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            onClick={() => {
+                                                setCustomRangeFn(null);
+                                                setOffsetFn(0);
+                                            }}
+                                            className="flex items-center gap-1 text-ui-secondary hover:text-ui-primary font-semibold transition-colors cursor-pointer"
+                                        >
+                                            <RotateCcw size={12} />
+                                            <span>Wróć do standardowych okresów</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between w-full">
+                                        <div className="text-ui-secondary text-[11px] font-medium">
+                                            Użyj przycisków, aby przeglądać wcześniejsze lub późniejsze okresy:
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => setOffsetFn(offsetVal + 1)}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-white text-ui-primary rounded-lg font-bold shadow-2xs hover:bg-ui-accent/20 transition-all cursor-pointer border border-ui-accent/40"
+                                                title="Generuj wykres dla wcześniejszego okresu"
+                                            >
+                                                <ChevronLeft size={14} />
+                                                <span>Wcześniejsze</span>
+                                            </button>
+
+                                            {offsetVal > 0 && (
+                                                <button
+                                                    onClick={() => setOffsetFn(0)}
+                                                    className="px-2.5 py-1.5 font-bold text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                                                    title="Wróć do aktualnego okresu"
+                                                >
+                                                    <RotateCcw size={13} className="inline mr-1" />
+                                                    Bieżące
+                                                </button>
+                                            )}
+
+                                            <button
+                                                onClick={() => setOffsetFn(Math.max(0, offsetVal - 1))}
+                                                disabled={offsetVal === 0}
+                                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold transition-all ${offsetVal === 0
+                                                    ? "text-ui-secondary/40 bg-transparent cursor-not-allowed"
+                                                    : "bg-white text-ui-primary shadow-2xs hover:bg-ui-accent/20 cursor-pointer border border-ui-accent/40"
+                                                    }`}
+                                                title="Następny okres"
+                                            >
+                                                <span>Późniejsze</span>
+                                                <ChevronRight size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1518,14 +1784,14 @@ export default function ProdukcjaPage() {
                                     </div>
 
                                     {/* Bułki */}
-                                    <div className="p-2.5 rounded-xl bg-sky-50/60 border border-sky-200/80 flex items-center gap-3">
-                                        <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-sky-400/50 shrink-0 shadow-xs">
-                                            <div className="flex-1 bg-[#BAE6FD]" title="Niesprzedane (jaśniejszy)" />
-                                            <div className="h-5 bg-[#0284C7]" title="Sprzedane (ciemniejszy)" />
+                                    <div className="p-2.5 rounded-xl bg-purple-50/60 border border-purple-200/80 flex items-center gap-3">
+                                        <div className="flex flex-col w-5 h-8 rounded overflow-hidden border border-purple-400/50 shrink-0 shadow-xs">
+                                            <div className="flex-1 bg-[#E9D5FF]" title="Niesprzedane (jaśniejszy)" />
+                                            <div className="h-5 bg-[#9333EA]" title="Sprzedane (ciemniejszy)" />
                                         </div>
                                         <div>
-                                            <div className="text-xs font-extrabold text-sky-900 flex items-center gap-1">
-                                                <Hamburger size={13} className="text-sky-700" /> Bułki
+                                            <div className="text-xs font-extrabold text-purple-900 flex items-center gap-1">
+                                                <Hamburger size={13} className="text-purple-700" /> Bułki
                                             </div>
                                         </div>
                                     </div>
@@ -1597,8 +1863,8 @@ export default function ProdukcjaPage() {
                                             <Bar dataKey="BREAD_unsold" stackId="BREAD" fill="#FDE68A" name="Chleby (Niesprzedane)" radius={[4, 4, 0, 0]} />
 
                                             {/* SŁUPEK 2: BUŁKI (Sprzedane ciemny + Niesprzedane jasny) */}
-                                            <Bar dataKey="ROLL_sold" stackId="ROLL" fill="#0284C7" name="Bułki (Sprzedaż)" radius={[0, 0, 0, 0]} />
-                                            <Bar dataKey="ROLL_unsold" stackId="ROLL" fill="#BAE6FD" name="Bułki (Niesprzedane)" radius={[4, 4, 0, 0]} />
+                                            <Bar dataKey="ROLL_sold" stackId="ROLL" fill="#9333EA" name="Bułki (Sprzedaż)" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="ROLL_unsold" stackId="ROLL" fill="#E9D5FF" name="Bułki (Niesprzedane)" radius={[4, 4, 0, 0]} />
 
                                             {/* SŁUPEK 3: SŁODKIE (Sprzedane ciemny + Niesprzedane jasny) */}
                                             <Bar dataKey="SWEET_sold" stackId="SWEET" fill="#DB2777" name="Słodkie (Sprzedaż)" radius={[0, 0, 0, 0]} />
@@ -1671,31 +1937,33 @@ export default function ProdukcjaPage() {
                             </div>
 
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs border-collapse">
+                                <table className="w-full text-center text-xs border-collapse">
                                     <thead>
                                         <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
-                                            <th className="py-3 px-3.5">Okres / Data</th>
-                                            <th className="py-3 px-2 text-right">
+                                            <th className="py-3 px-3.5 text-center">Okres / Data</th>
+                                            <th className="py-3 px-2 text-center">
                                                 <span className="text-amber-800">Chleby</span>
                                             </th>
-                                            <th className="py-3 px-2 text-right">
-                                                <span className="text-sky-800">Bułki</span>
+                                            <th className="py-3 px-2 text-center">
+                                                <span className="text-purple-800">Bułki</span>
                                             </th>
-                                            <th className="py-3 px-2 text-right">
+                                            <th className="py-3 px-2 text-center">
                                                 <span className="text-pink-800">Wypieki słodkie</span>
                                             </th>
-                                            <th className="py-3 px-2 text-right">
+                                            <th className="py-3 px-2 text-center">
                                                 <span className="text-emerald-800">Wypieki słone</span>
                                             </th>
-                                            <th className="py-3 px-3 text-right">Produkcja</th>
-                                            <th className="py-3 px-3 text-right">Sprzedaż</th>
-                                            <th className="py-3 px-2.5 text-right">Skuteczność</th>
-                                            <th className="py-3 px-3.5 text-right">Utarg</th>
-                                            <th className="py-3 px-1 text-center">Akcja</th>
+                                            <th className="py-3 px-3 text-center text-amber-800 bg-amber-500/10">Produkcja</th>
+                                            <th className="py-3 px-3 text-center text-emerald-700 bg-emerald-500/10">Sprzedaż</th>
+                                            <th className="py-3 px-3 text-center text-rose-700 bg-rose-500/10">Straty</th>
+                                            <th className="py-3 px-2.5 text-center">Skuteczność</th>
+                                            <th className="py-3 px-3.5 text-center">Utarg</th>
+                                            <th className="py-3 px-3 text-center">Akcja</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-ui-accent/30">
                                         {buckets.map((b: any) => {
+                                            const loss = Math.max(0, (b.totalProduced || 0) - (b.totalSold || 0));
                                             return (
                                                 <tr
                                                     key={b.id}
@@ -1717,7 +1985,7 @@ export default function ProdukcjaPage() {
                                                     }}
                                                     className="hover:bg-ui-accent/10 transition-colors cursor-pointer"
                                                 >
-                                                    <td className="py-3 px-3.5 font-bold text-ui-black">
+                                                    <td className="py-3 px-3.5 font-bold text-ui-black text-center">
                                                         <div className="text-sm">{b.label}</div>
                                                         <div className="text-[11px] text-ui-secondary font-normal">
                                                             {b.startDate === b.endDate ? formatDate(b.startDate) : `${formatDate(b.startDate)} do ${formatDate(b.endDate)}`}
@@ -1725,54 +1993,59 @@ export default function ProdukcjaPage() {
                                                     </td>
 
                                                     {/* Chleby */}
-                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                    <td className="py-3 px-2 text-center font-semibold">
                                                         <span className="font-extrabold text-amber-800">{b.BREAD?.sold || 0}</span>
                                                         <span className="text-ui-secondary text-[11px]"> / {b.BREAD?.produced || 0}</span>
                                                     </td>
 
                                                     {/* Bułki */}
-                                                    <td className="py-3 px-2 text-right font-semibold">
-                                                        <span className="font-extrabold text-sky-800">{b.ROLL?.sold || 0}</span>
+                                                    <td className="py-3 px-2 text-center font-semibold">
+                                                        <span className="font-extrabold text-purple-800">{b.ROLL?.sold || 0}</span>
                                                         <span className="text-ui-secondary text-[11px]"> / {b.ROLL?.produced || 0}</span>
                                                     </td>
 
                                                     {/* Słodkie */}
-                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                    <td className="py-3 px-2 text-center font-semibold">
                                                         <span className="font-extrabold text-pink-800">{b.SWEET?.sold || 0}</span>
                                                         <span className="text-ui-secondary text-[11px]"> / {b.SWEET?.produced || 0}</span>
                                                     </td>
 
                                                     {/* Słone */}
-                                                    <td className="py-3 px-2 text-right font-semibold">
+                                                    <td className="py-3 px-2 text-center font-semibold">
                                                         <span className="font-extrabold text-emerald-800">{b.SAVORY?.sold || 0}</span>
                                                         <span className="text-ui-secondary text-[11px]"> / {b.SAVORY?.produced || 0}</span>
                                                     </td>
 
                                                     {/* Razem prod */}
-                                                    <td className="py-3 px-3 text-right font-bold text-ui-black text-sm">
+                                                    <td className="py-3 px-3 text-center font-bold text-amber-900 bg-amber-500/5 text-sm">
                                                         {b.totalProduced.toLocaleString("pl-PL")} szt.
                                                     </td>
 
                                                     {/* Razem sprz */}
-                                                    <td className="py-3 px-3 text-right font-bold text-emerald-700 text-sm">
+                                                    <td className="py-3 px-3 text-center font-bold text-emerald-700 bg-emerald-500/5 text-sm">
                                                         {b.totalSold.toLocaleString("pl-PL")} szt.
                                                     </td>
 
+                                                    {/* Straty */}
+                                                    <td className="py-3 px-3 text-center font-bold text-rose-700 bg-rose-500/5 text-sm">
+                                                        {loss > 0 ? `-${loss.toLocaleString("pl-PL")} szt.` : "0 szt."}
+                                                    </td>
+
                                                     {/* Skuteczność */}
-                                                    <td className="py-3 px-2.5 text-right font-semibold">
+                                                    <td className="py-3 px-2.5 text-center font-semibold">
                                                         <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                                                             {b.sellThroughRate}%
                                                         </span>
                                                     </td>
 
                                                     {/* Utarg */}
-                                                    <td className="py-3 px-3.5 text-right font-black text-ui-primary text-sm">
+                                                    <td className="py-3 px-3.5 text-center font-black text-ui-primary text-sm">
                                                         {formatCurrency(b.totalIncome)}
                                                     </td>
 
                                                     {/* Akcja */}
                                                     <td className="py-3 px-3 text-center">
-                                                        <span className="flex items-center justify-center gap-1 text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-1 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm">
+                                                        <span className="inline-flex items-center justify-center text-center text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1 rounded-lg transition-colors cursor-pointer w-full max-w-[80px]">
                                                             {isDays ? "Raport" : "Wyroby"}
                                                         </span>
                                                     </td>
@@ -1782,31 +2055,37 @@ export default function ProdukcjaPage() {
                                     </tbody>
                                     <tfoot>
                                         <tr className="bg-ui-accent/20 font-black text-ui-black border-t-2 border-ui-accent">
-                                            <td className="py-3.5 px-3.5 uppercase text-xs">
+                                            <td className="py-3.5 px-3.5 uppercase text-xs text-center">
                                                 Podsumowanie okresu
                                             </td>
-                                            <td className="py-3.5 px-2 text-right text-amber-900 font-extrabold">
+                                            <td className="py-3.5 px-2 text-center text-amber-900 font-extrabold">
                                                 {buckets.reduce((acc: number, b: any) => acc + (b.BREAD?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.BREAD?.produced || 0), 0)}
                                             </td>
-                                            <td className="py-3.5 px-2 text-right text-sky-900 font-extrabold">
+                                            <td className="py-3.5 px-2 text-center text-purple-900 font-extrabold">
                                                 {buckets.reduce((acc: number, b: any) => acc + (b.ROLL?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.ROLL?.produced || 0), 0)}
                                             </td>
-                                            <td className="py-3.5 px-2 text-right text-pink-900 font-extrabold">
+                                            <td className="py-3.5 px-2 text-center text-pink-900 font-extrabold">
                                                 {buckets.reduce((acc: number, b: any) => acc + (b.SWEET?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.SWEET?.produced || 0), 0)}
                                             </td>
-                                            <td className="py-3.5 px-2 text-right text-emerald-900 font-extrabold">
+                                            <td className="py-3.5 px-2 text-center text-emerald-900 font-extrabold">
                                                 {buckets.reduce((acc: number, b: any) => acc + (b.SAVORY?.sold || 0), 0)} / {buckets.reduce((acc: number, b: any) => acc + (b.SAVORY?.produced || 0), 0)}
                                             </td>
-                                            <td className="py-3.5 px-3 text-right text-sm">
+                                            <td className="py-3.5 px-3 text-center text-sm text-amber-900 bg-amber-500/10 font-black">
                                                 {totalStats.totalProduced.toLocaleString("pl-PL")} szt.
                                             </td>
-                                            <td className="py-3.5 px-3 text-right text-sm text-emerald-700">
+                                            <td className="py-3.5 px-3 text-center text-sm text-emerald-700 bg-emerald-500/10 font-black">
                                                 {totalStats.totalSold.toLocaleString("pl-PL")} szt.
                                             </td>
-                                            <td className="py-3.5 px-2.5 text-right font-bold text-emerald-800">
+                                            <td className="py-3.5 px-3 text-center text-sm text-rose-700 bg-rose-500/10 font-black">
+                                                {(() => {
+                                                    const totalLoss = Math.max(0, (totalStats.totalProduced || 0) - (totalStats.totalSold || 0));
+                                                    return totalLoss > 0 ? `-${totalLoss.toLocaleString("pl-PL")} szt.` : "0 szt.";
+                                                })()}
+                                            </td>
+                                            <td className="py-3.5 px-2.5 text-center font-bold text-emerald-800">
                                                 {totalStats.sellThroughRate}%
                                             </td>
-                                            <td className="py-3.5 px-3.5 text-right text-sm text-ui-primary font-black">
+                                            <td className="py-3.5 px-3.5 text-center text-sm text-ui-primary font-black">
                                                 {formatCurrency(totalStats.totalIncome)}
                                             </td>
                                             <td className="py-3.5 px-3 text-center">
@@ -1842,6 +2121,26 @@ export default function ProdukcjaPage() {
                             </div>
 
                             <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowOnlyFavorites((prev) => !prev)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer border ${showOnlyFavorites && favoriteRecipeIds.length > 0
+                                        ? "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                                        : "bg-white text-ui-primary border-ui-accent hover:bg-ui-accent/30"
+                                        }`}
+                                    title={showOnlyFavorites ? "Kliknij, aby odkryć wszystkie przepisy w raporcie" : "Kliknij, aby ukryć rzadko używane przepisy"}
+                                >
+                                    <Star
+                                        size={13}
+                                        className={showOnlyFavorites && favoriteRecipeIds.length > 0 ? "text-amber-500 fill-amber-400" : "text-ui-secondary"}
+                                    />
+                                    <span>
+                                        {showOnlyFavorites && favoriteRecipeIds.length > 0
+                                            ? `Tylko oznaczone (${formOrderedProducts.length}/${allProducts.length})`
+                                            : `Wszystkie wyroby (${allProducts.length})`}
+                                    </span>
+                                </button>
+
                                 <button
                                     onClick={handleCopyPreviousDayProduction}
                                     disabled={isCopyingPrevious}
@@ -1892,6 +2191,7 @@ export default function ProdukcjaPage() {
                                     {/* Podział na kategorie w formularzu */}
                                     {Object.entries(CATEGORY_MAP).map(([catKey, catMeta]) => {
                                         const catProducts = formOrderedProducts.filter((p) => p.type === catKey);
+                                        const totalInCat = allFormProducts.filter((p) => p.type === catKey).length;
                                         if (catProducts.length === 0) return null;
 
                                         return (
@@ -1899,22 +2199,32 @@ export default function ProdukcjaPage() {
                                                 <div className={`px-4 py-2.5 font-bold text-xs flex items-center justify-between border-b ${catMeta.color}`}>
                                                     <div className="flex items-center gap-2">
                                                         {catMeta.icon}
-                                                        <span>{catMeta.label.toUpperCase()} ({catProducts.length})</span>
+                                                        <span>
+                                                            {catMeta.label.toUpperCase()} ({catProducts.length}{catProducts.length < totalInCat ? ` z ${totalInCat}` : ""})
+                                                        </span>
                                                     </div>
                                                 </div>
 
                                                 <div className="overflow-x-auto">
-                                                    <table className="w-full text-left text-xs border-collapse">
+                                                    <table className="w-full text-left text-xs border-collapse table-fixed min-w-[700px]">
+                                                        <colgroup>
+                                                            <col className="w-[40%]" />
+                                                            <col className="w-[10%]" />
+                                                            <col className="w-[10%]" />
+                                                            <col className="w-[10%]" />
+                                                            <col className="w-[8%]" />
+                                                            <col className="w-[10%]" />
+                                                            <col className="w-[10%]" />
+                                                        </colgroup>
                                                         <thead>
                                                             <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent">
                                                                 <th className="py-2.5 px-3">Nazwa wyrobu</th>
-                                                                <th className="py-2.5 px-2 text-right">Z wczoraj</th>
-                                                                <th className="py-2.5 px-2 text-right">Wyprodukowano</th>
-                                                                <th className="py-2.5 px-2 text-right">Razem asort.</th>
-                                                                <th className="py-2.5 px-2 text-right">Zostało</th>
-                                                                <th className="py-2.5 px-2 text-right">Sprzedano</th>
-                                                                <th className="py-2.5 px-2 text-center w-28">Godz. wyprzed.</th>
-                                                                <th className="py-2.5 px-2 text-center w-28">Przenieś na jutro</th>
+                                                                <th className="py-2.5 px-1.5 text-right">Z wczoraj</th>
+                                                                <th className="py-2.5 px-1.5 text-right">Wyprodukowano</th>
+                                                                <th className="py-2.5 px-1.5 text-right">Zostało</th>
+                                                                <th className="py-2.5 px-1.5 text-right">Sprzedano</th>
+                                                                <th className="py-2.5 px-1 text-center">Godz. wyprzed.</th>
+                                                                <th className="py-2.5 px-1 text-center">Przenieś na jutro</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-ui-accent/20">
@@ -1931,24 +2241,37 @@ export default function ProdukcjaPage() {
 
                                                                 const pVal = parseFloat(String(it.producedAmount || "0").replace(",", ".")) || 0;
                                                                 const cVal = parseFloat(String(it.carriedOverAmount || "0").replace(",", ".")) || 0;
-                                                                const totalAssort = pVal + cVal;
                                                                 const leftVal = parseFloat(String(it.leftoverAmount || "0").replace(",", ".")) || 0;
                                                                 const isTransferred = !!transferredProductIds[prod.id];
                                                                 const isTransferring = transferringProductId === prod.id;
+                                                                const isFav = favoriteRecipeIds.includes(prod.id);
 
                                                                 return (
                                                                     <tr key={prod.id} className="hover:bg-ui-accent/5 transition-colors">
                                                                         <td className="py-2 px-3 font-semibold text-ui-black">
-                                                                            {prod.name}
-                                                                            <span className="text-[10px] text-ui-secondary font-normal ml-1">
-                                                                                ({formatCurrency(Number(prod.sellingPrice))})
-                                                                            </span>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => handleToggleFavorite(prod.id, e)}
+                                                                                    className="p-1 rounded-md hover:bg-amber-100/60 transition-colors text-ui-secondary hover:text-amber-600 cursor-pointer shrink-0"
+                                                                                    title={isFav ? "Oznaczono gwiazdką (widoczne w raporcie). Kliknij, aby usunąć gwiazdkę." : "Brak gwiazdki. Kliknij, aby oznaczyć jako stały wyrób w raporcie."}
+                                                                                >
+                                                                                    <Star
+                                                                                        size={14}
+                                                                                        className={isFav ? "text-amber-500 fill-amber-400" : "text-gray-300 hover:text-amber-400"}
+                                                                                    />
+                                                                                </button>
+                                                                                <span className="font-semibold text-ui-black leading-tight break-words">{prod.name}</span>
+                                                                                <span className="text-[10px] text-ui-secondary font-normal shrink-0">
+                                                                                    ({formatCurrency(Number(prod.sellingPrice))} brutto / {formatCurrency(Number(prod.sellingPrice) / 1.05)} netto)
+                                                                                </span>
+                                                                            </div>
                                                                         </td>
 
                                                                         {/* Z wczoraj */}
-                                                                        <td className="py-2 px-2 text-right">
+                                                                        <td className="py-2 px-1.5 text-right">
                                                                             {cVal > 0 ? (
-                                                                                <span className="font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                                                                                <span className="font-bold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
                                                                                     {cVal}
                                                                                 </span>
                                                                             ) : (
@@ -1957,7 +2280,7 @@ export default function ProdukcjaPage() {
                                                                         </td>
 
                                                                         {/* Wyprodukowano (Input col 0) */}
-                                                                        <td className="py-2 px-2 text-right">
+                                                                        <td className="py-2 px-1.5 text-right">
                                                                             <input
                                                                                 type="text"
                                                                                 inputMode="decimal"
@@ -1967,17 +2290,12 @@ export default function ProdukcjaPage() {
                                                                                 onChange={(e) => handleFormItemChange(prod.id, "producedAmount", e.target.value)}
                                                                                 onKeyDown={(e) => handleGridKeyDown(e, rowIndex, 0)}
                                                                                 placeholder="0"
-                                                                                className="w-16 sm:w-20 text-right px-2 py-1 bg-white border border-ui-accent rounded-lg text-xs font-bold text-ui-black focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary shadow-2xs"
+                                                                                className="w-14 sm:w-16 text-right px-1.5 py-1 bg-white border border-ui-accent rounded-lg text-xs font-bold text-ui-black focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary shadow-2xs"
                                                                             />
                                                                         </td>
 
-                                                                        {/* Razem asortyment */}
-                                                                        <td className="py-2 px-2 text-right font-bold text-ui-black">
-                                                                            {totalAssort > 0 ? totalAssort : "—"}
-                                                                        </td>
-
                                                                         {/* Zostało (Input col 1) */}
-                                                                        <td className="py-2 px-2 text-right">
+                                                                        <td className="py-2 px-1.5 text-right">
                                                                             <input
                                                                                 type="text"
                                                                                 inputMode="decimal"
@@ -1987,17 +2305,17 @@ export default function ProdukcjaPage() {
                                                                                 onChange={(e) => handleFormItemChange(prod.id, "leftoverAmount", e.target.value)}
                                                                                 onKeyDown={(e) => handleGridKeyDown(e, rowIndex, 1)}
                                                                                 placeholder="0"
-                                                                                className="w-16 sm:w-20 text-right px-2 py-1 bg-white border border-ui-accent rounded-lg text-xs font-bold text-ui-black focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary shadow-2xs"
+                                                                                className="w-14 sm:w-16 text-right px-1.5 py-1 bg-white border border-ui-accent rounded-lg text-xs font-bold text-ui-black focus:outline-none focus:border-ui-primary focus:ring-1 focus:ring-ui-primary shadow-2xs"
                                                                             />
                                                                         </td>
 
                                                                         {/* Sprzedano */}
-                                                                        <td className="py-2 px-2 text-right font-black text-emerald-700">
+                                                                        <td className="py-2 px-1.5 text-right font-black text-emerald-700">
                                                                             {it.soldAmount ? `${it.soldAmount} szt.` : "—"}
                                                                         </td>
 
                                                                         {/* Godzina wyprzedania (Input col 2) */}
-                                                                        <td className="py-2 px-2 text-center">
+                                                                        <td className="py-2 px-1 text-center">
                                                                             <input
                                                                                 type="text"
                                                                                 data-row={rowIndex}
@@ -2006,12 +2324,12 @@ export default function ProdukcjaPage() {
                                                                                 onChange={(e) => handleFormItemChange(prod.id, "soldOutTime", e.target.value)}
                                                                                 onKeyDown={(e) => handleGridKeyDown(e, rowIndex, 2)}
                                                                                 placeholder="np. 14:30"
-                                                                                className="w-20 text-center px-1.5 py-1 bg-white border border-ui-accent rounded-lg text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
+                                                                                className="w-16 sm:w-18 text-center px-1 py-1 bg-white border border-ui-accent rounded-lg text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
                                                                             />
                                                                         </td>
 
                                                                         {/* Przenieś na jutro */}
-                                                                        <td className="py-2 px-2 text-center">
+                                                                        <td className="py-2 px-1 text-center">
                                                                             {leftVal > 0 ? (
                                                                                 <button
                                                                                     type="button"
@@ -2198,7 +2516,7 @@ export default function ProdukcjaPage() {
                                                         {sug.suggestedAmount} <span className="text-xs font-bold">szt.</span>
                                                     </div>
                                                     <div className="text-[10px] text-ui-secondary">
-                                                        Wartość: {formatCurrency(sug.suggestedAmount * sug.sellingPrice)}
+                                                        Wartość: {formatCurrency(sug.suggestedAmount * sug.sellingPrice)} brutto ({formatCurrency((sug.suggestedAmount * sug.sellingPrice) / 1.05)} netto)
                                                     </div>
                                                 </div>
                                             </div>

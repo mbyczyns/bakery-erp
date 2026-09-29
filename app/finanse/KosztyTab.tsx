@@ -488,7 +488,7 @@ export default function KosztyTab() {
                         >
                             <ChevronLeft size={16} />
                         </button>
-                        <span className="px-3 text-xs font-black text-ui-primary min-w-[120px] text-center">
+                        <span className="px-3 text-xs font-bold text-ui-primary min-w-[120px] text-center">
                             {costData?.monthName} {costData?.year}
                         </span>
                         <button
@@ -584,14 +584,11 @@ export default function KosztyTab() {
                 <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
                     <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                            <DollarSign size={15} className="text-ui-primary" />
-                            Łączne koszty
+                            Łączne koszty ({costData?.monthName})
                         </span>
-                        <span className="text-[10px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
-                            {costData?.monthName}
-                        </span>
+                        <DollarSign size={15} className="text-ui-secondary" />
                     </div>
-                    <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                    <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
                         {formatCurrency(liveGrandEnterpriseTotal)}
                     </div>
 
@@ -602,14 +599,12 @@ export default function KosztyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Briefcase size={15} className="text-ui-primary" />
-                                Koszty pozafakturowe
+
+                                Koszty pozafakturowe ({costData?.monthName})
                             </span>
-                            <span className="text-[10px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
-                                {liveGrandEnterpriseTotal > 0 ? Math.round((liveOpTotal / liveGrandEnterpriseTotal) * 100) : 0}%
-                            </span>
+                            <Briefcase size={15} className="text-ui-secondary" />
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
                             {formatCurrency(liveOpTotal)}
                         </div>
                     </div>
@@ -628,24 +623,17 @@ export default function KosztyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                <Receipt size={15} className="text-ui-primary" />
-                                Faktury kosztowe
+                                Faktury kosztowe ({costData?.monthName})
                             </span>
-                            <span className="text-[10px] font-black text-ui-primary bg-ui-accent/20 px-2 py-0.5 rounded-md">
-                                {liveGrandEnterpriseTotal > 0 ? Math.round((invoicesGross / liveGrandEnterpriseTotal) * 100) : 0}%
-                            </span>
+                            <Receipt size={15} className="text-ui-secondary" />
+
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
                             {formatCurrency(invoicesGross)}
                         </div>
                     </div>
                     <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
                         <span>Netto: {formatCurrency(invoicesNet)}</span>
-                        {foodBreakdown?.grossTotal > 0 && (
-                            <span className="text-[10px] text-amber-900 bg-amber-100/70 px-2 py-0.5 rounded font-bold">
-                                Spożywcze: {formatCurrency(foodBreakdown.grossTotal)}
-                            </span>
-                        )}
                     </div>
                 </div>
             </div>
@@ -656,21 +644,14 @@ export default function KosztyTab() {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                         {/* LEWA KOLUMNA: ZWARTA LISTA KATEGORII POZAFAKTUROWYCH (5/12) */}
                         <div className="lg:col-span-5 bg-white border border-ui-accent rounded-2xl shadow-xs overflow-hidden">
-                            <div className="p-3.5 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
+                            <div className="p-3.5 border-b border-ui-accent  flex items-center justify-between">
                                 <div>
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-1.5">
-                                        <Briefcase size={14} className="text-ui-primary" />
+                                        <Briefcase size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                         Koszty pozafakturowe ({costData?.monthName})
                                     </h3>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <button
-                                        onClick={() => setIsAddingCategory(true)}
-                                        className="p-1.5 bg-white hover:bg-ui-accent/15 border border-ui-accent rounded-lg text-ui-primary transition-colors cursor-pointer"
-                                        title="Dodaj nową kategorię"
-                                    >
-                                        <Plus size={14} />
-                                    </button>
                                     <button
                                         onClick={handleSaveCosts}
                                         disabled={isSaving}
@@ -751,7 +732,7 @@ export default function KosztyTab() {
                                                         placeholder="0.00"
                                                         value={currentVal}
                                                         onChange={(e) => handleInputChange(type.id, e.target.value)}
-                                                        className="w-32 text-right pr-7 pl-2.5 py-1.5 rounded-lg border border-ui-accent bg-white text-ui-black font-black text-xs focus:outline-none focus:ring-2 focus:ring-ui-secondary"
+                                                        className="w-32 text-right pr-7 pl-2.5 py-1.5 rounded-lg border border-ui-accent bg-white text-ui-black font-bold text-xs focus:outline-none focus:ring-2 focus:ring-ui-secondary"
                                                     />
                                                     <span className="absolute right-2 top-2 text-[10px] font-semibold text-ui-secondary pointer-events-none">
                                                         zł
@@ -764,11 +745,11 @@ export default function KosztyTab() {
                             </div>
 
                             {/* Dolny pasek podsumowania formularza */}
-                            <div className="p-3 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between">
+                            <div className="p-3 border-t border-ui-accent flex items-center justify-between">
                                 <div className="text-xs font-bold text-ui-secondary">
                                     Suma pozafakturowa:
                                 </div>
-                                <span className="text-base font-black text-ui-black">{formatCurrency(liveOpTotal)}</span>
+                                <span className="text-base font-bold text-ui-black">{formatCurrency(liveOpTotal)}</span>
                             </div>
                         </div>
 
@@ -783,15 +764,15 @@ export default function KosztyTab() {
                                                     setDrillDownCategory(null);
                                                     setExpandedSubcatKey(null);
                                                 }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100/80 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs transition-all cursor-pointer shadow-2xs"
+                                                className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                                             >
                                                 <ArrowLeft size={14} />
-                                                Wróć do wszystkich kosztów
+                                                Wróć
                                             </button>
                                         ) : (
                                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                                <PieIcon size={16} className="text-ui-primary" />
-                                                Struktura wszystkich kosztów ({costData?.monthName})
+                                                <PieIcon size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
+                                                Struktura kosztów ({costData?.monthName})
                                             </h3>
                                         )}
                                     </div>
@@ -826,12 +807,12 @@ export default function KosztyTab() {
 
                                 {/* Banner w trybie drill-down */}
                                 {drillDownCategory && (
-                                    <div className="mb-4 p-2.5 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-xs font-bold text-amber-950">
-                                            <ShoppingBag size={16} className="text-amber-700" />
-                                            <span>Szczegółowy podział kategorii: <b className="underline decoration-amber-400">{drillDownCategory}</b></span>
+                                    <div className="mb-4 p-2.5 bg-ui-accent/15 border border-ui-secondary/50 rounded-xl flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-ui-primary">
+                                            <ShoppingBag size={16} className="text-ui-primary" />
+                                            <span className="">{drillDownCategory}</span>
                                         </div>
-                                        <span className="text-xs font-extrabold text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-lg">
+                                        <span className="text-xs font-extrabold text-ui-primary bg-ui-accent/50 px-2.5 py-0.5 rounded-lg">
                                             Razem: {formatCurrency(foodBreakdown?.grossTotal || 0)}
                                         </span>
                                     </div>
@@ -882,14 +863,17 @@ export default function KosztyTab() {
                                             {pieChartItems.map((item: any) => {
                                                 const isFoodCategory = item.hasSubcategories || item.name.toLowerCase().includes("spożywcz");
                                                 const isExpanded = expandedSubcatKey === item.key;
+                                                const isClickable = isFoodCategory && !drillDownCategory;
 
                                                 return (
                                                     <div
                                                         key={item.id}
-                                                        className={`text-xs p-2 rounded-xl transition-all border ${isExpanded
-                                                            ? "bg-amber-50/80 border-amber-300 shadow-2xs"
-                                                            : "hover:bg-ui-accent/10 border-transparent"
-                                                            }`}
+                                                        onClick={() => {
+                                                            if (isClickable) {
+                                                                setDrillDownCategory("Produkty spożywcze");
+                                                            }
+                                                        }}
+                                                        className={`text-xs p-2 rounded-xl transition-all border hover:bg-ui-accent/10 border-transparent`}
                                                     >
                                                         <div className="flex items-center justify-between">
                                                             <div className="flex items-center gap-2 truncate pr-2">
@@ -902,20 +886,8 @@ export default function KosztyTab() {
                                                                         <span className="text-ui-primary font-bold truncate block">
                                                                             {item.name}
                                                                         </span>
-                                                                        {isFoodCategory && !drillDownCategory && (
-                                                                            <button
-                                                                                onClick={() => setDrillDownCategory("Produkty spożywcze")}
-                                                                                className="text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors cursor-pointer shrink-0"
-                                                                                title="Rozwiń podział na mąkę, nabiał itp."
-                                                                            >
-                                                                                <span>Podział</span>
-                                                                                <ChevronRight size={11} />
-                                                                            </button>
-                                                                        )}
                                                                     </div>
-                                                                    <span className="text-[10px] text-ui-secondary">
-                                                                        {item.sourceLabel}
-                                                                    </span>
+
                                                                 </div>
                                                             </div>
                                                             <div className="font-bold text-ui-black whitespace-nowrap text-right shrink-0">
@@ -928,18 +900,18 @@ export default function KosztyTab() {
 
                                                         {/* Rozwinięcie szczegółów w trybie drill-down */}
                                                         {drillDownCategory && item.items && item.items.length > 0 && (
-                                                            <div className="mt-1.5 pt-1.5 border-t border-amber-200/60">
+                                                            <div className="mt-0.5 pt-1.5 border-t border-ui-secondary/50">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setExpandedSubcatKey(isExpanded ? null : item.key)}
-                                                                    className="text-[11px] font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
+                                                                    className="text-[11px] font-semibold text-ui-secondary hover:text-ui-primary flex items-center gap-1 cursor-pointer"
                                                                 >
                                                                     <ChevronDown size={12} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                                                                     {isExpanded ? "Ukryj surowce" : `Pokaż surowce (${item.items.length})`}
                                                                 </button>
 
                                                                 {isExpanded && (
-                                                                    <div className="mt-2 space-y-1 pl-3 border-l-2 border-amber-300">
+                                                                    <div className="mt-2 space-y-1 pl-3 border-l-2 border-ui-secondary/40">
                                                                         {item.items.map((ingItem: any, iIdx: number) => (
                                                                             <div key={iIdx} className="flex items-center justify-between text-[11px] text-ui-secondary py-0.5">
                                                                                 <span className="font-medium text-ui-black truncate pr-2">
@@ -969,22 +941,7 @@ export default function KosztyTab() {
                                 )}
                             </div>
 
-                            <div className="mt-4 pt-3 border-t border-ui-accent/40 flex items-center justify-between text-xs font-bold text-ui-secondary">
-                                <span>
-                                    {drillDownCategory ? `Razem ${drillDownCategory}:` : "Razem w wybranym filtrze:"}
-                                </span>
-                                <span className="text-base font-black text-ui-black">
-                                    {formatCurrency(
-                                        drillDownCategory
-                                            ? (foodBreakdown?.grossTotal || 0)
-                                            : pieFilter === "ALL"
-                                                ? liveGrandEnterpriseTotal
-                                                : pieFilter === "INVOICES"
-                                                    ? invoicesGross
-                                                    : liveOpTotal
-                                    )}
-                                </span>
-                            </div>
+
                         </div>
                     </div>
 
@@ -1002,7 +959,7 @@ export default function KosztyTab() {
                                 <span className="text-xs font-bold text-ui-secondary">
                                     Dokumenty: <strong className="text-ui-black">{invoicesCount}</strong>
                                 </span>
-                                <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl">
+                                <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl">
                                     Suma brutto: {formatCurrency(invoicesGross)}
                                 </span>
                             </div>
@@ -1018,7 +975,7 @@ export default function KosztyTab() {
                                             <th className="p-3.5 text-right min-w-[120px]">Kwota Netto</th>
                                             <th className="p-3.5 text-right min-w-[120px]">Kwota Brutto</th>
                                             <th className="p-3.5 text-right min-w-[100px]">Udział w fakturach</th>
-                                            <th className="p-3.5 text-right min-w-[110px] bg-ui-accent/15 font-black text-ui-black">
+                                            <th className="p-3.5 text-right min-w-[110px] bg-ui-accent/15 font-bold text-ui-black">
                                                 Udział w kosztach firmy
                                             </th>
                                         </tr>
@@ -1035,7 +992,6 @@ export default function KosztyTab() {
                                                     <tr className="hover:bg-ui-accent/5 transition-colors">
                                                         <td className="p-3.5 font-bold text-ui-black">
                                                             <div className="flex items-center gap-2">
-                                                                <Boxes size={14} className="text-ui-secondary" />
                                                                 <span>{cat.name}</span>
                                                                 {isFood && (
                                                                     <button
@@ -1043,10 +999,9 @@ export default function KosztyTab() {
                                                                             setIsTableFoodExpanded(!isTableFoodExpanded);
                                                                             setDrillDownCategory("Produkty spożywcze");
                                                                         }}
-                                                                        className="ml-2 text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                                                                        className="ml-2 text-[10px] font-bold text-ui-secondary hover:text-ui-primary bg-ui-accent/30 hover:bg-ui-accent px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
                                                                     >
-                                                                        <Sparkles size={11} />
-                                                                        {isTableFoodExpanded ? "Zwiń podział" : "Pokaż podział (Mąka, Nabiał...)"}
+                                                                        {isTableFoodExpanded ? "Zwiń podział" : "Pokaż podział"}
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -1063,7 +1018,7 @@ export default function KosztyTab() {
                                                         <td className="p-3.5 text-right font-semibold text-emerald-700">
                                                             {cat.sharePercent}%
                                                         </td>
-                                                        <td className="p-3.5 text-right font-black text-ui-primary bg-ui-accent/5">
+                                                        <td className="p-3.5 text-right font-bold text-ui-primary bg-ui-accent/5">
                                                             {shareOfAll}%
                                                         </td>
                                                     </tr>
@@ -1078,7 +1033,7 @@ export default function KosztyTab() {
                                                                             <ShoppingBag size={14} className="text-amber-800" />
                                                                             Szczegółowy podział surowców spożywczych ({costData?.monthName})
                                                                         </div>
-                                                                        <span className="text-xs font-black text-amber-900">
+                                                                        <span className="text-xs font-bold text-amber-900">
                                                                             Razem spożywcze: {formatCurrency(foodBreakdown.grossTotal)}
                                                                         </span>
                                                                     </div>
@@ -1127,7 +1082,7 @@ export default function KosztyTab() {
                                         })}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="bg-ui-accent/15 font-black text-ui-black border-t border-ui-accent/40">
+                                        <tr className="bg-ui-accent/15 font-bold text-ui-black border-t border-ui-accent/40">
                                             <td className="p-3.5">RAZEM FAKTURY</td>
                                             <td className="p-3.5 text-right">
                                                 {invoiceCategoriesList.reduce((acc, c) => acc + (c.itemsCount || c.count), 0)}
@@ -1149,218 +1104,225 @@ export default function KosztyTab() {
                         )}
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* ---------------- 2. ZESTAWIENIE ROCZNE (MACIERZ) ---------------- */}
-            {view === "YEARLY_MATRIX" && (
-                <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
-                    <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
-                        <div>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <CalendarDays size={14} />
-                                Roczne zestawienie kosztów pozafakturowych – Rok {costData?.year}
-                            </h3>
-                            <p className="text-[11px] text-ui-secondary mt-0.5">
-                                Wypłaty, ZUS, PIT oraz kategorie własne w ujęciu 12 miesięcy
-                            </p>
-                        </div>
-                        <span className="text-xs font-black text-ui-primary bg-ui-accent/20 px-3 py-1 rounded-xl">
-                            Razem w roku: {formatCurrency(costData?.stats?.grandYearOpTotal || 0)}
-                        </span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                                <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider border-b border-ui-accent/30">
-                                    <th className="p-3.5 sticky left-0 bg-ui-white z-10 min-w-[200px]">Kategoria kosztu</th>
-                                    {MONTH_SHORT.map((m) => (
-                                        <th key={m} className="p-3.5 text-right min-w-[85px]">
-                                            {m}
-                                        </th>
-                                    ))}
-                                    <th className="p-3.5 text-right font-black text-ui-black min-w-[110px] bg-ui-accent/15">
-                                        Suma roczna
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-ui-accent/30 font-medium">
-                                {costData?.yearlyMatrix?.map((row: YearlyMatrixRow) => (
-                                    <tr key={row.costTypeId} className="hover:bg-ui-accent/5 transition-colors">
-                                        <td className="p-3.5 font-bold text-ui-black sticky left-0 bg-white z-10 truncate">
-                                            {row.costTypeName}
-                                        </td>
-                                        {row.months.map((val, mIdx) => (
-                                            <td
-                                                key={mIdx}
-                                                className={`p-3.5 text-right ${val > 0 ? "font-bold text-ui-primary" : "text-ui-secondary/40"}`}
-                                            >
-                                                {val > 0 ? val.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : "-"}
-                                            </td>
-                                        ))}
-                                        <td className="p-3.5 text-right font-black text-ui-black bg-ui-accent/5">
-                                            {formatCurrency(row.total)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr className="bg-ui-accent/15 font-black text-ui-black border-t border-ui-accent/40">
-                                    <td className="p-3.5 sticky left-0 bg-ui-accent/15 z-10">SUMA MIESIĄCA</td>
-                                    {costData?.monthlyOpTotals?.map((tot: number, mIdx: number) => (
-                                        <td key={mIdx} className="p-3.5 text-right">
-                                            {tot > 0 ? tot.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : "-"}
-                                        </td>
-                                    ))}
-                                    <td className="p-3.5 text-right bg-ui-accent/25 text-ui-primary">
-                                        {formatCurrency(costData?.stats?.grandYearOpTotal || 0)}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-            {/* ---------------- 3. WYKRESY ROCZNE ---------------- */}
-            {view === "CHARTS" && (
-                <div className="space-y-6">
-                    <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs">
-                        <div className="flex items-center justify-between mb-4">
+            {
+                view === "YEARLY_MATRIX" && (
+                    <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
+                        <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                             <div>
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                    <BarChart3 size={15} />
-                                    Porównanie kosztów w roku {costData?.year}: Płace/ZUS/PIT vs Faktury
+                                    <CalendarDays size={14} />
+                                    Roczne zestawienie kosztów pozafakturowych – Rok {costData?.year}
                                 </h3>
                                 <p className="text-[11px] text-ui-secondary mt-0.5">
-                                    Słupki skumulowane kosztów przedsiębiorstwa
+                                    Wypłaty, ZUS, PIT oraz kategorie własne w ujęciu 12 miesięcy
+                                </p>
+                            </div>
+                            <span className="text-xs font-bold text-ui-primary bg-ui-accent/20 px-3 py-1 rounded-xl">
+                                Razem w roku: {formatCurrency(costData?.stats?.grandYearOpTotal || 0)}
+                            </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider border-b border-ui-accent/30">
+                                        <th className="p-3.5 sticky left-0 bg-ui-white z-10 min-w-[200px]">Kategoria kosztu</th>
+                                        {MONTH_SHORT.map((m) => (
+                                            <th key={m} className="p-3.5 text-right min-w-[85px]">
+                                                {m}
+                                            </th>
+                                        ))}
+                                        <th className="p-3.5 text-right font-bold text-ui-black min-w-[110px] bg-ui-accent/15">
+                                            Suma roczna
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-ui-accent/30 font-medium">
+                                    {costData?.yearlyMatrix?.map((row: YearlyMatrixRow) => (
+                                        <tr key={row.costTypeId} className="hover:bg-ui-accent/5 transition-colors">
+                                            <td className="p-3.5 font-bold text-ui-black sticky left-0 bg-white z-10 truncate">
+                                                {row.costTypeName}
+                                            </td>
+                                            {row.months.map((val, mIdx) => (
+                                                <td
+                                                    key={mIdx}
+                                                    className={`p-3.5 text-right ${val > 0 ? "font-bold text-ui-primary" : "text-ui-secondary/40"}`}
+                                                >
+                                                    {val > 0 ? val.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : "-"}
+                                                </td>
+                                            ))}
+                                            <td className="p-3.5 text-right font-bold text-ui-black bg-ui-accent/5">
+                                                {formatCurrency(row.total)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-ui-accent/15 font-bold text-ui-black border-t border-ui-accent/40">
+                                        <td className="p-3.5 sticky left-0 bg-ui-accent/15 z-10">SUMA MIESIĄCA</td>
+                                        {costData?.monthlyOpTotals?.map((tot: number, mIdx: number) => (
+                                            <td key={mIdx} className="p-3.5 text-right">
+                                                {tot > 0 ? tot.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : "-"}
+                                            </td>
+                                        ))}
+                                        <td className="p-3.5 text-right bg-ui-accent/25 text-ui-primary">
+                                            {formatCurrency(costData?.stats?.grandYearOpTotal || 0)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* ---------------- 3. WYKRESY ROCZNE ---------------- */}
+            {
+                view === "CHARTS" && (
+                    <div className="space-y-6">
+                        <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
+                                        <BarChart3 size={15} />
+                                        Porównanie kosztów w roku {costData?.year}: Płace/ZUS/PIT vs Faktury
+                                    </h3>
+                                    <p className="text-[11px] text-ui-secondary mt-0.5">
+                                        Słupki skumulowane kosztów przedsiębiorstwa
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="h-[340px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={costData?.monthlyChartData || []} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                        <XAxis dataKey="month" tick={{ fill: "#6B7280", fontSize: 11 }} />
+                                        <YAxis tick={{ fill: "#6B7280", fontSize: 11 }} tickFormatter={(val) => `${val / 1000} tys.`} />
+                                        <Tooltip
+                                            formatter={(val: number) => formatCurrency(val)}
+                                            contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}
+                                        />
+                                        <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "12px", fontWeight: "600" }} />
+                                        <Bar dataKey="operationalTotal" name="Koszty pozafakturowe (Płace/ZUS/PIT)" fill="#042043" stackId="a" radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="invoiceGross" name="Faktury kosztowe (Brutto)" fill="#10b981" stackId="a" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* ---------------- 4. ZARZĄDZANIE KATEGORIAMI ---------------- */}
+            {
+                view === "SETTINGS" && (
+                    <div className="bg-white border border-ui-accent rounded-2xl p-6 shadow-xs max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between pb-4 border-b border-ui-accent/50 mb-6">
+                            <div>
+                                <h3 className="text-sm font-bold text-ui-black flex items-center gap-2">
+                                    <Settings size={16} />
+                                    Kategorie kosztów pozafakturowych
+                                </h3>
+                                <p className="text-xs text-ui-secondary mt-1">
+                                    Dodawaj nowe kategorie (np. premie, inne) i edytuj istniejące
                                 </p>
                             </div>
                         </div>
 
-                        <div className="h-[340px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={costData?.monthlyChartData || []} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                    <XAxis dataKey="month" tick={{ fill: "#6B7280", fontSize: 11 }} />
-                                    <YAxis tick={{ fill: "#6B7280", fontSize: 11 }} tickFormatter={(val) => `${val / 1000} tys.`} />
-                                    <Tooltip
-                                        formatter={(val: number) => formatCurrency(val)}
-                                        contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}
-                                    />
-                                    <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "12px", fontWeight: "600" }} />
-                                    <Bar dataKey="operationalTotal" name="Koszty pozafakturowe (Płace/ZUS/PIT)" fill="#042043" stackId="a" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="invoiceGross" name="Faktury kosztowe (Brutto)" fill="#10b981" stackId="a" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        {/* Formularz nowej kategorii */}
+                        <form onSubmit={handleAddCategory} className="flex gap-2 mb-6">
+                            <input
+                                type="text"
+                                placeholder="Wpisz nazwę nowej kategorii..."
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                className="flex-1 px-3 py-2 rounded-xl border border-ui-accent bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ui-secondary"
+                            />
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-ui-primary text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                            >
+                                <Plus size={14} />
+                                Dodaj
+                            </button>
+                        </form>
 
-            {/* ---------------- 4. ZARZĄDZANIE KATEGORIAMI ---------------- */}
-            {view === "SETTINGS" && (
-                <div className="bg-white border border-ui-accent rounded-2xl p-6 shadow-xs max-w-2xl mx-auto">
-                    <div className="flex items-center justify-between pb-4 border-b border-ui-accent/50 mb-6">
-                        <div>
-                            <h3 className="text-sm font-bold text-ui-black flex items-center gap-2">
-                                <Settings size={16} />
-                                Kategorie kosztów pozafakturowych
-                            </h3>
-                            <p className="text-xs text-ui-secondary mt-1">
-                                Dodawaj nowe kategorie (np. premie, inne) i edytuj istniejące
-                            </p>
-                        </div>
-                    </div>
+                        {/* Lista kategorii */}
+                        <div className="divide-y divide-ui-accent/30 space-y-2">
+                            {costData?.costTypes?.map((type: CostType) => {
+                                const isEditing = editingCategoryId === type.id;
+                                const isDefault = ["Wypłaty pracowników", "Składki ZUS", "Podatek PIT"].includes(type.name);
 
-                    {/* Formularz nowej kategorii */}
-                    <form onSubmit={handleAddCategory} className="flex gap-2 mb-6">
-                        <input
-                            type="text"
-                            placeholder="Wpisz nazwę nowej kategorii..."
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            className="flex-1 px-3 py-2 rounded-xl border border-ui-accent bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ui-secondary"
-                        />
-                        <button
-                            type="submit"
-                            className="px-4 py-2 bg-ui-primary text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                        >
-                            <Plus size={14} />
-                            Dodaj
-                        </button>
-                    </form>
-
-                    {/* Lista kategorii */}
-                    <div className="divide-y divide-ui-accent/30 space-y-2">
-                        {costData?.costTypes?.map((type: CostType) => {
-                            const isEditing = editingCategoryId === type.id;
-                            const isDefault = ["Wypłaty pracowników", "Składki ZUS", "Podatek PIT"].includes(type.name);
-
-                            return (
-                                <div key={type.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3">
-                                    {isEditing ? (
-                                        <div className="flex items-center gap-2 flex-1">
-                                            <input
-                                                type="text"
-                                                value={editingCategoryName}
-                                                onChange={(e) => setEditingCategoryName(e.target.value)}
-                                                className="flex-1 px-2.5 py-1.5 rounded-lg border border-ui-accent bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ui-secondary"
-                                            />
-                                            <button
-                                                onClick={() => handleUpdateCategory(type.id)}
-                                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer"
-                                            >
-                                                Zapisz
-                                            </button>
-                                            <button
-                                                onClick={() => setEditingCategoryId(null)}
-                                                className="px-2 py-1.5 text-xs text-ui-secondary hover:text-ui-black cursor-pointer"
-                                            >
-                                                Anuluj
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-center gap-2.5">
-                                                <span className="w-2 h-2 rounded-full bg-ui-secondary" />
-                                                <span className="font-bold text-xs text-ui-black">{type.name}</span>
-                                                {isDefault && (
-                                                    <span className="text-[10px] bg-ui-accent/20 text-ui-secondary px-2 py-0.5 rounded-md font-semibold">
-                                                        Domyślna
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="flex items-center gap-1">
+                                return (
+                                    <div key={type.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3">
+                                        {isEditing ? (
+                                            <div className="flex items-center gap-2 flex-1">
+                                                <input
+                                                    type="text"
+                                                    value={editingCategoryName}
+                                                    onChange={(e) => setEditingCategoryName(e.target.value)}
+                                                    className="flex-1 px-2.5 py-1.5 rounded-lg border border-ui-accent bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ui-secondary"
+                                                />
                                                 <button
-                                                    onClick={() => {
-                                                        setEditingCategoryId(type.id);
-                                                        setEditingCategoryName(type.name);
-                                                    }}
-                                                    className="p-1.5 text-ui-secondary hover:text-ui-black hover:bg-ui-accent/15 rounded-lg transition-colors cursor-pointer"
-                                                    title="Edytuj nazwę"
+                                                    onClick={() => handleUpdateCategory(type.id)}
+                                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer"
                                                 >
-                                                    <Edit3 size={13} />
+                                                    Zapisz
                                                 </button>
-                                                {!isDefault && (
-                                                    <button
-                                                        onClick={() => handleDeleteCategory(type.id, type.name)}
-                                                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                        title="Usuń kategorię"
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={() => setEditingCategoryId(null)}
+                                                    className="px-2 py-1.5 text-xs text-ui-secondary hover:text-ui-black cursor-pointer"
+                                                >
+                                                    Anuluj
+                                                </button>
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="w-2 h-2 rounded-full bg-ui-secondary" />
+                                                    <span className="font-bold text-xs text-ui-black">{type.name}</span>
+                                                    {isDefault && (
+                                                        <span className="text-[10px] bg-ui-accent/20 text-ui-secondary px-2 py-0.5 rounded-md font-semibold">
+                                                            Domyślna
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingCategoryId(type.id);
+                                                            setEditingCategoryName(type.name);
+                                                        }}
+                                                        className="p-1.5 text-ui-secondary hover:text-ui-black hover:bg-ui-accent/15 rounded-lg transition-colors cursor-pointer"
+                                                        title="Edytuj nazwę"
+                                                    >
+                                                        <Edit3 size={13} />
+                                                    </button>
+                                                    {!isDefault && (
+                                                        <button
+                                                            onClick={() => handleDeleteCategory(type.id, type.name)}
+                                                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                            title="Usuń kategorię"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

@@ -596,13 +596,23 @@ export default function PowiadomieniaPage() {
                                                 <div className="text-right">
                                                     <div className="text-[11px] text-ui-secondary font-semibold">Cena zakupu netto:</div>
                                                     <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-xs text-ui-secondary line-through font-medium">
-                                                            {pa.oldPrice.toFixed(2)} zł
-                                                        </span>
-                                                        <ArrowRight size={13} className="text-rose-600" />
-                                                        <span className="text-base font-black text-rose-950">
-                                                            {pa.newPrice.toFixed(2)} zł / {pa.ingredientUnit}
-                                                        </span>
+                                                        <div className="text-right">
+                                                            <div className="text-xs text-ui-secondary line-through font-medium">
+                                                                {pa.oldPrice.toFixed(2)} zł
+                                                            </div>
+                                                            <div className="text-[9px] text-ui-secondary line-through">
+                                                                ({(pa.oldPrice * 1.05).toFixed(2)} zł brutto)
+                                                            </div>
+                                                        </div>
+                                                        <ArrowRight size={13} className="text-rose-600 shrink-0" />
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-black text-rose-950">
+                                                                {pa.newPrice.toFixed(2)} zł <span className="text-[10px] font-normal">netto</span>
+                                                            </div>
+                                                            <div className="text-[10px] text-rose-800 font-semibold">
+                                                                {(pa.newPrice * 1.05).toFixed(2)} zł brutto / {pa.ingredientUnit}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -660,14 +670,20 @@ export default function PowiadomieniaPage() {
                                                                     </div>
                                                                     <div className="flex items-center justify-between pt-1 border-t border-ui-accent/40">
                                                                         <span className="text-ui-secondary">Obecna cena:</span>
-                                                                        <span className="font-bold text-ui-black">
-                                                                            {prod.currentSellingPrice.toFixed(2)} zł
+                                                                        <span className="font-bold text-ui-black text-right">
+                                                                            {prod.currentSellingPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">brutto</span>
+                                                                            <div className="text-[10px] font-normal text-ui-secondary">
+                                                                                ({(prod.currentSellingPrice / 1.05).toFixed(2)} zł netto)
+                                                                            </div>
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex items-center justify-between text-emerald-900 bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-200/60">
                                                                         <span className="font-medium text-[11px]">Sugerowana cena:</span>
-                                                                        <span className="font-black text-xs">
-                                                                            {prod.suggestedSellingPrice.toFixed(2)} zł
+                                                                        <span className="font-black text-xs text-right">
+                                                                            {prod.suggestedSellingPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-emerald-800">brutto</span>
+                                                                            <div className="text-[10px] font-normal text-emerald-700">
+                                                                                ({(prod.suggestedSellingPrice / 1.05).toFixed(2)} zł netto)
+                                                                            </div>
                                                                         </span>
                                                                     </div>
                                                                 </div>

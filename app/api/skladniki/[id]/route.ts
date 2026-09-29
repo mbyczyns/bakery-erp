@@ -8,6 +8,14 @@ const MONTH_NAMES = [
     "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"
 ];
 
+const POLISH_MONTHS_FULL = [
+    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+];
+
+const POLISH_WEEKDAYS = ["Niedziela", "Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota"];
+const POLISH_SHORT_WEEKDAYS = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "Sb"];
+
 const TYPE_MAP: Record<string, string> = {
     FLOUR: "Mąka",
     FRUIT: "Owoce/Warzywa/Bakalie",
@@ -221,6 +229,7 @@ export async function GET(
                 year: d.getFullYear(),
                 monthIndex: d.getMonth(),
                 label: MONTH_NAMES[d.getMonth()],
+                fullLabel: `${POLISH_MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`,
                 key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
             });
         }
@@ -249,13 +258,6 @@ export async function GET(
         });
 
         // 5. SZCZEGÓŁOWA ANALIZA ZUŻYCIA (DZIENNA, TYGODNIOWA, MIESIĘCZNA, WG PRODUKTÓW)
-        const POLISH_WEEKDAYS = ["Niedziela", "Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota"];
-        const POLISH_SHORT_WEEKDAYS = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "Sb"];
-        const POLISH_MONTHS_FULL = [
-            "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
-            "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
-        ];
-
         // Mapa zużycia dziennego: dateStr -> DailyData
         interface DailyProductUsage {
             productId: string;
@@ -676,6 +678,8 @@ export async function GET(
             const found = monthlyHistory.find((mh) => mh.year === m.year && mh.monthIndex === m.monthIndex);
             return {
                 month: m.label,
+                fullLabel: m.fullLabel,
+                year: m.year,
                 purchased: found ? found.totalPurchased : 0,
                 consumed: found ? found.totalConsumed : 0,
             };

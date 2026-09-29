@@ -32,6 +32,10 @@ function formatDate(dateStr?: string | Date | null): string {
 }
 
 const POLISH_MONTHS = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+const POLISH_MONTHS_FULL = [
+    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+];
 
 export default function SkladnikDetailPage({
     params
@@ -250,8 +254,8 @@ export default function SkladnikDetailPage({
                                 <span className="text-xs font-bold text-ui-secondary bg-white px-3 py-1 rounded-lg border border-ui-accent shadow-sm tracking-wider">
                                     {data.type}
                                 </span>
-                                <span className="text-xs font-semibold text-ui-primary bg-white/80 px-2.5 py-1 rounded-lg border border-ui-accent/50">
-                                    Jednostka: <strong>{data.unit}</strong>
+                                <span className="ml-2 text-xs font-normal text-ui-secondary bg-ui-accent/30 px-2 py-0.5 rounded-md">
+                                    {data.unit}
                                 </span>
 
                             </div>
@@ -264,7 +268,7 @@ export default function SkladnikDetailPage({
                                 setEditType(data.rawType || "OTHER");
                                 setIsEditModalOpen(true);
                             }}
-                            className="flex items-center gap-2 border border-ui-accent bg-white hover:bg-ui-accent/20 text-ui-primary px-4 py-2.5 rounded-xl font-medium shadow-sm transition-all text-xs cursor-pointer self-start sm:self-center"
+                            className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                         >
                             <Pencil size={15} />
                             Edytuj składnik
@@ -278,7 +282,8 @@ export default function SkladnikDetailPage({
                 <div className="bg-white border border-ui-accent rounded-2xl shadow-sm flex flex-col h-full overflow-hidden">
                     <div className="p-5 border-b border-ui-accent bg-emerald-50/30">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                            <Truck size={16} /> Dostawcy
+                            <Truck size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
+                            Dostawcy
                         </h3>
                     </div>
                     <div className="p-3 flex-1">
@@ -295,8 +300,13 @@ export default function SkladnikDetailPage({
                                             Ost. zakup: {sup.lastBuy && sup.lastBuy !== "Brak zakupów" ? formatDate(sup.lastBuy) : "Brak zakupów"}
                                         </div>
                                     </div>
-                                    <div className={`font-bold ${sup.isBest ? "text-emerald-600 text-sm" : "text-ui-primary text-base"}`}>
-                                        {sup.lastPrice.toFixed(2)} <span className="text-xs font-semibold opacity-70">zł</span>
+                                    <div className="text-right">
+                                        <div className={`font-bold ${sup.isBest ? "text-emerald-700 text-sm" : "text-ui-primary text-sm"}`}>
+                                            {sup.lastPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">netto</span>
+                                        </div>
+                                        <div className="text-[10px] text-ui-secondary font-medium">
+                                            {(sup.lastPrice * 1.05).toFixed(2)} zł brutto
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -311,7 +321,8 @@ export default function SkladnikDetailPage({
                 <div className="bg-white border border-ui-accent col-span-2 rounded-2xl shadow-sm flex flex-col h-full overflow-hidden">
                     <div className="p-5 border-b border-ui-accent flex items-center justify-between">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                            <History size={16} /> Historia zakupów
+                            <History size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
+                            Historia zakupów
                         </h3>
                         {data.deliveriesHistory && data.deliveriesHistory.length > 0 && (
                             <span className="text-[11px] font-semibold text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-full">
@@ -408,7 +419,7 @@ export default function SkladnikDetailPage({
                     <div>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <TrendingUp size={16} /> Historia cen zakupu
+                                <TrendingUp size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Historia cen zakupu
                             </h3>
                             {data.priceHistory && data.priceHistory.length > 0 && (
                                 <span className="text-[11px] font-semibold text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-full">
@@ -508,11 +519,11 @@ export default function SkladnikDetailPage({
                     <div>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Scale size={16} /> Zakupy / Zużycie
+                                <Scale size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Zakupy / Zużycie
                             </h3>
                             <button
                                 onClick={() => setIsConsumptionModalOpen(true)}
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-ui-accent/15 hover:bg-ui-accent/10 text-ui-primary border border-ui-accent px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                             >
                                 <BarChart3 size={14} />
                                 Szczegóły
@@ -531,18 +542,29 @@ export default function SkladnikDetailPage({
                                         content={({ active, payload, label }) => {
                                             if (active && payload && payload.length) {
                                                 const dataPoint = payload[0]?.payload;
+                                                let tooltipTitle = dataPoint?.fullLabel;
+                                                if (!tooltipTitle) {
+                                                    const mIdx = POLISH_MONTHS.indexOf(label);
+                                                    if (mIdx !== -1) {
+                                                        const year = dataPoint?.year || new Date().getFullYear();
+                                                        tooltipTitle = `${POLISH_MONTHS_FULL[mIdx]} ${year}`;
+                                                    } else {
+                                                        tooltipTitle = label;
+                                                    }
+                                                }
+
                                                 return (
-                                                    <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-lg text-xs">
-                                                        <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-1.5">
-                                                            {label}
+                                                    <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-lg text-xs min-w-[190px]">
+                                                        <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-2">
+                                                            {tooltipTitle}
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-4 text-[#3B82F6] mb-1">
-                                                            <span>Zakupiono:</span>
-                                                            <span className="font-semibold">{dataPoint?.purchased ?? 0} {data.unit}</span>
+                                                        <div className="flex items-center justify-between gap-4 text-[#3B82F6] mb-1.5">
+                                                            <span className="font-medium">Zakupiono:</span>
+                                                            <span className="font-bold">{dataPoint?.purchased ?? 0} {data.unit}</span>
                                                         </div>
                                                         <div className="flex items-center justify-between gap-4 text-[#059669] mb-1">
-                                                            <span>Zużyto:</span>
-                                                            <span className="font-semibold">{dataPoint?.consumed ?? 0} {data.unit}</span>
+                                                            <span className="font-medium">Zużyto:</span>
+                                                            <span className="font-bold">{dataPoint?.consumed ?? 0} {data.unit}</span>
                                                         </div>
                                                     </div>
                                                 );
@@ -594,8 +616,8 @@ export default function SkladnikDetailPage({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
-                            <h2 className="text-base font-bold text-ui-black flex items-center gap-2">
-                                <Pencil size={18} className="text-ui-primary" />
+                            <h2 className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer">
+                                <Pencil size={18} className="text-amber-900" />
                                 Edytuj składnik
                             </h2>
                             <button
@@ -808,8 +830,9 @@ export default function SkladnikDetailPage({
                                                                 <td className="py-2.5 px-3 text-center font-bold text-ui-black whitespace-nowrap">
                                                                     {pos.quantity} {pos.unit || "szt"}
                                                                 </td>
-                                                                <td className="py-2.5 px-3 text-right text-ui-secondary whitespace-nowrap">
-                                                                    {Number(pos.netPrice || 0).toFixed(2)} zł
+                                                                <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                                                    <div className="font-medium text-ui-black">{Number(pos.netPrice || 0).toFixed(2)} zł <span className="text-[10px] text-ui-secondary">netto</span></div>
+                                                                    <div className="text-[10px] text-ui-secondary">{(Number(pos.netPrice || 0) * (1 + (parseFloat(pos.vatRate || "5") || 5) / 100)).toFixed(2)} zł brutto</div>
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-right font-medium text-ui-black whitespace-nowrap">
                                                                     {Number(pos.netAmount || (Number(pos.quantity || 0) * Number(pos.netPrice || 0))).toFixed(2)} zł

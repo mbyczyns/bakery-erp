@@ -861,19 +861,39 @@ export default function FakturyPage() {
                                             <tr className="bg-ui-accent/20 text-ui-secondary font-bold uppercase border-b border-ui-accent">
                                                 <th className="p-3 text-left">Nazwa artykułu</th>
                                                 <th className="p-3 text-center whitespace-nowrap w-auto">Ilość</th>
+                                                <th className="p-3 text-right whitespace-nowrap">Cena</th>
                                                 <th className="p-3 text-right">Wartość Brutto</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-ui-accent/40">
-                                            {selectedDoc.positions?.map((pos) => (
-                                                <tr key={pos.id} className="hover:bg-ui-accent/5">
-                                                    <td className="p-3 font-semibold text-ui-black text-left">{pos.name}</td>
-                                                    <td className="p-3 text-center font-bold text-ui-primary whitespace-nowrap">
-                                                        {pos.quantity} {pos.unit}
-                                                    </td>
-                                                    <td className="p-3 text-right font-bold text-ui-black">{Number(pos.grossAmount || 0).toFixed(2)} zł</td>
-                                                </tr>
-                                            ))}
+                                            {selectedDoc.positions?.map((pos) => {
+                                                const netPrice = Number(pos.netPrice || 0);
+                                                const vatRate = parseFloat(pos.vatRate || "5") || 5;
+                                                const grossPrice = netPrice > 0 ? netPrice * (1 + vatRate / 100) : (pos.quantity ? Number(pos.grossAmount || 0) / pos.quantity : 0);
+                                                return (
+                                                    <tr key={pos.id} className="hover:bg-ui-accent/5">
+                                                        <td className="p-3 font-semibold text-ui-black text-left">{pos.name}</td>
+                                                        <td className="p-3 text-center font-bold text-ui-primary whitespace-nowrap">
+                                                            {pos.quantity} {pos.unit}
+                                                        </td>
+                                                        <td className="p-3 text-right whitespace-nowrap">
+                                                            {netPrice > 0 ? (
+                                                                <div>
+                                                                    <div className="font-semibold text-ui-black">
+                                                                        {netPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">netto</span>
+                                                                    </div>
+                                                                    <div className="text-[10px] text-ui-secondary font-medium">
+                                                                        {grossPrice.toFixed(2)} zł brutto
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-ui-secondary">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 text-right font-bold text-ui-black">{Number(pos.grossAmount || 0).toFixed(2)} zł</td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1190,10 +1210,11 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase border-b border-ui-accent">
-                                    <th className="p-3.5 w-1/3 text-left">Nazwa</th>
+                                    <th className="p-3.5 w-1/4 text-left">Nazwa</th>
                                     <th className="p-3.5 text-center whitespace-nowrap w-auto">Ilość</th>
-                                    <th className="p-3.5 w-[30%] text-left">Kategoria</th>
-                                    <th className="p-3.5 w-[35%] text-left">Surowiec</th>
+                                    <th className="p-3.5 text-right whitespace-nowrap">Cena</th>
+                                    <th className="p-3.5 w-[25%] text-left">Kategoria</th>
+                                    <th className="p-3.5 w-[28%] text-left">Surowiec</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-ui-accent/40">
@@ -1207,6 +1228,10 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                     const selectedIngredient = ingredients.find(i => i.id === currentMapping.ingredientId);
                                     const needsMultiplier = selectedIngredient && selectedIngredient.unit !== pos.unit;
 
+                                    const netPrice = Number(pos.netPrice || 0);
+                                    const vatRate = parseFloat(pos.vatRate || "5") || 5;
+                                    const grossPrice = netPrice * (1 + vatRate / 100);
+
                                     return (
                                         <tr
                                             key={pos.id}
@@ -1217,11 +1242,25 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                         >
                                             <td className="p-3.5 text-left">
                                                 <div className="font-bold text-ui-black text-sm">{pos.name}</div>
-
                                             </td>
 
                                             <td className="p-3.5 text-center whitespace-nowrap align-center">
                                                 <div className="text-ui-primary text-sm font-semibold">{pos.quantity} {pos.unit}</div>
+                                            </td>
+
+                                            <td className="p-3.5 text-right whitespace-nowrap align-center">
+                                                {netPrice > 0 ? (
+                                                    <div>
+                                                        <div className="font-bold text-ui-black">
+                                                            {netPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">netto</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-ui-secondary font-medium">
+                                                            {grossPrice.toFixed(2)} zł brutto
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-ui-secondary">—</span>
+                                                )}
                                             </td>
 
                                             <td className="p-3.5 align-center text-left">
@@ -1717,6 +1756,11 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                                                     />
                                                     <span className="absolute right-2 top-2.5 text-[10px] text-ui-secondary font-bold">zł</span>
                                                 </div>
+                                                {parseFloat(row.netPrice.replace(',', '.')) > 0 && (
+                                                    <div className="text-[10px] text-ui-secondary text-right mt-0.5 font-medium">
+                                                        ({((parseFloat(row.netPrice.replace(',', '.')) || 0) * (1 + (parseFloat(row.vatRate) || 0) / 100)).toFixed(2)} zł brutto)
+                                                    </div>
+                                                )}
                                             </td>
 
                                             <td className="p-2 align-top">

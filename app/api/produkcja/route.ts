@@ -292,6 +292,7 @@ export async function GET(request: NextRequest) {
                 monthlyProducts,
                 closedDays: closedDaysMap,
                 openingHours: settings.openingHours,
+                favoriteRecipeIds: settings.favoriteRecipeIds || [],
                 stats: {
                     monthProduced,
                     monthCarriedOver,
@@ -307,13 +308,15 @@ export async function GET(request: NextRequest) {
 
         // -------------------------------------------------------------
         // TRYB 3: ANALITYKA I WYKRESY (mode === "analytics")
-        // Obsługa: ostatnie 7 dni, ostatnie tygodnie, ostatnie miesiące
+        // Obsługa: dni, tygodnie, miesiące (zarówno presety, jak i własny zakres dat)
         // -------------------------------------------------------------
         if (mode === "analytics") {
             const rangeType = searchParams.get("type") || "days"; // "days" | "weeks" | "months"
-            const count = Math.min(24, Math.max(1, parseInt(searchParams.get("count") || (rangeType === "days" ? "7" : "6"), 10)));
+            const count = Math.min(60, Math.max(1, parseInt(searchParams.get("count") || (rangeType === "days" ? "7" : "6"), 10)));
             const offset = parseInt(searchParams.get("offset") || "0", 10);
             const anchorParam = searchParams.get("anchorDate") || new Date().toISOString().split("T")[0];
+            const startDateParam = searchParams.get("startDate");
+            const endDateParam = searchParams.get("endDate");
 
             interface CategoryMetric {
                 produced: number;
@@ -354,7 +357,126 @@ export async function GET(request: NextRequest) {
             const POLISH_DAYS_SHORT = ["Nd", "Pon", "Wt", "Śr", "Czw", "Pt", "Sob"];
             const POLISH_MONTHS_SHORT = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
 
-            if (rangeType === "days") {
+            const isCustomRange = Boolean(startDateParam && endDateParam && startDateParam <= endDateParam);
+
+            if (isCustomRange && startDateParam && endDateParam) {
+                if (rangeType === "days") {
+                    const sDate = new Date(`${startDateParam}T00:00:00.000Z`);
+                    const eDate = new Date(`${endDateParam}T00:00:00.000Z`);
+                    const diffDays = Math.min(180, Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / 86400000) + 1));
+
+                    for (let i = 0; i < diffDays; i++) {
+                        const currentD = new Date(sDate.getTime() + (i * 86400000));
+                        const dStr = currentD.toISOString().split("T")[0];
+                        const dayOfWeek = currentD.getUTCDay();
+                        const dayNum = String(currentD.getUTCDate()).padStart(2, "0");
+                        const monthNum = String(currentD.getUTCMonth() + 1).padStart(2, "0");
+                        const yearNum = currentD.getUTCFullYear();
+                        const label = `${POLISH_DAYS_SHORT[dayOfWeek]} ${dayNum}-${monthNum}`;
+
+                        buckets.push({
+                            id: dStr,
+                            label,
+                            subLabel: `${dayNum}-${monthNum}-${yearNum}`,
+                            startDate: dStr,
+                            endDate: dStr,
+                            BREAD: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            ROLL: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            SWEET: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            SAVORY: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            totalProduced: 0,
+                            totalSold: 0,
+                            totalUnsold: 0,
+                            totalIncome: 0,
+                            sellThroughRate: 0,
+                            products: [],
+                        });
+                    }
+                } else if (rangeType === "weeks") {
+                    const sDate = new Date(`${startDateParam}T00:00:00.000Z`);
+                    const eDate = new Date(`${endDateParam}T00:00:00.000Z`);
+                    // Znajdź poniedziałek dla sDate
+                    const sDayOfWeek = (sDate.getUTCDay() + 6) % 7;
+                    let currentMonday = new Date(sDate.getTime() - (sDayOfWeek * 86400000));
+                    
+                    let weekIndex = 0;
+                    while (currentMonday.getTime() <= eDate.getTime() && weekIndex < 52) {
+                        const mon = new Date(currentMonday.getTime());
+                        const sun = new Date(mon.getTime() + (6 * 86400000));
+                        const monStr = mon.toISOString().split("T")[0];
+                        const sunStr = sun.toISOString().split("T")[0];
+                        const monDay = String(mon.getUTCDate()).padStart(2, "0");
+                        const monMonth = String(mon.getUTCMonth() + 1).padStart(2, "0");
+                        const monYear = mon.getUTCFullYear();
+                        const sunDay = String(sun.getUTCDate()).padStart(2, "0");
+                        const sunMonth = String(sun.getUTCMonth() + 1).padStart(2, "0");
+                        const sunYear = sun.getUTCFullYear();
+                        const label = `${monDay}-${monMonth} - ${sunDay}-${sunMonth}`;
+
+                        buckets.push({
+                            id: `W_${monStr}`,
+                            label,
+                            subLabel: `${monDay}-${monMonth}-${monYear} do ${sunDay}-${sunMonth}-${sunYear}`,
+                            startDate: monStr,
+                            endDate: sunStr,
+                            BREAD: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            ROLL: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            SWEET: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            SAVORY: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            totalProduced: 0,
+                            totalSold: 0,
+                            totalUnsold: 0,
+                            totalIncome: 0,
+                            sellThroughRate: 0,
+                            products: [],
+                        });
+
+                        currentMonday = new Date(currentMonday.getTime() + (7 * 86400000));
+                        weekIndex++;
+                    }
+                } else if (rangeType === "months") {
+                    const [sYStr, sMStr] = startDateParam.split("-");
+                    const [eYStr, eMStr] = endDateParam.split("-");
+                    let curY = parseInt(sYStr, 10);
+                    let curM = parseInt(sMStr, 10) - 1; // 0-indexed
+                    const endY = parseInt(eYStr, 10);
+                    const endM = parseInt(eMStr, 10) - 1;
+
+                    let monthIndex = 0;
+                    while ((curY < endY || (curY === endY && curM <= endM)) && monthIndex < 36) {
+                        const firstDay = new Date(Date.UTC(curY, curM, 1));
+                        const lastDay = new Date(Date.UTC(curY, curM + 1, 0));
+                        const monStr = firstDay.toISOString().split("T")[0];
+                        const sunStr = lastDay.toISOString().split("T")[0];
+                        const label = `${POLISH_MONTHS_SHORT[curM]} ${curY}`;
+
+                        buckets.push({
+                            id: `M_${curY}-${String(curM + 1).padStart(2, "0")}`,
+                            label,
+                            subLabel: `${curY}-${String(curM + 1).padStart(2, "0")}`,
+                            startDate: monStr,
+                            endDate: sunStr,
+                            BREAD: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            ROLL: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            SWEET: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            SAVORY: { produced: 0, sold: 0, unsold: 0, income: 0 },
+                            totalProduced: 0,
+                            totalSold: 0,
+                            totalUnsold: 0,
+                            totalIncome: 0,
+                            sellThroughRate: 0,
+                            products: [],
+                        });
+
+                        curM++;
+                        if (curM > 11) {
+                            curM = 0;
+                            curY++;
+                        }
+                        monthIndex++;
+                    }
+                }
+            } else if (rangeType === "days") {
                 const anchorDate = new Date(`${anchorParam}T00:00:00.000Z`);
                 const endTimestamp = anchorDate.getTime() - (offset * count * 86400000);
                 
@@ -605,6 +727,7 @@ export async function GET(request: NextRequest) {
             isClosed: !!closedInfo?.isClosed,
             closedReason: closedInfo?.reason || "",
             openingHours: settings.openingHours,
+            favoriteRecipeIds: settings.favoriteRecipeIds || [],
         });
     } catch (error: any) {
         console.error("Błąd pobierania raportu produkcji:", error);

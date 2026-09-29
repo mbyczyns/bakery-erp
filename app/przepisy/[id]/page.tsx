@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { matchesSearch } from "@/lib/search-utils";
 import {
@@ -17,6 +17,10 @@ import {
     Coins,
     BarChart3,
     Calendar,
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    RotateCcw,
     CheckCircle2,
     AlertCircle,
     Scale,
@@ -55,6 +59,8 @@ interface DetailedIngredient {
     amount: number;
     unit: string;
     unitPrice: number;
+    unitPriceNet?: number;
+    unitPriceGross?: number;
     costContribution: number;
     ingredientDetails?: any;
     semiFinishedDetails?: any;
@@ -101,6 +107,19 @@ const CATEGORY_NAMES: Record<string, string> = {
     SAVORY: "Wypieki słone",
 };
 
+// Formatowanie daty: YYYY-MM-DD -> DD.MM.YYYY lub YYYY-MM -> MM.YYYY
+function formatDate(dateStr: string): string {
+    if (!dateStr) return "-";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    }
+    if (parts.length === 2) {
+        return `${parts[1]}.${parts[0]}`;
+    }
+    return dateStr;
+}
+
 export default function PrzepisSzczegolyPage({
     params,
 }: {
@@ -118,12 +137,20 @@ export default function PrzepisSzczegolyPage({
                     const parsed = JSON.parse(saved);
                     return Array.isArray(parsed) && parsed.includes(id);
                 }
-            } catch {}
+            } catch { }
         }
         return false;
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Produkcja i sprzedaż - zakresy dat
+    const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+    const [prodCount, setProdCount] = useState<number>(30);
+    const [prodOffset, setProdOffset] = useState<number>(0);
+    const [prodCustomRange, setProdCustomRange] = useState<{ startDate: string; endDate: string } | null>(null);
+    const [prodInputStart, setProdInputStart] = useState<string>(() => `${new Date().toISOString().split("T")[0].slice(0, 7)}-01`);
+    const [prodInputEnd, setProdInputEnd] = useState<string>(() => new Date().toISOString().split("T")[0]);
 
     // Dynamiczny kalkulator partii w tabeli składników
     const [previewBatchSize, setPreviewBatchSize] = useState<number>(1);
@@ -152,7 +179,7 @@ export default function PrzepisSzczegolyPage({
                 list = list.filter((favId) => favId !== id);
             }
             localStorage.setItem("bakery_favorite_recipes", JSON.stringify(list));
-        } catch {}
+        } catch { }
 
         try {
             await fetch("/api/przepisy/favorites", {
@@ -220,7 +247,7 @@ export default function PrzepisSzczegolyPage({
                     setIsFavorite(favData.favoriteIds.includes(id));
                     try {
                         localStorage.setItem("bakery_favorite_recipes", JSON.stringify(favData.favoriteIds));
-                    } catch {}
+                    } catch { }
                 }
             }
 
@@ -513,6 +540,11 @@ export default function PrzepisSzczegolyPage({
 
     const { recipe, detailedIngredients, totalFoodCost, productionStats, productions } = data;
 
+    const totalFoodCostGross = detailedIngredients.reduce((sum, item) => {
+        const grossUnit = typeof item.unitPriceGross === "number" ? item.unitPriceGross : (item.unitPrice * 1.05);
+        return sum + (item.amount * grossUnit);
+    }, 0) + (Number(recipe.packagingCost ?? data.packagingCost ?? 0) * 1.23);
+
     // Obliczenia kalkulatora marży
     const foodCostPerUnit = Math.max(0.001, totalFoodCost);
 
@@ -608,11 +640,10 @@ export default function PrzepisSzczegolyPage({
                         <button
                             type="button"
                             onClick={handleToggleFavorite}
-                            className={`p-1.5 rounded-xl transition-colors cursor-pointer shrink-0 border ${
-                                isFavorite
-                                    ? "bg-amber-50 border-amber-300 text-amber-500 shadow-2xs"
-                                    : "border-ui-accent bg-ui-white text-ui-secondary/40 hover:text-amber-500 hover:border-amber-300"
-                            }`}
+                            className={`p-1.5 rounded-xl transition-colors cursor-pointer shrink-0 border ${isFavorite
+                                ? "bg-amber-50 border-amber-300 text-amber-500 shadow-2xs"
+                                : "border-ui-accent bg-ui-white text-ui-secondary/40 hover:text-amber-500 hover:border-amber-300"
+                                }`}
                             title={isFavorite ? "Usuń z wyróżnionych" : "Oznacz gwiazdką"}
                         >
                             <Star
@@ -656,13 +687,14 @@ export default function PrzepisSzczegolyPage({
 
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 text-right">
                         <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-800">
-                            Cena sprzedaży (brutto)
+                            Cena sprzedaży
                         </div>
-                        <div className="text-xl font-black text-emerald-950">
+                        <div className="text-xl font-bold text-emerald-950">
                             {currentSellingPrice > 0 ? (
                                 <>
                                     {currentSellingPrice.toFixed(2)} zł{" "}
                                     <span className="text-xs font-semibold text-emerald-800">brutto</span>
+
                                 </>
                             ) : (
                                 <span className="text-sm font-semibold text-emerald-700 italic">Nieustalona</span>
@@ -681,7 +713,7 @@ export default function PrzepisSzczegolyPage({
                         <Scale size={18} className="text-ui-secondary" />
                     </div>
                     <div>
-                        <div className="text-2xl font-black text-ui-black">
+                        <div className="text-2xl font-black text-ui-primary">
                             {totalFoodCost.toFixed(2)} <span className="text-sm font-medium">zł</span>
                         </div>
                         <p className="text-[11px] text-ui-secondary mt-1">
@@ -719,7 +751,7 @@ export default function PrzepisSzczegolyPage({
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-ui-accent">
                             <div>
                                 <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                                    <Scale size={20} className="text-ui-secondary" />
+                                    <Scale size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                     Foodcost
                                 </h2>
                             </div>
@@ -735,11 +767,10 @@ export default function PrzepisSzczegolyPage({
                                         setPreviewBatchSize(1);
                                         setBatchInput("1");
                                     }}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        previewBatchSize === 1 && (batchInput === "1" || batchInput === "")
-                                            ? "bg-ui-primary text-white shadow-xs"
-                                            : "bg-ui-white/80 hover:bg-ui-accent/30 text-ui-secondary border border-ui-accent/40"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${previewBatchSize === 1 && (batchInput === "1" || batchInput === "")
+                                        ? "bg-ui-primary text-white shadow-xs"
+                                        : "bg-ui-white/80 hover:bg-ui-accent/30 text-ui-secondary border border-ui-accent/40"
+                                        }`}
                                 >
                                     1 szt.
                                 </button>
@@ -776,12 +807,16 @@ export default function PrzepisSzczegolyPage({
                                         <th className="py-3 px-3 text-right">
                                             {previewBatchSize === 1 ? "Waga na 1 szt." : `Ilość na ${previewBatchSize} szt.`}
                                         </th>
-                                        <th className="py-3 px-3 text-right">Cena surowca</th>
+                                        <th className="py-3 px-3 text-right">Cena netto</th>
+                                        <th className="py-3 px-3 text-right">Cena brutto</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-ui-accent/40">
                                     {detailedIngredients.map((item) => {
                                         const scaledAmount = item.amount * previewBatchSize;
+                                        const priceNet = item.unitPriceNet ?? item.unitPrice;
+                                        const priceGross = item.unitPriceGross ?? (priceNet * 1.05);
+
                                         return (
                                             <tr key={item.id} className="hover:bg-ui-accent/5 transition-colors">
                                                 <td className="py-3.5 px-3">
@@ -790,14 +825,18 @@ export default function PrzepisSzczegolyPage({
                                                     </span>
                                                 </td>
 
-                                                <td className="py-3.5 px-3 text-right font-medium text-ui-secondary">
+                                                <td className="py-3.5 px-3 text-right font-medium text-ui-black">
                                                     {scaledAmount < 1 && item.unit === "kg"
                                                         ? `${(scaledAmount * 1000).toFixed(1)} g`
                                                         : `${scaledAmount.toFixed(3)} ${item.unit}`}
                                                 </td>
 
+                                                <td className="py-3.5 px-3 text-right font-medium text-ui-black">
+                                                    {priceNet.toFixed(2)} zł / {item.unit}
+                                                </td>
+
                                                 <td className="py-3.5 px-3 text-right font-semibold text-ui-black">
-                                                    {item.unitPrice.toFixed(2)} zł / {item.unit}
+                                                    {priceGross.toFixed(2)} zł / {item.unit}
                                                 </td>
                                             </tr>
                                         );
@@ -812,14 +851,16 @@ export default function PrzepisSzczegolyPage({
                                                     <span className="font-bold text-ui-black text-xs">
                                                         Opakowanie
                                                     </span>
-
                                                 </div>
                                             </td>
                                             <td className="py-3.5 px-3 text-right font-medium text-ui-secondary">
                                                 {previewBatchSize} szt.
                                             </td>
-                                            <td className="py-3.5 px-3 text-right font-semibold text-amber-950">
+                                            <td className="py-3.5 px-3 text-right font-medium text-ui-secondary">
                                                 {Number(recipe.packagingCost ?? data.packagingCost ?? 0).toFixed(2)} zł / szt.
+                                            </td>
+                                            <td className="py-3.5 px-3 text-right font-semibold text-amber-950">
+                                                {(Number(recipe.packagingCost ?? data.packagingCost ?? 0) * 1.23).toFixed(2)} zł / szt.
                                             </td>
                                         </tr>
                                     )}
@@ -834,8 +875,11 @@ export default function PrzepisSzczegolyPage({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="py-3 px-3 text-right font-black text-sm text-amber-950">
+                                        <td className="py-3 px-3 text-right text-xs text-ui-black">
                                             {(totalFoodCost * previewBatchSize).toFixed(2)} zł
+                                        </td>
+                                        <td className="py-3 px-3 text-right font-black text-sm text-ui-black">
+                                            {(totalFoodCostGross * previewBatchSize).toFixed(2)} zł
                                         </td>
                                     </tr>
                                 </tfoot>
@@ -850,7 +894,7 @@ export default function PrzepisSzczegolyPage({
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                                    <Calculator size={20} className="text-ui-secondary" />
+                                    <Calculator size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                     Kalkulator ceny
                                 </h2>
                             </div>
@@ -928,12 +972,24 @@ export default function PrzepisSzczegolyPage({
                                         />
                                         <div className="w-16 relative">
                                             <input
-                                                type="number"
-                                                min="1"
-                                                max="99"
-                                                value={targetMargin}
-                                                onChange={(e) => setTargetMargin(Math.max(1, Math.min(99, Number(e.target.value) || 0)))}
-                                                className="w-full h-9 border border-ui-accent rounded-lg text-center font-bold text-sm text-ui-black focus:outline-none focus:border-emerald-600"
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={targetMargin === 0 ? "" : targetMargin}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/\D/g, "");
+                                                    if (val === "") {
+                                                        setTargetMargin(0);
+                                                    } else {
+                                                        const num = parseInt(val, 10);
+                                                        setTargetMargin(Math.min(99, num));
+                                                    }
+                                                }}
+                                                onBlur={() => {
+                                                    if (!targetMargin || targetMargin < 1) {
+                                                        setTargetMargin(1);
+                                                    }
+                                                }}
+                                                className="w-full h-9 border border-ui-accent rounded-lg pr-5 pl-2 text-center font-bold text-sm text-ui-black focus:outline-none focus:border-emerald-600 shadow-2xs"
                                             />
                                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-ui-secondary pointer-events-none">
                                                 %
@@ -999,7 +1055,7 @@ export default function PrzepisSzczegolyPage({
 
                                 <div className="flex items-center justify-between">
                                     <span className="text-ui-secondary font-medium">Marża handlowa:</span>
-                                    <span className="font-extrabold text-ui-black bg-ui-accent/5 px-2 py-0.5 rounded">
+                                    <span className="font-extrabold text-ui-black rounded">
                                         {activeMargin.toFixed(1)}%
                                     </span>
                                 </div>
@@ -1040,127 +1096,364 @@ export default function PrzepisSzczegolyPage({
             </div>
 
             {/* SEKCJA 2: HISTORIA PRODUKCJI I SPRZEDAŻY */}
-            <div className="bg-ui-white border border-ui-accent rounded-2xl p-6 sm:p-7 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-ui-accent">
-                    <div>
-                        <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                            <BarChart3 size={20} className="text-amber-800" />
-                            Produkcja i Sprzedaż
-                        </h2>
-                    </div>
+            {(() => {
+                const allProductions = productions || [];
+                let filteredList = [...allProductions];
+                if (prodCustomRange) {
+                    filteredList = filteredList.filter(
+                        (p) => p.date >= prodCustomRange.startDate && p.date <= prodCustomRange.endDate
+                    );
+                } else {
+                    const startIdx = prodOffset * prodCount;
+                    filteredList = filteredList.slice(startIdx, startIdx + prodCount);
+                }
 
-                    <div className="flex items-center gap-4 text-xs font-semibold">
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded bg-amber-500" />
-                            <span>Wyprodukowano</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded bg-emerald-600" />
-                            <span>Sprzedano</span>
-                        </div>
-                    </div>
-                </div>
+                let rangeStartStr = "";
+                let rangeEndStr = "";
+                const count = filteredList.length;
 
-                {productions.length === 0 ? (
-                    <div className="py-16 text-center text-ui-secondary">
-                        <Calendar size={36} className="mx-auto mb-2 opacity-40 text-ui-secondary" />
-                        <p className="font-bold text-sm text-ui-black mb-1">Brak zarejestrowanej produkcji</p>
-                        <p className="text-xs max-w-sm mx-auto">
-                            Dla tego wyrobu nie wprowadzono jeszcze dziennych raportów produkcji i sprzedaży.
-                            Dane pojawią się automatycznie po wprowadzeniu dziennych wypieków.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-8">
-                        {/* Wykres Recharts */}
-                        <div className="h-72 w-full pt-2">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={[...productions].reverse()}
-                                    margin={{ top: 10, right: 10, left: -10, bottom: 20 }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fontSize: 11, fill: "#6b7280" }}
-                                        tickFormatter={(val) => {
-                                            const parts = val.split("-");
-                                            return `${parts[2]}.${parts[1]}`;
-                                        }}
-                                        dy={5}
-                                    />
-                                    <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "#ffffff",
-                                            borderColor: "#e5e7eb",
-                                            borderRadius: "12px",
-                                            fontSize: "12px",
-                                            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                                        }}
-                                        formatter={(val: any, name: any) => [
-                                            `${val} szt.`,
-                                            name === "producedAmount" ? "Wyprodukowano" : "Sprzedano",
-                                        ]}
-                                        labelFormatter={(label) => `Data: ${label}`}
-                                    />
-                                    <Bar dataKey="producedAmount" name="producedAmount" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="soldAmount" name="soldAmount" fill="#059669" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                if (prodCustomRange) {
+                    rangeStartStr = formatDate(prodCustomRange.startDate);
+                    rangeEndStr = formatDate(prodCustomRange.endDate);
+                } else if (filteredList.length > 0) {
+                    rangeStartStr = formatDate(filteredList[filteredList.length - 1].date);
+                    rangeEndStr = formatDate(filteredList[0].date);
+                }
 
-                        {/* Tabela historii dziennej */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                    <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
-                                        <th className="py-3 px-3">Data wypieku</th>
-                                        <th className="py-3 px-3 text-right">Wyprodukowano</th>
-                                        <th className="py-3 px-3 text-right">Sprzedano</th>
-                                        <th className="py-3 px-3 text-right">Niesprzedane (strata)</th>
-                                        <th className="py-3 px-3 text-right">Skuteczność</th>
-                                        <th className="py-3 px-3 text-right">Przychód</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-ui-accent/40">
-                                    {productions.map((item) => (
-                                        <tr key={item.id} className="hover:bg-ui-accent/5 transition-colors">
-                                            <td className="py-3 px-3 font-semibold text-ui-black">
-                                                {item.date}
-                                            </td>
-                                            <td className="py-3 px-3 text-right font-bold text-amber-950">
-                                                {item.producedAmount} szt.
-                                            </td>
-                                            <td className="py-3 px-3 text-right font-bold text-emerald-950">
-                                                {item.soldAmount} szt.
-                                            </td>
-                                            <td className="py-3 px-3 text-right text-rose-700 font-medium">
-                                                {item.unsoldAmount > 0 ? `-${item.unsoldAmount} szt.` : "0 szt."}
-                                            </td>
-                                            <td className="py-3 px-3 text-right">
-                                                <span
-                                                    className={`px-2 py-0.5 rounded text-[11px] font-bold ${item.efficiencyRate >= 90
-                                                        ? "bg-emerald-100 text-emerald-800"
-                                                        : item.efficiencyRate >= 70
-                                                            ? "bg-amber-100 text-amber-800"
-                                                            : "bg-rose-100 text-rose-800"
+                return (
+                    <div className="bg-ui-white border border-ui-accent rounded-2xl p-6 sm:p-7 shadow-sm space-y-6">
+                        {/* 1. PASEK NAWIGACJI PO OKRESACH I WYBÓR ZAKRESU */}
+                        <div className="space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-ui-accent">
+                                <div className="flex items-center gap-3">
+                                    <BarChart3 size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
+                                    <div>
+                                        <h2 className="text-lg font-bold text-ui-black">
+                                            Produkcja i sprzedaż
+                                        </h2>
+                                        <div className="text-xs text-ui-secondary font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
+                                            {rangeStartStr && rangeEndStr ? (
+                                                <>
+                                                    <span>Zakres: <b>{rangeStartStr}</b> do <b>{rangeEndStr}</b></span>
+                                                    <span className="text-[10px] bg-ui-accent/30 text-ui-primary font-bold px-2 py-0.5 rounded-full">
+                                                        {count} {count === 1 ? "dzień" : "dni"}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span>Historia dziennych raportów produkcji i sprzedaży</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3.5">
+                                    {/* Legenda */}
+                                    <div className="flex items-center gap-3 text-xs font-semibold">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-3 h-3 rounded bg-amber-500" />
+                                            <span>Wyprodukowano</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-3 h-3 rounded bg-emerald-600" />
+                                            <span>Sprzedano</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Przyciski presetów & Własny zakres */}
+                                    {allProductions.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-1.5 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40 text-xs font-bold">
+                                            {[7, 14, 30].map((cnt) => (
+                                                <button
+                                                    key={cnt}
+                                                    onClick={() => {
+                                                        setProdCustomRange(null);
+                                                        setProdOffset(0);
+                                                        setProdCount(cnt);
+                                                    }}
+                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!prodCustomRange && prodCount === cnt
+                                                        ? "bg-white text-ui-primary shadow-xs font-black"
+                                                        : "text-ui-secondary hover:text-ui-primary"
                                                         }`}
                                                 >
-                                                    {item.efficiencyRate.toFixed(0)}%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-3 text-right font-extrabold text-ui-black">
-                                                {item.salesIncome.toLocaleString("pl-PL")} zł
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                    {cnt} dni
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => {
+                                                    const s = `${todayStr.slice(0, 7)}-01`;
+                                                    const e = todayStr;
+                                                    setProdInputStart(s);
+                                                    setProdInputEnd(e);
+                                                    setProdCustomRange({ startDate: s, endDate: e });
+                                                }}
+                                                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${prodCustomRange?.startDate === `${todayStr.slice(0, 7)}-01` && prodCustomRange?.endDate === todayStr
+                                                    ? "bg-white text-ui-primary shadow-xs font-black"
+                                                    : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                Ten miesiąc
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    if (!prodCustomRange) {
+                                                        setProdCustomRange({ startDate: prodInputStart, endDate: prodInputEnd });
+                                                    }
+                                                }}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${prodCustomRange
+                                                    ? "bg-white text-ui-primary shadow-xs font-black border border-ui-accent/40"
+                                                    : "text-ui-secondary hover:text-ui-primary"
+                                                    }`}
+                                            >
+                                                <CalendarDays size={13} />
+                                                <span>Własny zakres</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Wiersz drugorzędny: Kontrolki nawigacji paginacji lub selektor własnego zakresu dat */}
+                            {allProductions.length > 0 && (
+                                <div className="pt-1 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                    {prodCustomRange ? (
+                                        <div className="flex flex-wrap items-center gap-2.5 w-full justify-between">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-bold text-ui-secondary">Zakres od:</span>
+                                                <input
+                                                    type="date"
+                                                    value={prodInputStart}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setProdInputStart(val);
+                                                        if (val && prodInputEnd && val <= prodInputEnd) {
+                                                            setProdCustomRange({ startDate: val, endDate: prodInputEnd });
+                                                        }
+                                                    }}
+                                                    className="bg-ui-white border border-ui-accent rounded-lg px-2.5 py-1 font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
+                                                />
+                                                <span className="font-bold text-ui-secondary">do:</span>
+                                                <input
+                                                    type="date"
+                                                    value={prodInputEnd}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setProdInputEnd(val);
+                                                        if (prodInputStart && val && prodInputStart <= val) {
+                                                            setProdCustomRange({ startDate: prodInputStart, endDate: val });
+                                                        }
+                                                    }}
+                                                    className="bg-ui-white border border-ui-accent rounded-lg px-2.5 py-1 font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
+                                                />
+
+                                                <button
+                                                    onClick={() => {
+                                                        if (prodInputStart && prodInputEnd && prodInputStart <= prodInputEnd) {
+                                                            setProdCustomRange({ startDate: prodInputStart, endDate: prodInputEnd });
+                                                        } else {
+                                                            alert("Wprowadź poprawny zakres (data początkowa nie może być późniejsza niż końcowa).");
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1 bg-ui-primary text-white font-bold rounded-lg hover:bg-ui-primary/90 transition-colors shadow-2xs cursor-pointer"
+                                                >
+                                                    Zastosuj
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={() => {
+                                                    setProdCustomRange(null);
+                                                    setProdOffset(0);
+                                                }}
+                                                className="flex items-center gap-1 text-ui-secondary hover:text-ui-primary font-semibold transition-colors cursor-pointer"
+                                            >
+                                                <RotateCcw size={12} />
+                                                <span>Wróć do standardowych okresów</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-end w-full">
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    onClick={() => setProdOffset(prodOffset + 1)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-white text-ui-primary rounded-lg font-bold shadow-2xs hover:bg-ui-accent/20 transition-all cursor-pointer border border-ui-accent/40"
+                                                    title="Generuj dla wcześniejszego okresu"
+                                                >
+                                                    <ChevronLeft size={14} />
+                                                    <span>Wcześniejsze</span>
+                                                </button>
+
+                                                {prodOffset > 0 && (
+                                                    <button
+                                                        onClick={() => setProdOffset(0)}
+                                                        className="px-2.5 py-1.5 font-bold text-ui-secondary hover:text-ui-primary transition-colors cursor-pointer"
+                                                        title="Wróć do bieżącego okresu"
+                                                    >
+                                                        <RotateCcw size={13} className="inline mr-1" />
+                                                        Bieżące
+                                                    </button>
+                                                )}
+
+                                                <button
+                                                    onClick={() => setProdOffset(Math.max(0, prodOffset - 1))}
+                                                    disabled={prodOffset === 0}
+                                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold transition-all ${prodOffset === 0
+                                                        ? "bg-ui-accent/20 text-ui-secondary/50 cursor-not-allowed border border-transparent"
+                                                        : "bg-white text-ui-primary shadow-2xs hover:bg-ui-accent/20 cursor-pointer border border-ui-accent/40"
+                                                        }`}
+                                                    title="Generuj dla nowszego okresu"
+                                                >
+                                                    <span>Późniejsze</span>
+                                                    <ChevronRight size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
+
+                        {allProductions.length === 0 ? (
+                            <div className="py-16 text-center text-ui-secondary">
+                                <Calendar size={36} className="mx-auto mb-2 opacity-40 text-ui-secondary" />
+                                <p className="font-bold text-sm text-ui-black mb-1">Brak zarejestrowanej produkcji</p>
+                                <p className="text-xs max-w-sm mx-auto">
+                                    Dla tego wyrobu nie wprowadzono jeszcze dziennych raportów produkcji i sprzedaży.
+                                    Dane pojawią się automatycznie po wprowadzeniu dziennych wypieków.
+                                </p>
+                            </div>
+                        ) : filteredList.length === 0 ? (
+                            <div className="py-16 text-center text-ui-secondary">
+                                <Calendar size={36} className="mx-auto mb-2 opacity-40 text-ui-secondary" />
+                                <p className="font-bold text-sm text-ui-black mb-1">Brak danych w wybranym okresie</p>
+                                <p className="text-xs max-w-sm mx-auto">
+                                    Nie znaleziono raportów produkcji w wybranym zakresie dat.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-8">
+                                {/* Wykres Recharts */}
+                                <div className="h-72 w-full pt-2">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={[...filteredList].reverse()}
+                                            margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                            <XAxis
+                                                dataKey="date"
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fontSize: 11, fill: "#6B7280" }}
+                                                dy={10}
+                                                tickFormatter={(val) => {
+                                                    const parts = val.split("-");
+                                                    return `${parts[2]}.${parts[1]}`;
+                                                }}
+                                            />
+                                            <YAxis
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fontSize: 11, fill: "#6B7280" }}
+                                            />
+                                            <Tooltip
+                                                cursor={{ fill: "rgba(229, 231, 235, 0.4)" }}
+                                                content={({ active, payload, label }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const dataPoint = payload[0]?.payload;
+                                                        const produced = dataPoint?.producedAmount ?? 0;
+                                                        const sold = dataPoint?.soldAmount ?? 0;
+                                                        const unsold = Math.max(0, produced - sold);
+
+                                                        return (
+                                                            <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-lg text-xs min-w-[190px]">
+                                                                <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-2">
+                                                                    {formatDate(dataPoint?.date || label)}
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-4 text-[#f59e0b] mb-1.5">
+                                                                    <span className="font-medium">Wyprodukowano:</span>
+                                                                    <span className="font-bold">{produced} szt.</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-4 text-[#059669] mb-1">
+                                                                    <span className="font-medium">Sprzedano:</span>
+                                                                    <span className="font-bold">{sold} szt.</span>
+                                                                </div>
+                                                                {unsold > 0 && (
+                                                                    <div className="flex items-center justify-between gap-4 text-rose-600 text-[11px] pt-1 border-t border-ui-accent/30 mt-1">
+                                                                        <span className="font-medium">Niesprzedane:</span>
+                                                                        <span className="font-bold">-{unsold} szt.</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar dataKey="producedAmount" name="producedAmount" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                            <Bar dataKey="soldAmount" name="soldAmount" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                {/* Tabela historii dziennej */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
+                                                <th className="py-3 px-3">Data wypieku</th>
+                                                <th className="py-3 px-3 text-right">Wyprodukowano</th>
+                                                <th className="py-3 px-3 text-right">Sprzedano</th>
+                                                <th className="py-3 px-3 text-right">Niesprzedane (strata)</th>
+                                                <th className="py-3 px-3 text-right">Skuteczność</th>
+                                                <th className="py-3 px-3 text-right">Przychód</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-ui-accent/40">
+                                            {filteredList.map((item) => (
+                                                <tr key={item.id} className="hover:bg-ui-accent/5 transition-colors">
+                                                    <td className="py-3 px-3 font-semibold text-ui-black">
+                                                        {formatDate(item.date)}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-bold text-amber-950">
+                                                        {item.producedAmount} szt.
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-bold text-emerald-950">
+                                                        {item.soldAmount} szt.
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right text-rose-700 font-medium">
+                                                        {item.unsoldAmount > 0 ? `-${item.unsoldAmount} szt.` : "0 szt."}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right">
+                                                        <span
+                                                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${item.efficiencyRate >= 90
+                                                                ? "bg-emerald-100 text-emerald-800"
+                                                                : item.efficiencyRate >= 70
+                                                                    ? "bg-amber-100 text-amber-800"
+                                                                    : "bg-rose-100 text-rose-800"
+                                                                }`}
+                                                        >
+                                                            {item.efficiencyRate.toFixed(0)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-extrabold text-ui-black">
+                                                        {(() => {
+                                                            const itemIncome = Number(item.salesIncome) > 0
+                                                                ? Number(item.salesIncome)
+                                                                : Math.round(Number(item.soldAmount || 0) * (Number(recipe.sellingPrice) || 0) * 100) / 100;
+                                                            return `${itemIncome.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł`;
+                                                        })()}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                );
+            })()}
 
             {/* ========================================================= */}
             {/* MODAL EDYCJI PRZEPISU                                     */}

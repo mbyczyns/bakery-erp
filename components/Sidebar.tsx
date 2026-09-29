@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     ShoppingCart,
     DollarSign,
     ReceiptEuroIcon,
@@ -17,7 +18,10 @@ import {
     LogOut,
     Bell,
     X,
-    Wheat
+    Wheat,
+    Scale,
+    TrendingUp,
+    TrendingDown
 } from "lucide-react";
 
 interface SidebarProps {
@@ -25,11 +29,36 @@ interface SidebarProps {
     onCloseMobile?: () => void;
 }
 
-export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProps = {}) {
+interface SubMenuItem {
+    name: string;
+    href: string;
+    tab: string;
+    icon: any;
+}
+
+interface MenuItem {
+    name: string;
+    href: string;
+    icon: any;
+    subItems?: SubMenuItem[];
+}
+
+function SidebarContent({ isMobile = false, onCloseMobile }: SidebarProps = {}) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [notificationsCount, setNotificationsCount] = useState<number>(0);
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const { user, logout, canAccessPath } = useAuth();
+
+    const isFinanseActive = pathname === "/finanse" || pathname.startsWith("/finanse/");
+    const [isFinanseOpen, setIsFinanseOpen] = useState<boolean>(true);
+
+    // Automatycznie otwieraj menu finansów jeśli użytkownik jest na podstronie finansów
+    useEffect(() => {
+        if (isFinanseActive) {
+            setIsFinanseOpen(true);
+        }
+    }, [isFinanseActive]);
 
     const fetchNotificationsCount = async () => {
         try {
@@ -51,14 +80,23 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
         }
     }, [user, pathname]);
 
-    // Pełne menu aplikacji - linki i ikony (Powiadomienia przeniesione na dół nad profil)
-    const allMenuItems = [
+    // Pełne menu aplikacji - linki i ikony z rozwijaną sekcją Finanse
+    const allMenuItems: MenuItem[] = [
         { name: "Faktury", href: "/faktury", icon: ReceiptEuroIcon },
         { name: "Dostawcy i kontrahenci", href: "/kontrahenci", icon: ShoppingCart },
         { name: "Składniki", href: "/skladniki", icon: Milk },
         { name: "Przepisy i foodcosty", href: "/przepisy", icon: FileText },
         { name: "Produkcja i sprzedaż", href: "/produkcja", icon: Microwave },
-        { name: "Finanse", href: "/finanse", icon: DollarSign },
+        {
+            name: "Finanse",
+            href: "/finanse",
+            icon: DollarSign,
+            subItems: [
+                { name: "Podsumowanie", href: "/finanse?tab=podsumowanie", tab: "podsumowanie", icon: Scale },
+                { name: "Przychody", href: "/finanse?tab=przychody", tab: "przychody", icon: TrendingUp },
+                { name: "Koszty", href: "/finanse?tab=koszty", tab: "koszty", icon: TrendingDown },
+            ]
+        },
         { name: "Konfiguracja", href: "/konfiguracja", icon: Settings },
     ];
 
@@ -70,6 +108,8 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
 
     const isNotificationsActive =
         pathname === "/powiadomienia" || pathname.startsWith("/powiadomienia/");
+
+    const currentTab = (searchParams.get("tab")?.toLowerCase()) || (isFinanseActive ? "podsumowanie" : "");
 
     const getRoleBadge = (role?: string) => {
         switch (role) {
@@ -129,10 +169,79 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
                 <nav className="space-y-1.5">
                     {visibleMenuItems.map((item) => {
                         const Icon = item.icon;
+                        const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
                         const isActive =
                             pathname === item.href ||
                             pathname.startsWith(`${item.href}/`) ||
-                            (item.href === "/finanse" && (pathname.startsWith("/przychody") || pathname.startsWith("/koszty")));
+                            (item.href === "/finanse" && isFinanseActive);
+
+                        if (hasSubItems) {
+                            const isExpanded = isFinanseOpen && (!isCollapsed || isMobile);
+
+                            return (
+                                <div key={item.href} className="space-y-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!isMobile && isCollapsed) {
+                                                setIsCollapsed(false);
+                                                setIsFinanseOpen(true);
+                                            } else {
+                                                setIsFinanseOpen((prev) => !prev);
+                                            }
+                                        }}
+                                        className={`w-full relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${isActive && (!isExpanded || isCollapsed)
+                                            ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
+                                            : isActive
+                                                ? "bg-ui-white/10 text-ui-white font-bold"
+                                                : "text-ui-white/80 hover:bg-ui-white/10 hover:text-ui-white font-medium"
+                                            }`}
+                                        title={!isMobile && isCollapsed ? item.name : undefined}
+                                    >
+                                        <div className="flex items-center gap-x-4 min-w-0">
+                                            <div className="relative shrink-0">
+                                                <Icon size={20} />
+                                            </div>
+                                            <span className={`origin-left duration-200 whitespace-nowrap text-sm ${!isMobile && isCollapsed ? "scale-0 w-0 opacity-0 hidden" : "scale-100"}`}>
+                                                {item.name}
+                                            </span>
+                                        </div>
+
+                                        {(!isCollapsed || isMobile) && (
+                                            <ChevronDown
+                                                size={15}
+                                                className={`transition-transform duration-200 text-ui-white/70 ${isExpanded ? "rotate-180" : ""}`}
+                                            />
+                                        )}
+                                    </button>
+
+                                    {/* Rozwijane podmenu (Podsumowanie / Przychody / Koszty) */}
+                                    {isExpanded && item.subItems && (
+                                        <div className="pl-4 pr-1 py-1 space-y-1 border-l-2 border-ui-white/15 ml-5 my-1">
+                                            {item.subItems.map((sub) => {
+                                                const SubIcon = sub.icon;
+                                                const isSubActive = isFinanseActive && currentTab === sub.tab;
+
+                                                return (
+                                                    <Link
+                                                        key={sub.href}
+                                                        href={sub.href}
+                                                        onClick={() => onCloseMobile?.()}
+                                                        className={`relative flex items-center gap-x-3 px-3 py-2 rounded-xl text-xs transition-all duration-200 cursor-pointer ${isSubActive
+                                                            ? "bg-ui-accent text-ui-primary font-bold shadow-xs"
+                                                            : "text-ui-white/75 hover:bg-ui-white/10 hover:text-ui-white font-medium"
+                                                            }`}
+                                                    >
+                                                        <SubIcon size={15} className={isSubActive ? "text-ui-primary" : "text-ui-white/70"} />
+                                                        <span className="whitespace-nowrap">{sub.name}</span>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
 
                         return (
                             <Link
@@ -244,5 +353,13 @@ export default function Sidebar({ isMobile = false, onCloseMobile }: SidebarProp
                 )}
             </div>
         </div>
+    );
+}
+
+export default function Sidebar(props: SidebarProps) {
+    return (
+        <Suspense fallback={null}>
+            <SidebarContent {...props} />
+        </Suspense>
     );
 }

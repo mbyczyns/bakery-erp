@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getUserFromRequest } from "@/lib/auth";
 import { getCustomNamesMap } from "@/lib/contractor-names";
+import { getContractorNotesMap } from "@/lib/contractor-notes";
 
 const prisma = new PrismaClient();
 
 export async function GET() {
     try {
         const customNamesMap = getCustomNamesMap();
+        const notesMap = getContractorNotesMap();
         const contractors = await prisma.contractor.findMany({
             orderBy: { createdAt: "desc" },
             // ZMIANA: Pobieramy powiązane faktury, sortujemy od najnowszej i bierzemy tylko pierwszą
@@ -24,11 +26,13 @@ export async function GET() {
         const formattedContractors = contractors.map(c => {
             const { invoices, ...rest } = c as any;
             const customName = rest.customName || customNamesMap[c.id] || null;
+            const notes = rest.notes || notesMap[c.id] || null;
             const cleanAddress = rest.address === 'Pobrano z KSeF' ? '' : (rest.address || '');
             return {
                 ...rest,
                 address: cleanAddress,
                 customName,
+                notes,
                 displayName: customName || rest.name,
                 lastPurchaseDate: invoices.length > 0 ? invoices[0].issuedDate : null
             };

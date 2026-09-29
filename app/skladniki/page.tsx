@@ -321,11 +321,11 @@ export default function SkladnikiPage() {
                                                 )}
                                             </td>
 
-                                            <td className="p-4 text-center">
+                                            <td className="p-4 flex justify-center">
                                                 <button
                                                     type="button"
                                                     onClick={(e) => openEditModal(item, e)}
-                                                    className="inline-flex items-center justify-center p-2 rounded-lg border border-ui-accent/60 bg-ui-white hover:bg-ui-accent/30 text-ui-secondary hover:text-ui-primary transition-all cursor-pointer shadow-2xs"
+                                                    className="flex items-center justify-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                                                     title="Edytuj składnik"
                                                 >
                                                     <Pencil size={15} />

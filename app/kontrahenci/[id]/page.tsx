@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
     ArrowLeft,
     Building2,
+    CheckCircle2,
     Receipt,
     ShoppingCart,
     ShoppingBag,
@@ -35,6 +36,7 @@ import {
     TrendingUp,
     BarChart3,
     CalendarDays,
+    Pencil,
     X,
 } from "lucide-react";
 import {
@@ -165,6 +167,13 @@ export default function ContractorDetailPage() {
     const [customNameInput, setCustomNameInput] = useState("");
     const [isSavingCustomName, setIsSavingCustomName] = useState(false);
 
+    // -------------------------------------------------------------
+    // STAN EDYCJI WŁASNYCH UWAG / NOTATEK KONTRAHENTA
+    // -------------------------------------------------------------
+    const [isEditNotesModalOpen, setIsEditNotesModalOpen] = useState(false);
+    const [notesInput, setNotesInput] = useState("");
+    const [isSavingNotes, setIsSavingNotes] = useState(false);
+
     // Pobieranie danych kontrahenta
     const fetchContractorData = async () => {
         setIsLoading(true);
@@ -248,6 +257,51 @@ export default function ContractorDetailPage() {
             alert("Błąd połączenia z serwerem.");
         } finally {
             setIsSavingCustomName(false);
+        }
+    };
+
+    // Obsługa edycji własnych uwag / notatek kontrahenta
+    const handleOpenEditNotesModal = () => {
+        if (!data) return;
+        setNotesInput(data.contractor.notes || "");
+        setIsEditNotesModalOpen(true);
+    };
+
+    const handleSaveNotes = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!data) return;
+        setIsSavingNotes(true);
+        try {
+            const cleanNotes = notesInput.trim();
+            const res = await fetch(`/api/kontrahenci/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    notes: cleanNotes.length > 0 ? cleanNotes : null,
+                }),
+            });
+
+            if (res.ok) {
+                const updatedNotes = cleanNotes.length > 0 ? cleanNotes : null;
+                setData((prev) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        contractor: {
+                            ...prev.contractor,
+                            notes: updatedNotes,
+                        },
+                    };
+                });
+                setIsEditNotesModalOpen(false);
+            } else {
+                alert("Wystąpił błąd podczas zapisywania uwag.");
+            }
+        } catch (err) {
+            console.error("Błąd aktualizacji uwag:", err);
+            alert("Błąd połączenia z serwerem.");
+        } finally {
+            setIsSavingNotes(false);
         }
     };
 
@@ -537,10 +591,10 @@ export default function ContractorDetailPage() {
                             </h1>
                             <button
                                 onClick={handleOpenEditNameModal}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary font-bold text-xs transition-colors cursor-pointer shadow-sm"
+                                className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                                 title="Zmień własną nazwę kontrahenta"
                             >
-                                <Edit3 size={13} className="text-ui-accent" />
+                                <Edit3 size={13} className="text-amber-900" />
                                 Zmień nazwę
                             </button>
                         </div>
@@ -596,13 +650,34 @@ export default function ContractorDetailPage() {
                     </div>
                 </div>
 
-                {/* Notatka wewnętrzna jeśli istnieje */}
-                {contractor.notes && (
-                    <div className="mt-5 p-3.5 bg-ui-accent/10 border border-ui-accent/40 rounded-xl text-xs">
-                        <span className="font-bold text-ui-secondary uppercase tracking-wider text-[10px] block mb-0.5">
-                            Notatka wewnętrzna:
-                        </span>
-                        <p className="text-ui-black/90 whitespace-pre-wrap">{contractor.notes}</p>
+                {/* Notatka wewnętrzna / własne uwagi */}
+                {contractor.notes ? (
+                    <div className="mt-5 p-4 bg-ui-accent/10 border border-ui-accent/40 rounded-xl text-xs flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                            <span className="font-bold text-ui-secondary uppercase tracking-wider text-[10px] flex items-center gap-1.5 mb-1.5">
+                                <FileText size={13} className="text-ui-secondary" />
+                                Uwagi:
+                            </span>
+                            <p className="text-ui-black/90 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">{contractor.notes}</p>
+                        </div>
+                        <button
+                            onClick={handleOpenEditNotesModal}
+                            className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Edytuj uwagi"
+                        >
+                            <Pencil size={12} />
+                            Edytuj
+                        </button>
+                    </div>
+                ) : (
+                    <div className="mt-4">
+                        <button
+                            onClick={handleOpenEditNotesModal}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ui-secondary hover:text-ui-primary bg-ui-accent/10 hover:bg-ui-accent/20 border border-dashed border-ui-accent/40 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                        >
+                            <FileText size={13} />
+                            + Dodaj uwagi / notatki do kontrahenta
+                        </button>
                     </div>
                 )}
             </div>
@@ -610,19 +685,19 @@ export default function ContractorDetailPage() {
             {/* ========================================================= */}
             {/* KARTY STATYSTYK FINANSOWYCH (PODSUMOWANIE WYDATKÓW)       */}
             {/* ========================================================= */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 {/* 1. Łączne wydatki brutto */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
                         <span className="text-[11px] font-bold uppercase tracking-wider">Łączne wydatki</span>
-                        <Coins size={18} className="text-ui-primary" />
+                        <Coins size={18} className="text-ui-secondary" />
                     </div>
                     <div>
                         <div className="text-2xl font-black text-ui-primary">
-                            {stats.totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold">zł</span>
+                            {stats.totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold">zł brutto</span>
                         </div>
                         <p className="text-[11px] text-ui-secondary mt-1">
-                            Netto: <b>{stats.totalNet.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b>
+                            <b>{stats.totalNet.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b> netto
                         </p>
                     </div>
                 </div>
@@ -631,7 +706,7 @@ export default function ContractorDetailPage() {
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
                         <span className="text-[11px] font-bold uppercase tracking-wider">Zarejestrowane faktury</span>
-                        <Receipt size={18} className="text-ui-primary" />
+                        <Receipt size={18} className="text-ui-secondary" />
                     </div>
                     <div>
                         <div className="text-2xl font-black text-ui-black">
@@ -644,34 +719,17 @@ export default function ContractorDetailPage() {
                 </div>
 
                 {/* 3. Średnia wartość faktury */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Średnia faktura</span>
-                        <BarChart3 size={18} className="text-ui-primary" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-black">
-                            {stats.averageInvoiceGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-ui-secondary">zł</span>
-                        </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            Średnia wartość brutto
-                        </p>
-                    </div>
-                </div>
 
                 {/* 4. Ostatni zakup */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Ostatni zakup</span>
-                        <Calendar size={18} className="text-ui-primary" />
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Data ostatniego zakupu</span>
+                        <Calendar size={18} className="text-ui-secondary" />
                     </div>
                     <div>
-                        <div className="text-xl font-black text-ui-black">
+                        <div className="text-xl font-black text-ui-primary">
                             {stats.lastPurchaseDate ? formatDate(stats.lastPurchaseDate) : "Brak zakupów"}
                         </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            Data ostatniej faktury
-                        </p>
                     </div>
                 </div>
             </div>
@@ -683,13 +741,13 @@ export default function ContractorDetailPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                     <div>
                         <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                            <TrendingUp size={16} className="text-ui-primary" /> Wydatki miesięczne
+                            <TrendingUp size={16} className="text-ui-secondary" /> Wydatki miesięczne
                         </h3>
 
                     </div>
                     {monthlySpendingData.length > 0 && (
                         <div className="text-xs font-semibold text-ui-primary bg-ui-accent/15 px-3 py-1.5 rounded-xl self-start sm:self-auto flex items-center gap-1.5">
-                            <Receipt size={13} className="text-ui-secondary" />
+                            <Calendar size={13} className="text-ui-secondary" />
                             <span>Okres: <b className="text-ui-black font-bold">{monthlySpendingData[0].month} – {monthlySpendingData[monthlySpendingData.length - 1].month}</b></span>
                         </div>
                     )}
@@ -853,7 +911,7 @@ export default function ContractorDetailPage() {
                                     <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
                                         <th className="py-3 px-3 text-center w-12">Zamów</th>
                                         <th className="py-3 px-3">Nazwa Produktu</th>
-                                        <th className="py-3 px-3 text-right">Ostatnia cena netto</th>
+                                        <th className="py-3 px-3 text-right">Ostatnia cena</th>
                                         <th className="py-3 px-3 text-right">Kupiona ilość</th>
                                         <th className="py-3 px-3 text-right">Wydano łącznie</th>
                                         <th className="py-3 px-3 text-right">Ostatni zakup</th>
@@ -886,8 +944,13 @@ export default function ContractorDetailPage() {
                                                 </td>
 
                                                 {/* Ostatnia cena */}
-                                                <td className="py-3 px-3 text-right font-bold text-ui-black">
-                                                    {prod.lastPrice > 0 ? `${prod.lastPrice.toFixed(2)} zł / ${prod.unit}` : "—"}
+                                                <td className="py-3 px-3 text-right">
+                                                    {prod.lastPrice > 0 ? (
+                                                        <div>
+                                                            <div className="font-bold text-ui-black">{prod.lastPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">netto</span></div>
+                                                            <div className="text-[10px] text-ui-secondary">{(prod.lastPrice * 1.05).toFixed(2)} zł brutto / {prod.unit}</div>
+                                                        </div>
+                                                    ) : "—"}
                                                 </td>
 
                                                 {/* Kupiona ilość */}
@@ -896,12 +959,12 @@ export default function ContractorDetailPage() {
                                                 </td>
 
                                                 {/* Wydano łącznie */}
-                                                <td className="py-3 px-3 text-right font-black text-ui-secondary">
+                                                <td className="py-3 px-3 text-right text-ui-black">
                                                     {prod.totalSpent > 0 ? `${prod.totalSpent.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł` : "—"}
                                                 </td>
 
                                                 {/* Data ostatniego zakupu */}
-                                                <td className="py-3 px-3 text-right text-ui-secondary font-medium">
+                                                <td className="py-3 px-3 text-right text-ui-black  font-medium">
                                                     {prod.lastPurchasedDate && prod.lastPurchasedDate !== "-" ? formatDate(prod.lastPurchasedDate) : "—"}
                                                 </td>
                                             </tr>
@@ -978,7 +1041,7 @@ export default function ContractorDetailPage() {
 
                                             <div className="flex items-center justify-between sm:justify-end gap-6">
                                                 <div className="text-right">
-                                                    <div className="text-base font-black text-ui-secondary">
+                                                    <div className="text-base font-black text-ui-black">
                                                         {inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                     </div>
                                                     <div className="text-[11px] text-ui-secondary">
@@ -1004,7 +1067,7 @@ export default function ContractorDetailPage() {
                                                             <tr className="bg-ui-accent/15 text-ui-secondary font-bold uppercase text-[9px] border-b border-ui-accent/60">
                                                                 <th className="py-2 px-3">Pozycja</th>
                                                                 <th className="py-2 px-3 text-right">Ilość</th>
-                                                                <th className="py-2 px-3 text-right">Cena jedn. netto</th>
+                                                                <th className="py-2 px-3 text-right">Cena jednostkowa</th>
                                                                 <th className="py-2 px-3 text-right">Wartość brutto</th>
                                                             </tr>
                                                         </thead>
@@ -1017,8 +1080,9 @@ export default function ContractorDetailPage() {
                                                                     <td className="py-2.5 px-3 text-right font-medium">
                                                                         {pos.quantity} {pos.unit}
                                                                     </td>
-                                                                    <td className="py-2.5 px-3 text-right text-ui-secondary">
-                                                                        {pos.netPrice.toFixed(2)} zł
+                                                                    <td className="py-2.5 px-3 text-right">
+                                                                        <div className="text-ui-primary font-medium">{pos.netPrice.toFixed(2)} zł <span className="text-[10px] text-ui-black">netto</span></div>
+                                                                        <div className="text-[10px] text-ui-secondary">{(pos.netPrice * 1.05).toFixed(2)} zł brutto</div>
                                                                     </td>
                                                                     <td className="py-2.5 px-3 text-right font-bold text-ui-black">
                                                                         {pos.grossAmount.toFixed(2)} zł
@@ -1109,7 +1173,7 @@ export default function ContractorDetailPage() {
                                                     >
                                                         <div className="font-bold text-ui-black">{prod.name}</div>
                                                         <div className="text-[10px] text-ui-secondary">
-                                                            Ostatnia cena: {prod.lastPrice > 0 ? `${prod.lastPrice.toFixed(2)} zł` : "—"}
+                                                            Ostatnia cena: {prod.lastPrice > 0 ? `${prod.lastPrice.toFixed(2)} zł netto (${(prod.lastPrice * 1.05).toFixed(2)} zł brutto)` : "—"}
                                                         </div>
                                                     </td>
 
@@ -1341,6 +1405,97 @@ export default function ContractorDetailPage() {
                     </div>
                 </div>
             )}
-        </div>
+            {/* ========================================================= */}
+            {/* MODAL EDYCJI WŁASNYCH UWAG / NOTATEK KONTRAHENTA           */}
+            {/* ========================================================= */}
+            {isEditNotesModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setIsEditNotesModalOpen(false)}
+                >
+                    <div
+                        className="bg-ui-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-ui-accent p-6 space-y-5"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-ui-accent pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl">
+                                    <FileText size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-ui-black">
+                                        Uwagi i notatki
+                                    </h3>
+                                    <p className="text-[11px] text-ui-secondary font-medium truncate max-w-xs sm:max-w-sm">
+                                        {contractor.displayName || contractor.customName || contractor.name}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsEditNotesModalOpen(false)}
+                                className="p-1 hover:bg-ui-accent/20 rounded-full text-ui-secondary cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveNotes} className="space-y-4">
+                            <div>
+                                <textarea
+                                    rows={5}
+                                    value={notesInput}
+                                    onChange={(e) => setNotesInput(e.target.value)}
+                                    placeholder="np. Warunki dostaw, dni przywozu towaru, rabaty, dane kierowcy, godziny kontaktu..."
+                                    className="w-full bg-ui-white border border-ui-accent rounded-xl p-3.5 text-xs sm:text-sm text-ui-black focus:outline-none focus:border-ui-accent shadow-sm leading-relaxed"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-ui-accent/30">
+                                {notesInput.trim().length > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setNotesInput("");
+                                        }}
+                                        className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                                    >
+                                        Wyczyść treść
+                                    </button>
+                                ) : (
+                                    <div />
+                                )}
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditNotesModalOpen(false)}
+                                        className="px-3.5 py-2 rounded-xl border border-ui-accent text-ui-secondary hover:text-ui-black text-xs font-semibold cursor-pointer"
+                                    >
+                                        Anuluj
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSavingNotes}
+                                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                        {isSavingNotes ? (
+                                            <>
+                                                <Loader2 size={13} className="animate-spin" />
+                                                Zapisywanie...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 size={16} />
+                                                Zapisz  </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div >
+            )
+            }
+        </div >
     );
 }

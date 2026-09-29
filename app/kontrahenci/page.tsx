@@ -16,7 +16,9 @@ import {
     Calendar,
     Loader2,
     ChevronRight,
-    ExternalLink
+    ExternalLink,
+    CheckCircle,
+    CheckCircle2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -285,6 +287,12 @@ export default function KontrahenciPage() {
                                                         <User size={12} className="shrink-0" /> {c.contactPerson}
                                                     </div>
                                                 )}
+                                                {c.notes && (
+                                                    <div className="text-[11px] font-normal text-ui-secondary/80 flex items-center gap-1 mt-0.5 truncate italic" title={c.notes}>
+                                                        <FileText size={11} className="shrink-0 text-amber-700" />
+                                                        <span className="truncate">{c.notes}</span>
+                                                    </div>
+                                                )}
                                             </td>
 
                                             {/* NIP */}
@@ -537,10 +545,10 @@ function AddContractorModal({ isOpen, isSaving, onClose, onSave }: AddContractor
                         <button
                             type="submit"
                             disabled={isSaving}
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-6 py-2.5 rounded-xl font-semibold shadow-sm transition-colors text-sm cursor-pointer disabled:opacity-50"
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                         >
-                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                            Zapisz w bazie
+                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                            Zapisz
                         </button>
                     </div>
 

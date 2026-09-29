@@ -216,5 +216,37 @@
       "d9f272c4-eb39-4dc6-b00a-bf7017ef8233": "13:40",
       "d09d0c3c-7df4-47d4-a61b-689f58c36b4f": "18:00"
     }
+  },
+  "2026-09-24": {
+    "fiscalIncome": 0,
+    "soldOutTimes": {}
+  },
+  "2026-09-12": {
+    "fiscalIncome": 9480.5,
+    "soldOutTimes": {}
+  },
+  "2026-09-14": {
+    "fiscalIncome": 5012.95,
+    "soldOutTimes": {}
+  },
+  "2026-09-15": {
+    "fiscalIncome": 5694.5,
+    "soldOutTimes": {}
+  },
+  "2026-09-16": {
+    "fiscalIncome": 4918.25,
+    "soldOutTimes": {}
+  },
+  "2026-09-17": {
+    "fiscalIncome": 5048.75,
+    "soldOutTimes": {}
+  },
+  "2026-09-18": {
+    "fiscalIncome": 6719,
+    "soldOutTimes": {}
+  },
+  "2026-09-19": {
+    "fiscalIncome": 8983.5,
+    "soldOutTimes": {}
   }
 }
