@@ -1,5 +1,6 @@
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import crypto from 'crypto';
+import { XMLParser } from 'fast-xml-parser';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,7 @@ export interface KsefSyncResult {
     success: boolean;
     message: string;
     importedCount?: number;
+    salesDetailsCount?: number;
     skipped?: boolean;
     inProgress?: boolean;
     error?: string;
@@ -407,13 +409,64 @@ export async function syncKsefInvoices(force: boolean = false): Promise<KsefSync
             console.warn('[KSeF Sync] Błąd podczas scalania duplikatów kontrahentów:', mergeErr);
         }
 
+        // 7. AUTOMATYCZNE POBIERANIE SZCZEGÓŁÓW (POZYCJI) DLA FAKTUR SPRZEDAŻOWYCH
+        let salesProcessedCount = 0;
+        try {
+            const salesInvoicesToProcess = await prisma.invoice.findMany({
+                where: {
+                    isSales: true,
+                    ksefNumber: { not: null },
+                    positions: { none: {} },
+                },
+                include: { contractor: true },
+                orderBy: { issuedDate: 'desc' },
+            });
+
+            if (salesInvoicesToProcess.length > 0) {
+                console.log(`[KSeF Sync] Znaleziono ${salesInvoicesToProcess.length} faktur sprzedażowych bez pozycji. Pobieram szczegóły XML...`);
+
+                for (const invoice of salesInvoicesToProcess) {
+                    if (!invoice.ksefNumber) continue;
+
+                    try {
+                        // Bezpieczny odstęp czasowy (600ms) zapobiegający timeoutom i rate-limitom serwerów KSeF
+                        await new Promise((resolve) => setTimeout(resolve, 600));
+
+                        const xmlRes = await fetch(`${baseUrl}/v2/invoices/ksef/${invoice.ksefNumber}`, {
+                            method: 'GET',
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                        });
+
+                        if (!xmlRes.ok) {
+                            console.warn(`[KSeF Sync Details] Faktura ${invoice.invoiceNumber} (${invoice.ksefNumber}): błąd HTTP ${xmlRes.status}`);
+                            continue;
+                        }
+
+                        const xmlText = await xmlRes.text();
+                        await parseAndSaveInvoiceXml(invoice.id, invoice.ksefNumber, xmlText, invoice.contractorId, true);
+                        salesProcessedCount++;
+                        console.log(`[KSeF Sync Details] Pomyślnie pobrano pozycje dla faktury sprzedażowej ${invoice.invoiceNumber} (${salesProcessedCount}/${salesInvoicesToProcess.length})`);
+                    } catch (invErr: any) {
+                        console.warn(`[KSeF Sync Details] Błąd przetwarzania faktury ${invoice.invoiceNumber}:`, invErr?.message);
+                    }
+                }
+            }
+        } catch (salesDetailsErr) {
+            console.warn('[KSeF Sync Details] Błąd podczas automatycznego pobierania pozycji faktur sprzedażowych:', salesDetailsErr);
+        }
+
         lastSyncTimestamp = Date.now();
-        console.log(`[KSeF Sync] Sukces`);
+        console.log(`[KSeF Sync] Sukces. Zaimportowano nagłówków: ${importedCount}, pobrano szczegółów sprzedaży: ${salesProcessedCount}`);
+
+        const resultMessage = salesProcessedCount > 0
+            ? `Zsynchronizowano pomyślnie. Pobrano szczegóły dla ${salesProcessedCount} faktur sprzedażowych.`
+            : `Zsynchronizowano pomyślnie (${importedCount} faktur).`;
 
         return {
             success: true,
-            message: `Zsynchronizowano pomyślnie`,
+            message: resultMessage,
             importedCount,
+            salesDetailsCount: salesProcessedCount,
         };
     } catch (error: any) {
         console.error('[KSeF Sync] Błąd podczas synchronizacji KSeF:', error);
@@ -425,4 +478,145 @@ export async function syncKsefInvoices(force: boolean = false): Promise<KsefSync
     } finally {
         isSyncInProgress = false;
     }
+}
+
+/**
+ * Parsuje pobrany plik XML faktury KSeF i zapisuje pozycje oraz adres kontrahenta w bazie danych.
+ */
+export async function parseAndSaveInvoiceXml(
+    invoiceId: string,
+    ksefNumber: string,
+    xmlText: string,
+    contractorId: string | null,
+    isSales: boolean
+) {
+    const xmlParser = new XMLParser({ ignoreAttributes: true, removeNSPrefix: true });
+    const parsedXml = xmlParser.parse(xmlText);
+
+    const faRoot = parsedXml.Faktura || parsedXml;
+    const faSection = faRoot?.Fa;
+
+    // --- POBIERANIE I AKTUALIZACJA ADRESU KONTRAHENTA ---
+    // Dla faktur sprzedażowych (wystawionych przez nas) kontrahentem jest Nabywca (Podmiot2)
+    // Dla faktur zakupowych (kosztowych) kontrahentem jest Sprzedawca (Podmiot1)
+    const remoteSubject = isSales ? (faRoot?.Podmiot2 || faRoot?.Podmiot1) : (faRoot?.Podmiot1 || faRoot?.Podmiot2);
+    const adres = remoteSubject?.Adres;
+
+    if (adres && contractorId) {
+        let fullAddress = '';
+
+        // Opcja 1: Adres ustrukturyzowany polski (AdresPol)
+        if (adres.AdresPol) {
+            const ulica = adres.AdresPol.Ulica ? `ul. ${adres.AdresPol.Ulica}` : '';
+            const nrDomu = adres.AdresPol.NrDomu || '';
+            const nrLokalu = adres.AdresPol.NrLokalu ? `/${adres.AdresPol.NrLokalu}` : '';
+            const kodPocztowy = adres.AdresPol.KodPocztowy || '';
+            const miejscowosc = adres.AdresPol.Miejscowosc || '';
+
+            const streetPart = `${ulica} ${nrDomu}${nrLokalu}`.trim();
+            const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
+            fullAddress = [streetPart, cityPart].filter(Boolean).join(', ');
+        }
+        // Opcja 2: Adres zagraniczny (AdresZagr)
+        else if (adres.AdresZagr) {
+            const ulica = adres.AdresZagr.Ulica || '';
+            const nrDomu = adres.AdresZagr.NrDomu || '';
+            const kodPocztowy = adres.AdresZagr.KodPocztowy || '';
+            const miejscowosc = adres.AdresZagr.Miejscowosc || '';
+            const kraj = adres.AdresZagr.NazwaKraju || adres.AdresZagr.KodKraju || '';
+
+            const streetPart = `${ulica} ${nrDomu}`.trim();
+            const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
+            fullAddress = [streetPart, cityPart, kraj].filter(Boolean).join(', ');
+        }
+        // Opcja 3: Adres liniowy (AdresL1, AdresL2)
+        else if (adres.AdresL1 || adres.AdresL2) {
+            const l1 = adres.AdresL1 || '';
+            const l2 = adres.AdresL2 || '';
+            fullAddress = [l1, l2].filter(Boolean).join(', ');
+        }
+
+        if (fullAddress && fullAddress.trim()) {
+            await prisma.contractor.update({
+                where: { id: contractorId },
+                data: { address: fullAddress.trim() },
+            }).catch(() => {});
+        }
+    }
+
+    if (contractorId) {
+        const c = await prisma.contractor.findUnique({ where: { id: contractorId } });
+        if (c && c.address === 'Pobrano z KSeF') {
+            await prisma.contractor.update({
+                where: { id: contractorId },
+                data: { address: '' },
+            }).catch(() => {});
+        }
+    }
+
+    let rows = faSection?.FaWiersz || [];
+    if (!Array.isArray(rows)) {
+        rows = rows ? [rows] : [];
+    }
+
+    // Usunięcie starych pozycji jeśli występowały (zapobiega duplikatom)
+    await prisma.invoicePosition.deleteMany({
+        where: { invoiceId: invoiceId }
+    });
+
+    for (const row of rows) {
+        const productName = String(row.P_7 || 'Towar/Usługa bez nazwy').trim();
+        if (!productName) continue;
+
+        const unit = String(row.P_8A || 'szt');
+        const quantity = parseFloat(String(row.P_8B || '1'));
+        const netPrice = parseFloat(String(row.P_9A || '0'));
+        const netAmount = parseFloat(String(row.P_11 || row.P_11A || '0'));
+        const grossAmount = parseFloat(String(row.P_11A || '0')) || (netAmount * 1.23);
+
+        const rawVat = row.P_12 !== undefined ? String(row.P_12).toLowerCase().trim() : '23';
+        let safeVatRate = 0;
+
+        if (rawVat === 'zw' || rawVat === 'np' || rawVat === 'oo') {
+            safeVatRate = 0;
+        } else {
+            safeVatRate = parseFloat(rawVat.replace('%', '').replace(',', '.')) || 0;
+        }
+
+        let product = null;
+        if (contractorId) {
+            product = await prisma.product.findFirst({
+                where: { name: productName, supplierId: contractorId },
+            });
+        }
+
+        if (!product) {
+            product = await prisma.product.create({
+                data: {
+                    name: productName,
+                    price: netPrice,
+                    unit: unit,
+                    categoryId: null,
+                    supplierId: contractorId,
+                    ingredientId: null,
+                },
+            });
+        }
+
+        await prisma.invoicePosition.create({
+            data: {
+                invoiceId: invoiceId,
+                productId: product.id,
+                name: productName,
+                quantity: quantity,
+                unit: unit,
+                netPrice: netPrice,
+                netAmount: netAmount,
+                vatRate: safeVatRate,
+                grossAmount: grossAmount,
+            },
+        });
+    }
+
+    return rows.length;
 }

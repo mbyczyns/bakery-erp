@@ -50,7 +50,7 @@ export default function AppLayoutWrapper({ children }: { children: React.ReactNo
     if (isLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-ui-white">
-                <Loader2 size={32} className="animate-spin text-ui-primary" />
+                <Loader2 size={32} className="animate-spin text-ui-secondary" />
             </div>
         );
     }

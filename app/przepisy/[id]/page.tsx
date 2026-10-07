@@ -514,7 +514,7 @@ export default function PrzepisSzczegolyPage({
         return (
             <div className="min-h-screen bg-ui-white flex items-center justify-center pb-20">
                 <div className="flex flex-col items-center gap-3 text-ui-secondary">
-                    <Loader2 size={32} className="animate-spin text-amber-600" />
+                    <Loader2 size={32} className="animate-spin text-ui-secondary" />
                     <p className="font-medium text-sm">Ładowanie danych receptury i foodcostu...</p>
                 </div>
             </div>
@@ -617,6 +617,7 @@ export default function PrzepisSzczegolyPage({
     // Aktualna marża na podstawie obecnej ceny w bazie (cena w cenniku to brutto)
     const currentSellingPrice = Number(recipe.sellingPrice || 0);
     const currentNetPrice = currentSellingPrice / (1 + VAT_RATE / 100);
+    const currentProfit = currentNetPrice - totalFoodCost;
     const currentMargin =
         currentSellingPrice > 0
             ? ((currentNetPrice - totalFoodCost) / currentNetPrice) * 100
@@ -680,8 +681,8 @@ export default function PrzepisSzczegolyPage({
                         <div className="text-[11px] uppercase tracking-wider font-bold text-ui-secondary">
                             Koszt produkcji
                         </div>
-                        <div className="text-xl font-black text-ui-primary">
-                            {totalFoodCost.toFixed(2)} zł <span className="text-xs font-semibold text-ui-secondary">/ szt.</span>
+                        <div className="text-xl font-black text-ui-primary leading-tight">
+                            {totalFoodCost.toFixed(2)} zł <span className="text-xs font-semibold text-ui-secondary">netto</span>
                         </div>
                     </div>
 
@@ -705,7 +706,7 @@ export default function PrzepisSzczegolyPage({
             </div>
 
             {/* GŁÓWNE KARTY KPI */}
-            <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 {/* Karta 1: Foodcost */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
@@ -713,16 +714,38 @@ export default function PrzepisSzczegolyPage({
                         <Scale size={18} className="text-ui-secondary" />
                     </div>
                     <div>
+                        <div className="text-2xl font-black text-ui-primary leading-tight">
+                            {totalFoodCost.toFixed(2)} <span className="text-sm font-semibold text-ui-secondary">zł netto</span>
+                        </div>
+                        <div className="text-xs font-bold text-ui-secondary mt-1">
+                            {totalFoodCostGross.toFixed(2)} zł <span className="font-medium text-[10px]">brutto</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Karta 2: Zysk na sztuce */}
+                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Zysk / 1 szt.</span>
+                        <Coins size={18} className="text-ui-secondary" />
+                    </div>
+                    <div>
                         <div className="text-2xl font-black text-ui-primary">
-                            {totalFoodCost.toFixed(2)} <span className="text-sm font-medium">zł</span>
+                            {currentSellingPrice > 0 ? (
+                                <>
+                                    {currentProfit.toFixed(2)} <span className="text-sm font-medium">zł netto</span>
+                                </>
+                            ) : "—"}
                         </div>
                         <p className="text-[11px] text-ui-secondary mt-1">
-                            Suma kosztów surowców i półproduktów
+                            {currentSellingPrice > 0
+                                ? `Cena netto (${currentNetPrice.toFixed(2)} zł) - koszt (${totalFoodCost.toFixed(2)} zł)`
+                                : "Ustal cenę sprzedaży poniżej"}
                         </p>
                     </div>
                 </div>
 
-                {/* Karta 2: Aktualna marża */}
+                {/* Karta 3: Aktualna marża */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
                         <span className="text-xs font-bold uppercase tracking-wider">Aktualna marża</span>
@@ -734,13 +757,11 @@ export default function PrzepisSzczegolyPage({
                         </div>
                         <p className="text-[11px] text-ui-secondary mt-1">
                             {currentSellingPrice > 0
-                                ? `Zysk netto: ${(currentNetPrice - totalFoodCost).toFixed(2)} zł / szt.`
+                                ? `Rentowność sprzedaży wyrobu`
                                 : "Ustal cenę sprzedaży poniżej"}
                         </p>
                     </div>
                 </div>
-
-
             </div>
 
             {/* SEKCJA 1: ROZPISANY FOODCOST & KALKULATOR CENY */}
@@ -937,7 +958,7 @@ export default function PrzepisSzczegolyPage({
                                         <label className="text-xs font-bold text-ui-black uppercase tracking-wider">
                                             Oczekiwana marża:
                                         </label>
-                                        <span className="text-lg font-black text-emerald-800">
+                                        <span className="text-lg font-black text-ui-secondary">
                                             {targetMargin}%
                                         </span>
                                     </div>
@@ -968,7 +989,7 @@ export default function PrzepisSzczegolyPage({
                                             step="1"
                                             value={targetMargin}
                                             onChange={(e) => setTargetMargin(Number(e.target.value))}
-                                            className="flex-1 accent-emerald-700 cursor-pointer"
+                                            className="flex-1 accent-ui-secondary cursor-pointer"
                                         />
                                         <div className="w-16 relative">
                                             <input
@@ -1043,7 +1064,9 @@ export default function PrzepisSzczegolyPage({
 
                                 <div className="flex items-center justify-between">
                                     <span className="text-ui-secondary font-medium">Koszt surowcowy (Foodcost):</span>
-                                    <span className="font-bold">{foodCostPerUnit.toFixed(2)} zł</span>
+                                    <span className="font-bold">
+                                        {foodCostPerUnit.toFixed(2)} zł <span className="text-[10px] text-ui-secondary font-normal">netto ({totalFoodCostGross.toFixed(2)} zł brutto)</span>
+                                    </span>
                                 </div>
 
                                 <div className="flex items-center justify-between">
@@ -1086,7 +1109,7 @@ export default function PrzepisSzczegolyPage({
                                 ) : (
                                     <>
                                         <CircleCheck size={18} />
-                                        Zapisz cenę sprzedaży ({finalGrossToSave.toFixed(2)} zł brutto)
+                                        Zapisz cenę
                                     </>
                                 )}
                             </button>

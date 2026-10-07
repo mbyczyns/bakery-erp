@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { TrendingUp, TrendingDown, Scale } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale, Loader2 } from "lucide-react";
 import PodsumowanieTab from "./PodsumowanieTab";
 import PrzychodyTab from "./PrzychodyTab";
 import KosztyTab from "./KosztyTab";
@@ -49,40 +49,40 @@ function FinanseContent() {
                         Finanse
                     </h1>
                 </div>
+            </div>
 
-                {/* ---------------- GŁÓWNY PRZEŁĄCZNIK ZAKŁADEK (PODSUMOWANIE / PRZYCHODY / KOSZTY) ---------------- */}
-                <div className="flex items-center p-1 sm:p-1.5 bg-ui-accent/15 rounded-2xl border border-ui-accent/40 shadow-xs w-full sm:w-auto">
-                    <button
-                        onClick={() => handleTabChange("PODSUMOWANIE")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "PODSUMOWANIE"
-                                ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
-                                : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <Scale size={16} className={activeTab === "PODSUMOWANIE" ? "text-ui-primary" : ""} />
-                        <span>Podsumowanie</span>
-                    </button>
-                    <button
-                        onClick={() => handleTabChange("PRZYCHODY")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "PRZYCHODY"
-                                ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
-                                : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <TrendingUp size={16} className={activeTab === "PRZYCHODY" ? "text-emerald-600" : ""} />
-                        <span>Przychody</span>
-                    </button>
-                    <button
-                        onClick={() => handleTabChange("KOSZTY")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "KOSZTY"
-                                ? "bg-white text-ui-black shadow-xs border border-ui-accent/60"
-                                : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <TrendingDown size={16} className={activeTab === "KOSZTY" ? "text-rose-600" : ""} />
-                        <span>Koszty</span>
-                    </button>
-                </div>
+            {/* ---------------- GŁÓWNY PRZEŁĄCZNIK ZAKŁADEK (PODSUMOWANIE / PRZYCHODY / KOSZTY) ---------------- */}
+            <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
+                <button
+                    onClick={() => handleTabChange("PODSUMOWANIE")}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "PODSUMOWANIE"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <Scale size={15} />
+                    <span>Podsumowanie</span>
+                </button>
+                <button
+                    onClick={() => handleTabChange("PRZYCHODY")}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "PRZYCHODY"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <TrendingUp size={15} />
+                    <span>Przychody</span>
+                </button>
+                <button
+                    onClick={() => handleTabChange("KOSZTY")}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "KOSZTY"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <TrendingDown size={15} />
+                    <span>Koszty</span>
+                </button>
             </div>
 
             {/* ---------------- ZAWARTOŚĆ AKTYWNEJ ZAKŁADKI ---------------- */}
@@ -95,7 +95,7 @@ function FinanseContent() {
 
 export default function FinansePage() {
     return (
-        <Suspense fallback={<div className="p-8 text-xs font-bold text-ui-secondary">Ładowanie modułu finansów...</div>}>
+        <Suspense fallback={<div className="p-8 flex items-center justify-center gap-2 text-xs font-bold text-ui-secondary"><Loader2 size={16} className="animate-spin text-ui-secondary" /> Ładowanie modułu finansów...</div>}>
             <FinanseContent />
         </Suspense>
     );

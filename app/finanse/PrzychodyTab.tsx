@@ -607,7 +607,7 @@ export default function PrzychodyTab() {
                 <div>
                     <h2 className="text-xl font-extrabold text-ui-black flex items-center gap-2">
                         <TrendingUp size={20} className="text-emerald-600" />
-                        Przychody ze sprzedaży
+                        Przychody
                     </h2>
                 </div>
 
@@ -654,7 +654,7 @@ export default function PrzychodyTab() {
                             }`}
                     >
                         <Calendar size={14} />
-                        Dzienne (Sklep)
+                        Dzienne
                     </button>
                     <button
                         onClick={() => setView("WEEKLY")}
@@ -784,7 +784,7 @@ export default function PrzychodyTab() {
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
 
-                                Sprzedaż pieczywa
+                                Pieczywo i wypieki
                             </span>
                             <Wheat size={15} className="text-ui-secondary" />
                         </div>
@@ -800,7 +800,7 @@ export default function PrzychodyTab() {
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
 
-                                Inne (kasa)
+                                Pozostałe produkty
                             </span>
                             <ShoppingBag size={15} className="text-ui-secondary" />
                         </div>
@@ -815,7 +815,8 @@ export default function PrzychodyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                                Faktury (B2B)
+                                Sprzedaż na faktury (przelewy)
+
                             </span>
                             <Receipt size={15} className="text-ui-secondary" />
                         </div>
@@ -879,7 +880,7 @@ export default function PrzychodyTab() {
                                                                 </span>
                                                                 <span>{formatCurrency(pt.bakery)}</span>
                                                             </div>
-                                                            <div className="flex items-center justify-between text-blue-600 font-bold">
+                                                            <div className="flex items-center justify-between text-ui-primary font-bold">
                                                                 <span className="flex items-center gap-1">
                                                                     <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8]" />
                                                                     Inne z kasy:
@@ -970,13 +971,13 @@ export default function PrzychodyTab() {
                         <div className={`grid ${view === "MONTHLY" ? "grid-cols-3" : "grid-cols-2"} gap-1.5 pt-2 border-t border-ui-accent/30 text-xs`}>
                             <div className="p-2 rounded-xl bg-ui-accent/10">
                                 <div className="text-[10px] text-ui-secondary font-bold">Pieczywo:</div>
-                                <div className="font-bold text-ui-primary text-xs sm:text-sm">{activeStats.bakerySharePercent}%</div>
+                                <div className="font-bold text-ui-secondary text-xs sm:text-sm">{activeStats.bakerySharePercent}%</div>
                                 <div className="text-[9px] sm:text-[10px] text-ui-secondary truncate">{formatCurrency(activeStats.bakerySalesIncome)}</div>
                             </div>
-                            <div className="p-2 rounded-xl bg-blue-50">
-                                <div className="text-[10px] text-blue-900 font-bold">Inne detal:</div>
-                                <div className="font-bold text-blue-900 text-xs sm:text-sm">{activeStats.otherSharePercent}%</div>
-                                <div className="text-[9px] sm:text-[10px] text-blue-700 truncate">{formatCurrency(activeStats.otherIncome)}</div>
+                            <div className="p-2 rounded-xl bg-ui-accent/10">
+                                <div className="text-[10px] text-ui-primary font-bold">Inne z kasy:</div>
+                                <div className="font-bold text-ui-primary text-xs sm:text-sm">{activeStats.otherSharePercent}%</div>
+                                <div className="text-[9px] sm:text-[10px] text-ui-primary truncate">{formatCurrency(activeStats.otherIncome)}</div>
                             </div>
                             {view === "MONTHLY" && (
                                 <div className="p-2 rounded-xl bg-emerald-50">
@@ -998,7 +999,7 @@ export default function PrzychodyTab() {
                     <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                         <div>
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Calendar size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Dzienny rejestr utargu i sprzedaży w sklepie
+                                <Calendar size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Dzienny rejestr utargu i sprzedaży
                             </h3>
 
                         </div>
@@ -1016,7 +1017,6 @@ export default function PrzychodyTab() {
                                     <th className="p-3.5 text-right">Sprzedaż pieczywa</th>
                                     <th className="p-3.5 text-right">Inne z kasy</th>
                                     <th className="p-3.5 text-right">Utarg dzienny</th>
-                                    <th className="p-3.5 text-center">Udział pieczywa</th>
                                     <th className="p-3.5 text-center">Sprzedano (szt.)</th>
                                     <th className="p-3.5 text-center">Wyprzedanie (%)</th>
                                     <th className="p-3.5 text-center w-10">Szczegóły</th>
@@ -1037,25 +1037,18 @@ export default function PrzychodyTab() {
                                                         {formatDate(d.date)}
                                                     </td>
                                                     <td className="p-3.5 text-ui-secondary font-semibold">
-                                                        <span className={d.isWeekend ? "text-amber-600 font-bold" : ""}>
-                                                            {d.dayOfWeek}
-                                                        </span>
+                                                        {d.dayOfWeek}
                                                     </td>
                                                     <td className="p-3.5 text-right font-bold text-ui-primary">
                                                         {formatCurrency(d.bakerySalesIncome)}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-blue-600">
+                                                    <td className="p-3.5 text-right font-bold text-[#38bdf8]">
                                                         {formatCurrency(d.otherIncome)}
                                                     </td>
                                                     <td className="p-3.5 text-right font-bold text-ui-black text-sm">
                                                         {formatCurrency(d.totalIncome)}
                                                     </td>
                                                     <td className="p-3.5 text-center">
-                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-ui-accent/20 text-ui-primary font-bold text-[11px]">
-                                                            {d.bakerySharePercent}%
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-3.5 text-center font-bold text-ui-black">
                                                         {d.totalSold > 0 ? d.totalSold.toLocaleString("pl-PL") : "—"}
                                                     </td>
                                                     <td className="p-3.5 text-center">
@@ -1498,47 +1491,11 @@ export default function PrzychodyTab() {
             {/* 5. SEKCJA FAKTUR SPRZEDAŻOWYCH (DEDYKOWANY WIDOK) */}
             {view === "INVOICES" && (
                 <div className="space-y-6">
-                    {/* Karty głównych odbiorców B2B */}
-                    {data?.contractorSalesRanking && data.contractorSalesRanking.length > 0 && (
-                        <div className="space-y-3">
-                            <div className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Building2 size={15} className="text-emerald-700" />
-                                Główni odbiorcy B2B (wg wartości faktur)
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                {data.contractorSalesRanking.slice(0, 4).map((c, idx) => (
-                                    <div
-                                        key={c.contractorId}
-                                        className="bg-white border border-emerald-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between"
-                                    >
-                                        <div className="flex items-start justify-between gap-1">
-                                            <span className="font-bold text-ui-black text-xs truncate" title={c.contractorName}>
-                                                {idx + 1}. {c.contractorName}
-                                            </span>
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-950 whitespace-nowrap">
-                                                {c.sharePercent}%
-                                            </span>
-                                        </div>
-                                        <div className="mt-3">
-                                            <div className="text-lg font-bold text-emerald-950">
-                                                {formatCurrency(c.totalGross)}
-                                            </div>
-                                            <div className="text-[10px] text-ui-secondary mt-0.5 flex justify-between">
-                                                <span>Faktury: <strong>{c.invoicesCount} szt.</strong></span>
-                                                <span>Ostatnia: {formatDate(c.lastInvoiceDate)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Tabela wszystkich faktur sprzedażowych */}
                     <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
                         <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Receipt size={14} className="text-emerald-700" /> Rejestr faktur sprzedażowych
+                                <Receipt size={14} className="text-ui-secondary" /> Rejestr faktur sprzedażowych
                             </h3>
                             <span className="text-[11px] font-semibold text-ui-secondary">
                                 {filteredSalesInvoices.length} faktur
@@ -1556,7 +1513,6 @@ export default function PrzychodyTab() {
                                         <th className="p-3.5 text-right">Wartość netto</th>
                                         <th className="p-3.5 text-right">VAT</th>
                                         <th className="p-3.5 text-right">Wartość brutto</th>
-                                        <th className="p-3.5 text-center w-10">Szczegóły</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-ui-accent/30 font-medium">
@@ -1570,15 +1526,14 @@ export default function PrzychodyTab() {
                                                         className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
                                                             }`}
                                                     >
-                                                        <td className="p-3.5 font-bold text-ui-black">
+                                                        <td className="p-3.5 text-ui-black">
                                                             {formatDate(inv.issuedDate)}
                                                         </td>
-                                                        <td className="p-3.5 font-bold text-ui-primary">
+                                                        <td className="p-3.5  text-ui-primary">
                                                             {inv.invoiceNumber}
                                                         </td>
-                                                        <td className="p-3.5 font-bold text-ui-black">
+                                                        <td className="p-3.5 text-ui-black">
                                                             <div className="flex items-center gap-1.5">
-                                                                <Building2 size={13} className="text-emerald-700 shrink-0" />
                                                                 <span>{inv.contractorName}</span>
                                                             </div>
                                                         </td>
@@ -1587,17 +1542,14 @@ export default function PrzychodyTab() {
                                                                 {inv.positionsCount} poz.
                                                             </span>
                                                         </td>
-                                                        <td className="p-3.5 text-right font-semibold text-ui-secondary">
+                                                        <td className="p-3.5 text-right text-ui-secondary">
                                                             {formatCurrency(inv.netAmount)}
                                                         </td>
-                                                        <td className="p-3.5 text-right font-semibold text-ui-secondary">
+                                                        <td className="p-3.5 text-right text-ui-secondary">
                                                             {formatCurrency(inv.vatAmount)}
                                                         </td>
-                                                        <td className="p-3.5 text-right font-bold text-emerald-950 text-sm">
+                                                        <td className="p-3.5 text-right text-ui-primary text-sm">
                                                             {formatCurrency(inv.grossAmount)}
-                                                        </td>
-                                                        <td className="p-3.5 text-center text-ui-secondary">
-                                                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                                         </td>
                                                     </tr>
 

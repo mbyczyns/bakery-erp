@@ -251,7 +251,7 @@ export default function KontrahenciPage() {
                                 <tr>
                                     <td colSpan={4} className="p-12 text-center text-ui-secondary">
                                         <div className="flex items-center justify-center gap-2">
-                                            <Loader2 size={18} className="animate-spin text-ui-primary" />
+                                            <Loader2 size={18} className="animate-spin text-ui-secondary" />
                                             Ładowanie bazy kontrahentów...
                                         </div>
                                     </td>
@@ -285,12 +285,6 @@ export default function KontrahenciPage() {
                                                 {c.contactPerson && (
                                                     <div className="text-xs font-normal text-ui-secondary flex items-center gap-1 mt-0.5 truncate">
                                                         <User size={12} className="shrink-0" /> {c.contactPerson}
-                                                    </div>
-                                                )}
-                                                {c.notes && (
-                                                    <div className="text-[11px] font-normal text-ui-secondary/80 flex items-center gap-1 mt-0.5 truncate italic" title={c.notes}>
-                                                        <FileText size={11} className="shrink-0 text-amber-700" />
-                                                        <span className="truncate">{c.notes}</span>
                                                     </div>
                                                 )}
                                             </td>

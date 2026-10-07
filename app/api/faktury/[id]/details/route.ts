@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
-import { XMLParser } from 'fast-xml-parser';
+import { parseAndSaveInvoiceXml } from '@/lib/ksef-sync';
 
 const prisma = new PrismaClient();
 
@@ -100,137 +100,13 @@ export async function GET(
         }
 
         const xmlText = await xmlRes.text();
-        const xmlParser = new XMLParser({ ignoreAttributes: true, removeNSPrefix: true });
-        const parsedXml = xmlParser.parse(xmlText);
-
-        const faRoot = parsedXml.Faktura || parsedXml;
-        const faSection = faRoot?.Fa;
-
-        // --- POBIERANIE I AKTUALIZACJA ADRESU KONTRAHENTA ---
-        // Dla faktur sprzedażowych (wystawionych przez nas) kontrahentem jest Nabywca (Podmiot2)
-        // Dla faktur zakupowych (kosztowych) kontrahentem jest Sprzedawca (Podmiot1)
-        const isSalesInvoice = (invoice as any).isSales || invoice.type === 'SALES';
-        const remoteSubject = isSalesInvoice ? (faRoot?.Podmiot2 || faRoot?.Podmiot1) : (faRoot?.Podmiot1 || faRoot?.Podmiot2);
-        const adres = remoteSubject?.Adres;
-
-        if (adres && invoice.contractorId) {
-            let fullAddress = '';
-
-            // Opcja 1: Adres ustrukturyzowany polski (AdresPol)
-            if (adres.AdresPol) {
-                const ulica = adres.AdresPol.Ulica ? `ul. ${adres.AdresPol.Ulica}` : '';
-                const nrDomu = adres.AdresPol.NrDomu || '';
-                const nrLokalu = adres.AdresPol.NrLokalu ? `/${adres.AdresPol.NrLokalu}` : '';
-                const kodPocztowy = adres.AdresPol.KodPocztowy || '';
-                const miejscowosc = adres.AdresPol.Miejscowosc || '';
-
-                const streetPart = `${ulica} ${nrDomu}${nrLokalu}`.trim();
-                const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
-                fullAddress = [streetPart, cityPart].filter(Boolean).join(', ');
-            }
-            // Opcja 2: Adres zagraniczny (AdresZagr)
-            else if (adres.AdresZagr) {
-                const ulica = adres.AdresZagr.Ulica || '';
-                const nrDomu = adres.AdresZagr.NrDomu || '';
-                const kodPocztowy = adres.AdresZagr.KodPocztowy || '';
-                const miejscowosc = adres.AdresZagr.Miejscowosc || '';
-                const kraj = adres.AdresZagr.NazwaKraju || adres.AdresZagr.KodKraju || '';
-
-                const streetPart = `${ulica} ${nrDomu}`.trim();
-                const cityPart = `${kodPocztowy} ${miejscowosc}`.trim();
-                fullAddress = [streetPart, cityPart, kraj].filter(Boolean).join(', ');
-            }
-            // Opcja 3: Adres liniowy (AdresL1, AdresL2)
-            else if (adres.AdresL1 || adres.AdresL2) {
-                const l1 = adres.AdresL1 || '';
-                const l2 = adres.AdresL2 || '';
-                fullAddress = [l1, l2].filter(Boolean).join(', ');
-            }
-
-            // Aktualizuj w bazie tylko jeśli udało się odczytać faktyczny adres
-            if (fullAddress && fullAddress.trim()) {
-                await prisma.contractor.update({
-                    where: { id: invoice.contractorId },
-                    data: { address: fullAddress.trim() },
-                });
-                console.log(`[ON-DEMAND] Zaktualizowano adres dla ${invoice.contractor.name}: ${fullAddress}`);
-            }
-        }
-
-        // Czyszczenie starego placeholdera jeśli wciąż istnieje
-        if (invoice.contractor && invoice.contractor.address === 'Pobrano z KSeF') {
-            await prisma.contractor.update({
-                where: { id: invoice.contractorId },
-                data: { address: '' },
-            }).catch(() => {});
-        }
-        // ---------------------------------------------------------
-
-        let rows = faSection?.FaWiersz || [];
-        if (!Array.isArray(rows)) {
-            rows = rows ? [rows] : [];
-        }
-
-        let defaultCategory = await prisma.productCategory.findFirst({ where: { name: 'Produkty spożywcze' } })
-            || await prisma.productCategory.findFirst();
-
-        if (!defaultCategory) {
-            defaultCategory = await prisma.productCategory.create({ data: { name: 'Produkty spożywcze' } });
-        }
-
-        // Zapis pozycji w bazie danych
-        for (const row of rows) {
-            const productName = String(row.P_7 || 'Towar/Usługa bez nazwy').trim();
-            if (!productName) continue;
-
-            const unit = String(row.P_8A || 'szt');
-            const quantity = parseFloat(String(row.P_8B || '1'));
-            const netPrice = parseFloat(String(row.P_9A || '0'));
-            const netAmount = parseFloat(String(row.P_11 || row.P_11A || '0'));
-            const grossAmount = parseFloat(String(row.P_11A || '0')) || (netAmount * 1.23);
-
-            // --- BEZPIECZNE PARSOWANIE STAWKI VAT ---
-            const rawVat = row.P_12 !== undefined ? String(row.P_12).toLowerCase().trim() : '23';
-            let safeVatRate = 0;
-
-            if (rawVat === 'zw' || rawVat === 'np' || rawVat === 'oo') {
-                safeVatRate = 0;
-            } else {
-                safeVatRate = parseFloat(rawVat.replace('%', '').replace(',', '.')) || 0;
-            }
-            // ----------------------------------------
-
-            let product = await prisma.product.findFirst({
-                where: { name: productName, supplierId: invoice.contractorId },
-            });
-
-            if (!product) {
-                product = await prisma.product.create({
-                    data: {
-                        name: productName,
-                        price: netPrice,
-                        unit: unit,
-                        categoryId: null,
-                        supplierId: invoice.contractorId,
-                        ingredientId: null,
-                    },
-                });
-            }
-
-            await prisma.invoicePosition.create({
-                data: {
-                    invoiceId: invoice.id,
-                    productId: product.id,
-                    name: productName,
-                    quantity: quantity,
-                    unit: unit,
-                    netPrice: netPrice,
-                    netAmount: netAmount,
-                    vatRate: safeVatRate,
-                    grossAmount: grossAmount,
-                },
-            });
-        }
+        const positionsCount = await parseAndSaveInvoiceXml(
+            invoice.id,
+            invoice.ksefNumber,
+            xmlText,
+            invoice.contractorId,
+            Boolean((invoice as any).isSales || invoice.type === 'SALES')
+        );
 
         // Pobieramy odświeżoną fakturę z nowo powiązanymi pozycjami
         const updatedInvoice = await prisma.invoice.findUnique({
@@ -241,7 +117,7 @@ export async function GET(
             },
         });
 
-        console.log(`[ON-DEMAND SUKCES] Pomyślnie pobrano i zapisano w bazie ${rows.length} pozycji.`);
+        console.log(`[ON-DEMAND SUKCES] Pomyślnie pobrano i zapisano w bazie ${positionsCount} pozycji.`);
 
         return NextResponse.json({
             source: 'ksef',

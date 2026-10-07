@@ -714,7 +714,7 @@ export default function PrzepisyPage() {
                             <tr>
                                 <td colSpan={3} className="p-12 text-center text-ui-secondary">
                                     <div className="flex items-center justify-center gap-2">
-                                        <Loader2 size={18} className="animate-spin text-amber-600" />
+                                        <Loader2 size={18} className="animate-spin text-ui-secondary" />
                                         Ładowanie danych...
                                     </div>
                                 </td>
@@ -1017,7 +1017,7 @@ export default function PrzepisyPage() {
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-ui-accent/10 rounded-xl text-ui-primary shadow-sm">
                                     {(editingRecipeId || editingSemiFinishedId) ? (
-                                        <Pencil size={22} className="text-amber-700" />
+                                        <Pencil size={22} className="text-ui-secondary" />
                                     ) : creationKind === "PRODUCT" ? (
                                         <ChefHat size={22} />
                                     ) : (

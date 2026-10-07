@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
 
         const monthlyCostInvoicesGross = new Array(12).fill(0);
         const monthlyCostInvoicesNet = new Array(12).fill(0);
-        const costInvoiceCategoryMap = new Map<string, number>();
+        const costInvoiceCategoryMap = new Map<string, { total: number; monthlyValues: number[] }>();
 
         costInvoices.forEach((inv) => {
             const invDate = new Date(inv.issuedDate);
@@ -232,11 +232,23 @@ export async function GET(request: NextRequest) {
                 inv.positions.forEach((pos) => {
                     const catName = pos.product?.category?.name || "Bez kategorii";
                     const posGross = Number(pos.grossAmount || 0);
-                    costInvoiceCategoryMap.set(catName, (costInvoiceCategoryMap.get(catName) || 0) + posGross);
+                    let entry = costInvoiceCategoryMap.get(catName);
+                    if (!entry) {
+                        entry = { total: 0, monthlyValues: new Array(12).fill(0) };
+                        costInvoiceCategoryMap.set(catName, entry);
+                    }
+                    entry.total += posGross;
+                    entry.monthlyValues[mIdx] += posGross;
                 });
             } else {
                 const catName = "Bez kategorii";
-                costInvoiceCategoryMap.set(catName, (costInvoiceCategoryMap.get(catName) || 0) + gross);
+                let entry = costInvoiceCategoryMap.get(catName);
+                if (!entry) {
+                    entry = { total: 0, monthlyValues: new Array(12).fill(0) };
+                    costInvoiceCategoryMap.set(catName, entry);
+                }
+                entry.total += gross;
+                entry.monthlyValues[mIdx] += gross;
             }
         });
 
@@ -258,10 +270,10 @@ export async function GET(request: NextRequest) {
         });
 
         const monthlyOperationalCosts = new Array(12).fill(0);
-        const costTypeTotalsMap = new Map<string, { id: string; name: string; total: number }>();
+        const costTypeTotalsMap = new Map<string, { id: string; name: string; total: number; monthlyValues: number[] }>();
 
         costTypes.forEach((ct) => {
-            costTypeTotalsMap.set(ct.id, { id: ct.id, name: ct.name, total: 0 });
+            costTypeTotalsMap.set(ct.id, { id: ct.id, name: ct.name, total: 0, monthlyValues: new Array(12).fill(0) });
         });
 
         monthlyCostsDb.forEach((mc) => {
@@ -273,6 +285,7 @@ export async function GET(request: NextRequest) {
             const existing = costTypeTotalsMap.get(mc.costTypeId);
             if (existing) {
                 existing.total += val;
+                existing.monthlyValues[mIdx] += val;
             }
         });
 
@@ -299,6 +312,8 @@ export async function GET(request: NextRequest) {
             const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 1000) / 10 : 0;
             const isCurrentMonth = selectedYear === currentYearNum && idx === currentMonthIdx;
             const hasData = totalRevenue > 0 || totalCost > 0;
+            const monthPrefix = `${selectedYear}-${String(idx + 1).padStart(2, "0")}`;
+            const activeDaysInMonth = Array.from(allDaysInYear).filter((d) => d.startsWith(monthPrefix)).length;
 
             return {
                 monthIndex: idx,
@@ -323,6 +338,7 @@ export async function GET(request: NextRequest) {
                 profitMargin,
                 isCurrentMonth,
                 hasData,
+                activeDaysCount: activeDaysInMonth,
                 categoryRevenues: {
                     BREAD: Math.round(monthlyCategoryRevenues[idx].BREAD * 100) / 100,
                     ROLL: Math.round(monthlyCategoryRevenues[idx].ROLL * 100) / 100,
@@ -341,9 +357,13 @@ export async function GET(request: NextRequest) {
         const monthsWithData = monthlyData.filter((m) => m.hasData);
         const activeMonthsCount = Math.max(1, monthsWithData.length);
 
+        const activeDaysCount = Array.from(allDaysInYear).filter((d) => d.startsWith(String(selectedYear))).length;
+        const totalDaysForAvg = activeDaysCount > 0 ? activeDaysCount : activeMonthsCount * 30;
+
         const avgMonthlyRevenue = Math.round((grandTotalRevenue / activeMonthsCount) * 100) / 100;
         const avgMonthlyCost = Math.round((grandTotalCost / activeMonthsCount) * 100) / 100;
         const avgMonthlyProfit = Math.round((grandNetProfit / activeMonthsCount) * 100) / 100;
+        const avgDailyProfit = totalDaysForAvg > 0 ? Math.round((grandNetProfit / totalDaysForAvg) * 100) / 100 : 0;
 
         // Najlepszy i najgorszy miesiąc
         let bestMonth = monthsWithData.length > 0
@@ -408,18 +428,20 @@ export async function GET(request: NextRequest) {
                 source: "OPERATIONAL" as const,
                 sourceLabel: "Koszty stałe / operacyjne",
                 value: Math.round(i.total * 100) / 100,
+                monthlyValues: i.monthlyValues.map((v) => Math.round(v * 100) / 100),
                 sharePercent: grandTotalCost > 0 ? Math.round((i.total / grandTotalCost) * 1000) / 10 : 0,
             }));
 
         const invoiceCostItems = Array.from(costInvoiceCategoryMap.entries())
-            .filter(([_, val]) => val > 0)
-            .map(([name, val]) => ({
+            .filter(([_, entry]) => entry.total > 0)
+            .map(([name, entry]) => ({
                 id: `inv_${name}`,
                 name,
                 source: "INVOICE" as const,
                 sourceLabel: "Faktury kosztowe",
-                value: Math.round(val * 100) / 100,
-                sharePercent: grandTotalCost > 0 ? Math.round((val / grandTotalCost) * 1000) / 10 : 0,
+                value: Math.round(entry.total * 100) / 100,
+                monthlyValues: entry.monthlyValues.map((v) => Math.round(v * 100) / 100),
+                sharePercent: grandTotalCost > 0 ? Math.round((entry.total / grandTotalCost) * 1000) / 10 : 0,
             }));
 
         const allCostBreakdown = [...operationalCostItems, ...invoiceCostItems].sort((a, b) => b.value - a.value);
@@ -437,7 +459,9 @@ export async function GET(request: NextRequest) {
                 avgMonthlyRevenue,
                 avgMonthlyCost,
                 avgMonthlyProfit,
+                avgDailyProfit,
                 activeMonthsCount,
+                activeDaysCount,
                 grandBakeryRevenue,
                 grandOtherRevenue,
                 grandSalesInvGross,

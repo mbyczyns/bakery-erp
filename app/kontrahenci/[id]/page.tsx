@@ -527,7 +527,7 @@ export default function ContractorDetailPage() {
         return (
             <div className="min-h-screen bg-ui-white flex items-center justify-center pb-20">
                 <div className="flex flex-col items-center gap-3 text-ui-secondary">
-                    <Loader2 size={32} className="animate-spin text-ui-accent" />
+                    <Loader2 size={32} className="animate-spin text-ui-secondary" />
                     <p className="font-medium text-sm">Ładowanie karty kontrahenta i historii zakupów...</p>
                 </div>
             </div>
@@ -576,10 +576,10 @@ export default function ContractorDetailPage() {
             {/* ========================================================= */}
             <div className="bg-ui-white border border-ui-accent rounded-2xl p-6 sm:p-7 shadow-sm mb-8">
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-                    <div>
+                    <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                             {contractor.nip && (
-                                <span className="text-xs  text-ui-secondary">
+                                <span className="text-xs text-ui-black">
                                     NIP: <b className="text-ui-black">{contractor.nip}</b>
                                 </span>
                             )}
@@ -601,7 +601,7 @@ export default function ContractorDetailPage() {
 
                         {/* Informacja o oficjalnej nazwie z faktury */}
                         <div className="text-xs text-ui-secondary flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="font-semibold text-ui-secondary">Nazwa z faktury:</span>
+                            <span className="font-semibold text-ui-black">Nazwa z faktury:</span>
                             <span className="text-ui-black font-medium">{contractor.name}</span>
                             {contractor.customName && contractor.customName !== contractor.name && (
                                 <span className="text-[10px] font-bold bg-ui-white text-ui-accent border border-ui-accent px-1.5 py-0.2 rounded">
@@ -611,10 +611,10 @@ export default function ContractorDetailPage() {
                         </div>
 
                         {/* Dane kontaktowe w tagach */}
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3.5 text-xs text-ui-secondary">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3.5 text-xs text-ui-black">
                             {contractor.address && contractor.address !== 'Pobrano z KSeF' && (
                                 <div className="flex items-center gap-1.5">
-                                    <MapPin size={14} className="text-ui-accent shrink-0" />
+                                    <MapPin size={14} className="text-ui-black shrink-0" />
                                     <span>{contractor.address}</span>
                                 </div>
                             )}
@@ -648,6 +648,22 @@ export default function ContractorDetailPage() {
                             )}
                         </div>
                     </div>
+
+                    {/* KAFELEK ŁĄCZNYCH WYDATKÓW W PRAWYM GÓRNYM ROGU */}
+                    <div className="bg-ui-accent/10 border border-ui-accent/60 rounded-2xl p-4 sm:p-5 text-right shrink-0 w-full lg:w-auto min-w-[220px]">
+                        <div className="flex items-center justify-between lg:justify-end gap-2 text-ui-secondary mb-1.5">
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Łączne wydatki</span>
+                            <Coins size={18} className="text-ui-secondary" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-black text-ui-primary">
+                                {stats.totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-ui-secondary">zł brutto</span>
+                            </div>
+                            <p className="text-xs text-ui-secondary mt-1">
+                                <b className="text-ui-primary">{stats.totalNet.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b> netto
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Notatka wewnętrzna / własne uwagi */}
@@ -673,7 +689,7 @@ export default function ContractorDetailPage() {
                     <div className="mt-4">
                         <button
                             onClick={handleOpenEditNotesModal}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ui-secondary hover:text-ui-primary bg-ui-accent/10 hover:bg-ui-accent/20 border border-dashed border-ui-accent/40 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                            className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                         >
                             <FileText size={13} />
                             + Dodaj uwagi / notatki do kontrahenta
@@ -682,57 +698,7 @@ export default function ContractorDetailPage() {
                 )}
             </div>
 
-            {/* ========================================================= */}
-            {/* KARTY STATYSTYK FINANSOWYCH (PODSUMOWANIE WYDATKÓW)       */}
-            {/* ========================================================= */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {/* 1. Łączne wydatki brutto */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Łączne wydatki</span>
-                        <Coins size={18} className="text-ui-secondary" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-primary">
-                            {stats.totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold">zł brutto</span>
-                        </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            <b>{stats.totalNet.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b> netto
-                        </p>
-                    </div>
-                </div>
 
-                {/* 2. Liczba faktur */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Zarejestrowane faktury</span>
-                        <Receipt size={18} className="text-ui-secondary" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-ui-black">
-                            {stats.invoicesCount} <span className="text-xs font-semibold text-ui-secondary">dokumentów</span>
-                        </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            VAT: <b>{stats.totalVat.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b>
-                        </p>
-                    </div>
-                </div>
-
-                {/* 3. Średnia wartość faktury */}
-
-                {/* 4. Ostatni zakup */}
-                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-ui-secondary mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Data ostatniego zakupu</span>
-                        <Calendar size={18} className="text-ui-secondary" />
-                    </div>
-                    <div>
-                        <div className="text-xl font-black text-ui-primary">
-                            {stats.lastPurchaseDate ? formatDate(stats.lastPurchaseDate) : "Brak zakupów"}
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             {/* ========================================================= */}
             {/* WYKRES KOLUMNOWY: WYDATKI MIESIĘCZNE U DOSTAWCY           */}
@@ -741,7 +707,7 @@ export default function ContractorDetailPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                     <div>
                         <h3 className="text-sm font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                            <TrendingUp size={16} className="text-ui-secondary" /> Wydatki miesięczne
+                            <TrendingUp size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Wydatki miesięczne
                         </h3>
 
                     </div>
@@ -791,13 +757,13 @@ export default function ContractorDetailPage() {
                                                     </div>
                                                     <div className="space-y-1.5">
                                                         <div className="flex items-center justify-between gap-3">
-                                                            <span className="text-ui-secondary">Wydatki brutto:</span>
+                                                            <span className="text-ui-black">Wydatki brutto:</span>
                                                             <span className="font-black text-ui-primary text-sm">
                                                                 {item.gross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center justify-between gap-3 text-[11px]">
-                                                            <span className="text-ui-secondary">Wydatki netto:</span>
+                                                            <span className="text-ui-black">Wydatki netto:</span>
                                                             <span className="font-semibold text-ui-black">
                                                                 {item.net.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                             </span>
@@ -825,40 +791,55 @@ export default function ContractorDetailPage() {
             {/* ========================================================= */}
             {/* ZAKŁADKI: PRODUKTY / FAKTURY / GENERATOR LISTY ZAKUPÓW    */}
             {/* ========================================================= */}
-            <div className="flex items-center gap-2 border-b border-ui-accent mb-6">
+            <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab("PRODUCTS")}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "PRODUCTS"
-                        ? "border-ui-primary text-ui-primary"
-                        : "border-transparent text-ui-secondary hover:text-ui-black"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "PRODUCTS"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    <ShoppingBag size={16} />
-                    Produkty ({data.purchasedProducts.length})
+                    <ShoppingBag size={15} />
+                    <span>Produkty</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "PRODUCTS"
+                        ? "bg-ui-secondary text-ui-white"
+                        : "bg-ui-accent/25 text-ui-primary/70"
+                        }`}>
+                        {data.purchasedProducts.length}
+                    </span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab("INVOICES")}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "INVOICES"
-                        ? "border-ui-primary text-ui-primary"
-                        : "border-transparent text-ui-secondary hover:text-ui-black"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "INVOICES"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    <Receipt size={16} />
-                    Ostatnie faktury ({invoices.length})
+                    <Receipt size={15} />
+                    <span>Ostatnie faktury</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "INVOICES"
+                        ? "bg-ui-secondary text-ui-white"
+                        : "bg-ui-accent/25 text-ui-primary/70"
+                        }`}>
+                        {invoices.length}
+                    </span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab("SHOPPING_LIST")}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "SHOPPING_LIST"
-                        ? "border-ui-accent text-ui-primary"
-                        : "border-transparent text-ui-secondary hover:text-ui-black"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "SHOPPING_LIST"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    <ShoppingCart size={16} />
-                    Lista zakupów
+                    <ShoppingCart size={15} />
+                    <span>Lista zakupów</span>
                     {selectedCount > 0 && (
-                        <span className="ml-1 bg-ui-accent text-white font-extrabold px-2 py-0.5 rounded-full text-[11px]">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "SHOPPING_LIST"
+                            ? "bg-ui-secondary text-ui-white"
+                            : "bg-ui-accent/25 text-ui-primary/70"
+                            }`}>
                             {selectedCount}
                         </span>
                     )}
@@ -948,7 +929,7 @@ export default function ContractorDetailPage() {
                                                     {prod.lastPrice > 0 ? (
                                                         <div>
                                                             <div className="font-bold text-ui-black">{prod.lastPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">netto</span></div>
-                                                            <div className="text-[10px] text-ui-secondary">{(prod.lastPrice * 1.05).toFixed(2)} zł brutto / {prod.unit}</div>
+                                                            <div className="text-[10px] text-ui-black">{(prod.lastPrice * 1.05).toFixed(2)} zł brutto</div>
                                                         </div>
                                                     ) : "—"}
                                                 </td>
@@ -1020,20 +1001,8 @@ export default function ContractorDetailPage() {
                                                 <div>
                                                     <div className="font-bold text-sm text-ui-black flex flex-wrap items-center gap-2">
                                                         <span>{inv.invoiceNumber}</span>
-                                                        {inv.isSales ? (
-                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider">
-                                                                Sprzedaż
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-ui-accent/20 text-ui-accent uppercase tracking-wider">
-                                                                Zakup
-                                                            </span>
-                                                        )}
-                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ui-accent/20 text-ui-secondary">
-                                                            {inv.positionsCount} pozycji
-                                                        </span>
                                                     </div>
-                                                    <div className="text-[11px] text-ui-secondary flex items-center gap-3 mt-0.5">
+                                                    <div className="text-[11px] text-ui-black flex items-center gap-3 mt-0.5">
                                                         <span>{formatDate(inv.issuedDate)}</span>
                                                     </div>
                                                 </div>
@@ -1044,7 +1013,7 @@ export default function ContractorDetailPage() {
                                                     <div className="text-base font-black text-ui-black">
                                                         {inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                     </div>
-                                                    <div className="text-[11px] text-ui-secondary">
+                                                    <div className="text-[11px] text-ui-black">
                                                         netto: {inv.netAmount.toFixed(2)} zł | VAT: {inv.vatAmount.toFixed(2)} zł
                                                     </div>
                                                 </div>
@@ -1239,9 +1208,6 @@ export default function ContractorDetailPage() {
                                     <h3 className="text-sm font-bold text-ui-primary tracking-wider">
                                         Treść zamówienia
                                     </h3>
-                                    <span className="text-[10px] text-ui-secondary bg-ui-accent/20 px-2 py-0.5 rounded-md font-medium">
-                                        Edytowalna
-                                    </span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {customShoppingListText !== generatedShoppingListText && (

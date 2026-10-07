@@ -65,6 +65,7 @@ interface MonthlyData {
     profitMargin: number;
     isCurrentMonth: boolean;
     hasData: boolean;
+    activeDaysCount?: number;
     categoryRevenues: {
         BREAD: number;
         ROLL: number;
@@ -83,7 +84,9 @@ interface SummaryResponse {
         avgMonthlyRevenue: number;
         avgMonthlyCost: number;
         avgMonthlyProfit: number;
+        avgDailyProfit?: number;
         activeMonthsCount: number;
+        activeDaysCount?: number;
         grandBakeryRevenue: number;
         grandOtherRevenue: number;
         grandSalesInvGross: number;
@@ -131,6 +134,7 @@ interface SummaryResponse {
             source: "OPERATIONAL" | "INVOICE";
             sourceLabel: string;
             value: number;
+            monthlyValues?: number[];
             sharePercent: number;
         }>;
     };
@@ -197,8 +201,8 @@ export default function PodsumowanieTab() {
         setCustomEndMonth(`${selectedYear}-12`);
     }, [selectedYear]);
 
-    // Filtrowane dane dla wykresów w zależności od viewMode
-    const filteredChartData = useMemo(() => {
+    // Lista miesięcy odpowiadająca aktualnemu filtrowi (12M, 6M, CUSTOM, QUARTERS)
+    const filteredMonths = useMemo(() => {
         if (!data) return [];
         if (viewMode === "6M") {
             const currentMonthIdx = new Date().getMonth();
@@ -210,6 +214,28 @@ export default function PodsumowanieTab() {
             const end = customEndMonth || `${selectedYear}-12`;
             const filtered = data.monthlyData.filter((m) => m.monthKey >= start && m.monthKey <= end);
             return filtered.length > 0 ? filtered : data.monthlyData;
+        }
+        return data.monthlyData;
+    }, [data, viewMode, customStartMonth, customEndMonth, selectedYear]);
+
+    // Etykieta aktualnie wybranego zakresu
+    const currentRangeLabel = useMemo(() => {
+        if (viewMode === "12M") return `w ${selectedYear}`;
+        if (viewMode === "6M") return `(ostatnie 6 miesięcy ${selectedYear})`;
+        if (viewMode === "QUARTERS") return `w ${selectedYear} (kwartały)`;
+        if (viewMode === "CUSTOM") {
+            const startStr = customStartMonth ? `${customStartMonth.slice(5)}.${customStartMonth.slice(0, 4)}` : "";
+            const endStr = customEndMonth ? `${customEndMonth.slice(5)}.${customEndMonth.slice(0, 4)}` : "";
+            return `(${startStr} - ${endStr})`;
+        }
+        return `w ${selectedYear}`;
+    }, [viewMode, selectedYear, customStartMonth, customEndMonth]);
+
+    // Filtrowane dane dla wykresów w zależności od viewMode
+    const filteredChartData = useMemo(() => {
+        if (!data) return [];
+        if (viewMode === "6M" || viewMode === "CUSTOM") {
+            return filteredMonths;
         }
         if (viewMode === "QUARTERS") {
             // Grupowanie w kwartały Q1..Q4
@@ -236,21 +262,137 @@ export default function PodsumowanieTab() {
             });
         }
         return data.monthlyData;
-    }, [data, viewMode, customStartMonth, customEndMonth, selectedYear]);
+    }, [data, viewMode, filteredMonths]);
 
-    // Filtrowana lista kosztów do wykresu struktury
+    // Dynamiczna struktura przychodów dla wybranego zakresu
+    const filteredRevenueStructure = useMemo(() => {
+        if (!filteredMonths || filteredMonths.length === 0) return data?.revenueStructure || [];
+        const bakery = Math.round(filteredMonths.reduce((acc, m) => acc + (m.retailBakeryRevenue || 0), 0) * 100) / 100;
+        const other = Math.round(filteredMonths.reduce((acc, m) => acc + (m.retailOtherRevenue || 0), 0) * 100) / 100;
+        const salesInv = Math.round(filteredMonths.reduce((acc, m) => acc + (m.salesInvoicesGross || 0), 0) * 100) / 100;
+        const total = Math.round((bakery + other + salesInv) * 100) / 100;
+
+        return [
+            {
+                id: "bakery",
+                name: "Pieczywo i wypieki",
+                value: bakery,
+                sharePercent: total > 0 ? Math.round((bakery / total) * 1000) / 10 : 0,
+                color: "#10b981", // emerald-500
+            },
+            {
+                id: "other_retail",
+                name: "Przychody z pozostałych produktów i wczorajszego pieczywa",
+                value: other,
+                sharePercent: total > 0 ? Math.round((other / total) * 1000) / 10 : 0,
+                color: "#06b6d4", // cyan-500
+            },
+            {
+                id: "sales_invoices",
+                name: "Sprzedaż na faktury (przelewy)",
+                value: salesInv,
+                sharePercent: total > 0 ? Math.round((salesInv / total) * 1000) / 10 : 0,
+                color: "#8b5cf6", // purple-500
+            },
+        ].filter((i) => i.value > 0);
+    }, [filteredMonths, data?.revenueStructure]);
+
+    // Filtrowana lista kosztów do wykresu struktury w wybranym zakresie
     const filteredCostItems = useMemo(() => {
-        if (!data?.costStructure?.items) return [];
-        if (activeCostView === "OPERATIONAL") {
-            return data.costStructure.items.filter((i) => i.source === "OPERATIONAL");
-        }
-        if (activeCostView === "INVOICES") {
-            return data.costStructure.items.filter((i) => i.source === "INVOICE");
-        }
-        return data.costStructure.items;
-    }, [data, activeCostView]);
+        if (!data?.costStructure?.items || !filteredMonths || filteredMonths.length === 0) return [];
+        const selectedMonthIndices = new Set(filteredMonths.map((m) => m.monthIndex));
 
-    const kpis = data?.kpis;
+        const mappedItems = data.costStructure.items.map((item) => {
+            const calculatedValue = item.monthlyValues && item.monthlyValues.length > 0
+                ? Math.round(item.monthlyValues.filter((_, idx) => selectedMonthIndices.has(idx)).reduce((s, v) => s + v, 0) * 100) / 100
+                : (viewMode === "12M" ? item.value : Math.round((item.value / 12) * filteredMonths.length * 100) / 100);
+            return {
+                ...item,
+                value: calculatedValue,
+            };
+        }).filter((i) => i.value > 0);
+
+        let filteredBySource = mappedItems;
+        if (activeCostView === "OPERATIONAL") {
+            filteredBySource = mappedItems.filter((i) => i.source === "OPERATIONAL");
+        } else if (activeCostView === "INVOICES") {
+            filteredBySource = mappedItems.filter((i) => i.source === "INVOICE");
+        }
+
+        const subtotal = filteredBySource.reduce((acc, i) => acc + i.value, 0);
+
+        return filteredBySource.map((i) => ({
+            ...i,
+            sharePercent: subtotal > 0 ? Math.round((i.value / subtotal) * 1000) / 10 : 0,
+        })).sort((a, b) => b.value - a.value);
+    }, [data, filteredMonths, activeCostView, viewMode]);
+
+    // Dynamicznie przeliczane KPI w zależności od wybranego widoku
+    const activeKpis = useMemo(() => {
+        if (!data) return null;
+        if (viewMode === "12M" || viewMode === "QUARTERS") {
+            return data.kpis;
+        }
+
+        const totalRevenue = Math.round(filteredMonths.reduce((acc, m) => acc + m.totalRevenue, 0) * 100) / 100;
+        const totalCost = Math.round(filteredMonths.reduce((acc, m) => acc + m.totalCost, 0) * 100) / 100;
+        const netProfit = Math.round((totalRevenue - totalCost) * 100) / 100;
+        const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 1000) / 10 : 0;
+        const monthsWithData = filteredMonths.filter((m) => m.hasData);
+        const activeMonths = Math.max(1, monthsWithData.length);
+        const totalDays = filteredMonths.reduce((acc, m) => acc + (m.activeDaysCount || 0), 0) || activeMonths * 30;
+
+        const avgMonthlyRevenue = Math.round((totalRevenue / activeMonths) * 100) / 100;
+        const avgMonthlyCost = Math.round((totalCost / activeMonths) * 100) / 100;
+        const avgMonthlyProfit = Math.round((netProfit / activeMonths) * 100) / 100;
+        const avgDailyProfit = totalDays > 0 ? Math.round((netProfit / totalDays) * 100) / 100 : 0;
+
+        const grandBakery = Math.round(filteredMonths.reduce((acc, m) => acc + m.retailBakeryRevenue, 0) * 100) / 100;
+        const grandOther = Math.round(filteredMonths.reduce((acc, m) => acc + m.retailOtherRevenue, 0) * 100) / 100;
+        const grandSalesInv = Math.round(filteredMonths.reduce((acc, m) => acc + m.salesInvoicesGross, 0) * 100) / 100;
+        const grandOp = Math.round(filteredMonths.reduce((acc, m) => acc + m.costOperational, 0) * 100) / 100;
+        const grandCostInv = Math.round(filteredMonths.reduce((acc, m) => acc + m.costInvoicesGross, 0) * 100) / 100;
+
+        const bestMonth = monthsWithData.length > 0 ? [...monthsWithData].sort((a, b) => b.netProfit - a.netProfit)[0] : null;
+        const worstMonth = monthsWithData.length > 0 ? [...monthsWithData].sort((a, b) => a.netProfit - b.netProfit)[0] : null;
+
+        return {
+            ...data.kpis,
+            totalRevenue,
+            totalCost,
+            netProfit,
+            profitMargin,
+            avgMonthlyRevenue,
+            avgMonthlyCost,
+            avgMonthlyProfit,
+            avgDailyProfit,
+            activeMonthsCount: activeMonths,
+            activeDaysCount: totalDays,
+            grandBakeryRevenue: grandBakery,
+            grandOtherRevenue: grandOther,
+            grandSalesInvGross: grandSalesInv,
+            grandOperationalCosts: grandOp,
+            grandCostInvoicesGross: grandCostInv,
+            bestMonth: bestMonth ? {
+                monthKey: bestMonth.monthKey,
+                monthName: bestMonth.monthName,
+                netProfit: bestMonth.netProfit,
+                totalRevenue: bestMonth.totalRevenue,
+                totalCost: bestMonth.totalCost,
+                profitMargin: bestMonth.profitMargin,
+            } : null,
+            worstMonth: worstMonth ? {
+                monthKey: worstMonth.monthKey,
+                monthName: worstMonth.monthName,
+                netProfit: worstMonth.netProfit,
+                totalRevenue: worstMonth.totalRevenue,
+                totalCost: worstMonth.totalCost,
+                profitMargin: worstMonth.profitMargin,
+            } : null,
+        };
+    }, [data, viewMode, filteredMonths]);
+
+    const kpis = activeKpis;
 
     return (
         <div className="space-y-6">
@@ -372,7 +514,7 @@ export default function PodsumowanieTab() {
             {/* ---------------- STAN ŁADOWANIA I BŁĘDU ---------------- */}
             {loading && !data && (
                 <div className="flex flex-col items-center justify-center p-16 bg-white rounded-2xl border border-ui-accent/40 shadow-xs space-y-3">
-                    <Loader2 size={36} className="animate-spin text-emerald-600" />
+                    <Loader2 size={36} className="animate-spin text-ui-secondary" />
                     <p className="text-sm font-bold text-ui-secondary">Kalkulowanie zestawienia zysków i kosztów...</p>
                 </div>
             )}
@@ -404,13 +546,13 @@ export default function PodsumowanieTab() {
                                 </div>
                                 <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs font-semibold text-ui-secondary">
                                     <div className="flex justify-between">
-                                        <span>Sprzedaż w sklepie:</span>
+                                        <span>Sprzedaż detaliczna:</span>
                                         <span className="text-ui-black font-bold">
                                             {formatPLN((kpis?.grandBakeryRevenue || 0) + (kpis?.grandOtherRevenue || 0))}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Faktury B2B (sprzedaż):</span>
+                                        <span>Sprzedaż na faktury:</span>
                                         <span className="text-ui-black font-bold">
                                             {formatPLN(kpis?.grandSalesInvGross || 0)}
                                         </span>
@@ -441,7 +583,7 @@ export default function PodsumowanieTab() {
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Koszty stałe / operacyjne:</span>
+                                        <span>Koszty pozafakturowe:</span>
                                         <span className="text-ui-black font-bold">
                                             {formatPLN(kpis?.grandOperationalCosts || 0)}
                                         </span>
@@ -451,9 +593,7 @@ export default function PodsumowanieTab() {
                         </div>
 
                         {/* KARTA 3: WYNIK FINANSOWY (ZYSK NETTO / STRATA) */}
-                        <div
-                            className="bg-white p-5 rounded-2xl border border-ui-accent/40 shadow-xs hover:border-ui-secondary transition-all flex flex-col justify-between"
-                        >
+                        <div className="bg-white p-5 rounded-2xl border border-ui-accent/40 shadow-xs hover:border-ui-secondary transition-all flex flex-col justify-between">
                             <div className="flex items-center justify-between gap-2 mb-2">
                                 <span className="text-xs font-bold text-ui-secondary uppercase tracking-wider">
                                     Wynik Finansowy (Zysk)
@@ -470,11 +610,19 @@ export default function PodsumowanieTab() {
                                     {(kpis?.netProfit || 0) >= 0 ? "+" : ""}
                                     {formatPLN(kpis?.netProfit || 0)}
                                 </div>
-                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex items-center justify-between text-xs font-semibold text-ui-secondary">
-                                    <span>Średnio na miesiąc:</span>
-                                    <span className="text-ui-black font-bold">
-                                        {formatPLN(kpis?.avgMonthlyProfit || 0)}
-                                    </span>
+                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs font-semibold text-ui-secondary">
+                                    <div className="flex justify-between">
+                                        <span>Średnio na miesiąc:</span>
+                                        <span className="text-ui-black font-bold">
+                                            {formatPLN(kpis?.avgMonthlyProfit || 0)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Średnio dziennie:</span>
+                                        <span className="text-ui-black font-bold">
+                                            {formatPLN(kpis?.avgDailyProfit || 0)}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -621,7 +769,7 @@ export default function PodsumowanieTab() {
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-base font-bold text-ui-primary flex items-center gap-2">
                                         <PieIcon size={35} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
-                                        Struktura przychodów w {selectedYear}
+                                        Struktura przychodów {currentRangeLabel}
                                     </h3>
                                 </div>
                             </div>
@@ -631,7 +779,7 @@ export default function PodsumowanieTab() {
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
-                                                data={data.revenueStructure}
+                                                data={filteredRevenueStructure}
                                                 dataKey="value"
                                                 nameKey="name"
                                                 cx="50%"
@@ -640,7 +788,7 @@ export default function PodsumowanieTab() {
                                                 outerRadius={75}
                                                 paddingAngle={4}
                                             >
-                                                {data.revenueStructure.map((entry, index) => (
+                                                {filteredRevenueStructure.map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                                 ))}
                                             </Pie>
@@ -661,14 +809,14 @@ export default function PodsumowanieTab() {
                                 </div>
 
                                 <div className="space-y-2.5">
-                                    {data.revenueStructure.map((item) => (
+                                    {filteredRevenueStructure.map((item) => (
                                         <div key={item.id} className="p-2.5 bg-ui-accent/10 rounded-xl flex items-center justify-between text-xs gap-3">
                                             <div className="flex items-start gap-2 min-w-0">
                                                 <span className="w-3 h-3 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: item.color }} />
                                                 <span className="font-semibold text-ui-black break-words leading-snug text-xs">{item.name}</span>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <div className="font-bold text-ui-black">{formatCompactPLN(item.value)}</div>
+                                                <div className="font-bold text-ui-black whitespace-nowrap">{formatPLN(item.value)}</div>
                                                 <div className="text-[10px] font-semibold text-ui-secondary">{item.sharePercent}%</div>
                                             </div>
                                         </div>
@@ -683,7 +831,7 @@ export default function PodsumowanieTab() {
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-base font-bold text-ui-black mb-3 flex items-center gap-2">
                                         <PieIcon size={35} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
-                                        Struktura kosztów w {selectedYear}
+                                        Struktura kosztów {currentRangeLabel}
                                     </h3>
                                 </div>
                                 <div className="flex items-center justify-between mt-1.5">
@@ -756,7 +904,7 @@ export default function PodsumowanieTab() {
                                                 <span className="font-semibold text-ui-black break-words leading-tight text-[11px]">{item.name}</span>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <div className="font-bold text-ui-black text-[11px]">{formatCompactPLN(item.value)}</div>
+                                                <div className="font-bold text-ui-black text-[11px] whitespace-nowrap">{formatPLN(item.value)}</div>
                                                 <div className="text-[9px] font-semibold text-ui-secondary">{item.sharePercent}%</div>
                                             </div>
                                         </div>

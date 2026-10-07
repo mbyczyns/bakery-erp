@@ -296,7 +296,7 @@ export default function PowiadomieniaPage() {
                         disabled={isRefreshing || isLoading}
                         className="flex items-center justify-center gap-2 border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-semibold shadow-xs transition-all text-xs cursor-pointer disabled:opacity-50"
                     >
-                        <RotateCw size={14} className={isRefreshing ? "animate-spin text-emerald-600" : ""} />
+                        <RotateCw size={14} className={isRefreshing ? "animate-spin text-ui-secondary" : ""} />
                         <span>Odśwież</span>
                     </button>
                 </div>
@@ -386,48 +386,72 @@ export default function PowiadomieniaPage() {
             {/* ========================================================= */}
             {/* ZAKŁADKI FILTROWANIA (Przewijany pasek na telefonach)      */}
             {/* ========================================================= */}
-            <div className="flex items-center gap-1.5 sm:gap-2 border-b border-ui-accent/60 pb-3 mb-6 overflow-x-auto">
+            <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab("ALL")}
-                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "ALL"
-                        ? "bg-ui-primary text-white shadow-xs"
-                        : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "ALL"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    Wszystkie ({summary.totalCount})
+                    <span>Wszystkie</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "ALL"
+                        ? "bg-ui-secondary text-ui-white"
+                        : "bg-ui-accent/25 text-ui-primary/70"
+                        }`}>
+                        {summary.totalCount}
+                    </span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab("INVOICES")}
-                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeTab === "INVOICES"
-                        ? "bg-ui-primary text-white shadow-xs"
-                        : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "INVOICES"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    <FileText size={14} />
-                    Faktury ({summary.unmappedInvoicesCount})
+                    <FileText size={15} />
+                    <span>Faktury</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "INVOICES"
+                        ? "bg-ui-secondary text-ui-white"
+                        : "bg-ui-accent/25 text-ui-primary/70"
+                        }`}>
+                        {summary.unmappedInvoicesCount}
+                    </span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab("PRICE_INCREASES")}
-                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeTab === "PRICE_INCREASES"
-                        ? "bg-ui-primary text-white shadow-xs"
-                        : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "PRICE_INCREASES"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    <TrendingUp size={14} />
-                    Wzrosty cen ({summary.priceAlertsCount})
+                    <TrendingUp size={15} />
+                    <span>Wzrosty cen</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "PRICE_INCREASES"
+                        ? "bg-ui-secondary text-ui-white"
+                        : "bg-ui-accent/25 text-ui-primary/70"
+                        }`}>
+                        {summary.priceAlertsCount}
+                    </span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab("ORDER_REMINDERS")}
-                    className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeTab === "ORDER_REMINDERS"
-                        ? "bg-ui-primary text-white shadow-xs"
-                        : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/20"
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "ORDER_REMINDERS"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                         }`}
                 >
-                    <ShoppingCart size={14} />
-                    Zamówienia surowców ({summary.orderRemindersCount})
+                    <ShoppingCart size={15} />
+                    <span>Zamówienia surowców</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "ORDER_REMINDERS"
+                        ? "bg-ui-secondary text-ui-white"
+                        : "bg-ui-accent/25 text-ui-primary/70"
+                        }`}>
+                        {summary.orderRemindersCount}
+                    </span>
                 </button>
             </div>
 
@@ -436,7 +460,7 @@ export default function PowiadomieniaPage() {
             {/* ========================================================= */}
             {isLoading ? (
                 <div className="py-20 flex flex-col items-center justify-center text-ui-secondary gap-3">
-                    <Loader2 size={32} className="animate-spin text-emerald-600" />
+                    <Loader2 size={32} className="animate-spin text-ui-secondary" />
                     <p className="text-sm font-medium">Analizowanie powiadomień i bazy danych...</p>
                 </div>
             ) : summary.totalCount === 0 && (

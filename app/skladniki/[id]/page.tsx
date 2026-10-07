@@ -209,7 +209,7 @@ export default function SkladnikDetailPage({
         return (
             <div className="min-h-screen bg-ui-white flex items-center justify-center pb-20">
                 <div className="flex flex-col items-center gap-3 text-ui-secondary">
-                    <Loader2 size={32} className="animate-spin text-emerald-600" />
+                    <Loader2 size={32} className="animate-spin text-ui-secondary" />
                     <p className="font-medium">Analizowanie danych składnika...</p>
                 </div>
             </div>
@@ -474,12 +474,12 @@ export default function SkladnikDetailPage({
                                                             )}
                                                             <div className="flex items-center justify-between gap-4 text-ui-black mb-0.5">
                                                                 <span>Cena netto:</span>
-                                                                <span className="font-semibold text-[#265ff0]">{Number(point.priceNet ?? point.price).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">/ {data.unit}</span></span>
+                                                                <span className="font-semibold text-[#265ff0]">{Number(point.priceNet ?? point.price).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">/ {data.unit}</span></span>
                                                             </div>
                                                             {point.priceGross ? (
                                                                 <div className="flex items-center justify-between gap-4 text-ui-black mb-0.5">
                                                                     <span>Cena brutto:</span>
-                                                                    <span className="font-semibold">{Number(point.priceGross).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">/ {data.unit}</span></span>
+                                                                    <span className="font-semibold">{Number(point.priceGross).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">/ {data.unit}</span></span>
                                                                 </div>
                                                             ) : null}
                                                             {point.quantity ? (
@@ -790,9 +790,6 @@ export default function SkladnikDetailPage({
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary">
                                         Pozycje na fakturze ({selectedInvoice.positions?.length || 0})
                                     </h3>
-                                    <span className="text-[11px] text-ui-secondary">
-                                        Podgląd dla składnika: <strong className="text-ui-black">{data.name}</strong>
-                                    </span>
                                 </div>
 
                                 <div className="border border-ui-accent rounded-xl overflow-hidden shadow-2xs">
@@ -831,13 +828,13 @@ export default function SkladnikDetailPage({
                                                                     {pos.quantity} {pos.unit || "szt"}
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                                                    <div className="font-medium text-ui-black">{Number(pos.netPrice || 0).toFixed(2)} zł <span className="text-[10px] text-ui-secondary">netto</span></div>
-                                                                    <div className="text-[10px] text-ui-secondary">{(Number(pos.netPrice || 0) * (1 + (parseFloat(pos.vatRate || "5") || 5) / 100)).toFixed(2)} zł brutto</div>
+                                                                    <div className="font-medium text-ui-black">{Number(pos.netPrice || 0).toFixed(2)} zł <span className="text-[10px] text-ui-black">netto</span></div>
+                                                                    <div className="text-[10px] text-ui-black">{(Number(pos.netPrice || 0) * (1 + (parseFloat(pos.vatRate || "5") || 5) / 100)).toFixed(2)} zł brutto</div>
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-right font-medium text-ui-black whitespace-nowrap">
                                                                     {Number(pos.netAmount || (Number(pos.quantity || 0) * Number(pos.netPrice || 0))).toFixed(2)} zł
                                                                 </td>
-                                                                <td className="py-2.5 px-3 text-center text-ui-secondary whitespace-nowrap">
+                                                                <td className="py-2.5 px-3 text-center text-ui-black whitespace-nowrap">
                                                                     {pos.vatRate ? `${pos.vatRate}%` : "—"}
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-right font-black text-ui-primary whitespace-nowrap">
@@ -862,9 +859,6 @@ export default function SkladnikDetailPage({
 
                         {/* Stopka modalu */}
                         <div className="p-3.5 px-5 border-t border-ui-accent bg-ui-accent/10 flex items-center justify-between shrink-0">
-                            <div className="text-xs text-ui-secondary font-mono truncate max-w-md">
-                                {selectedInvoice.ksefNumber ? `KSeF: ${selectedInvoice.ksefNumber}` : "Faktura wprowadzona ręcznie"}
-                            </div>
                             <button
                                 type="button"
                                 onClick={() => setSelectedInvoice(null)}

@@ -569,18 +569,21 @@ export default function FakturyPage() {
 
             {/* ZAKŁADKI STATUSÓW (Tylko dla faktur Kosztowych - przewijane poziomo na mobile) */}
             {invoiceDirection === "COST" && (
-                <div className="flex border-b border-ui-accent mb-6 gap-1.5 sm:gap-2 overflow-x-auto pb-0.5">
+                <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
                     <button
                         onClick={() => setActiveTab("WAITING")}
-                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "WAITING"
-                            ? "border-ui-accent text-ui-primary bg-ui-accent/20 rounded-t-xl font-bold"
-                            : "border-transparent text-ui-secondary hover:text-ui-primary"
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "WAITING"
+                            ? "border-ui-secondary text-ui-secondary font-bold"
+                            : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                             }`}
                     >
                         <Clock size={15} />
-                        Do weryfikacji
+                        <span>Do weryfikacji</span>
                         {waitingCount > 0 && (
-                            <span className="bg-ui-accent/30 text-ui-primary text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "WAITING"
+                                ? "bg-ui-secondary text-ui-white"
+                                : "bg-ui-accent/25 text-ui-primary/70"
+                                }`}>
                                 {waitingCount}
                             </span>
                         )}
@@ -588,28 +591,34 @@ export default function FakturyPage() {
 
                     <button
                         onClick={() => setActiveTab("IMPORTED")}
-                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "IMPORTED"
-                            ? "border-emerald-600 text-emerald-800 bg-emerald-50/50 rounded-t-xl font-bold"
-                            : "border-transparent text-ui-secondary hover:text-ui-primary"
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "IMPORTED"
+                            ? "border-ui-secondary text-ui-secondary font-bold"
+                            : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                             }`}
                     >
                         <CheckCircle2 size={15} />
-                        Zaakceptowane
-                        <span className="bg-ui-accent/30 text-ui-primary text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
+                        <span>Zaakceptowane</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "IMPORTED"
+                            ? "bg-ui-secondary text-ui-white"
+                            : "bg-ui-accent/25 text-ui-primary/70"
+                            }`}>
                             {importedCount}
                         </span>
                     </button>
 
                     <button
                         onClick={() => setActiveTab("REJECTED")}
-                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${activeTab === "REJECTED"
-                            ? "border-rose-500 text-rose-700 bg-rose-50/50 rounded-t-xl font-bold"
-                            : "border-transparent text-ui-secondary hover:text-ui-primary"
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "REJECTED"
+                            ? "border-ui-secondary text-ui-secondary font-bold"
+                            : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                             }`}
                     >
                         <XCircle size={15} />
-                        Odrzucone
-                        <span className="bg-ui-accent/30 text-ui-primary text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
+                        <span>Odrzucone</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${activeTab === "REJECTED"
+                            ? "bg-ui-secondary text-ui-white"
+                            : "bg-ui-accent/25 text-ui-primary/70"
+                            }`}>
                             {rejectedCount}
                         </span>
                     </button>
@@ -646,7 +655,7 @@ export default function FakturyPage() {
                                 <tr>
                                     <td colSpan={5} className="p-12 text-center text-ui-secondary text-sm">
                                         <div className="flex items-center justify-center gap-2">
-                                            <Loader2 size={20} className="animate-spin" />
+                                            <Loader2 size={20} className="animate-spin text-ui-secondary" />
                                             Ładowanie listy faktur z bazy danych...
                                         </div>
                                     </td>
@@ -726,7 +735,7 @@ export default function FakturyPage() {
                                                         <button
                                                             onClick={() => loadInvoiceDetails(doc, "VERIFY")}
                                                             disabled={isThisLoading}
-                                                            className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-60"
+                                                            className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                                                             title="Edytuj mapowanie"
                                                         >
                                                             {isThisLoading ? <Loader2 size={14} className="animate-spin" /> : <Edit2 size={14} />}
@@ -782,150 +791,156 @@ export default function FakturyPage() {
 
             {/* MODALE POZOSTAJĄ BEZ ZMIAN */}
 
-            {verifyingDoc && (
-                <VerificationModal
-                    doc={verifyingDoc}
-                    categories={categories}
-                    ingredients={ingredients}
-                    onClose={() => setVerifyingDoc(null)}
-                    onSuccess={async () => {
-                        setVerifyingDoc(null);
-                        await fetchInvoices();
-                    }}
-                    onRefreshDictionaries={fetchDictionaries}
-                />
-            )}
+            {
+                verifyingDoc && (
+                    <VerificationModal
+                        doc={verifyingDoc}
+                        categories={categories}
+                        ingredients={ingredients}
+                        onClose={() => setVerifyingDoc(null)}
+                        onSuccess={async () => {
+                            setVerifyingDoc(null);
+                            await fetchInvoices();
+                        }}
+                        onRefreshDictionaries={fetchDictionaries}
+                    />
+                )
+            }
 
-            {isManualModalOpen && (
-                <ManualInvoiceModal
-                    categories={categories}
-                    ingredients={ingredients}
-                    contractors={contractors}
-                    onClose={() => setIsManualModalOpen(false)}
-                    onSuccess={async () => {
-                        setIsManualModalOpen(false);
-                        await fetchInvoices();
-                    }}
-                    onRefreshDictionaries={fetchDictionaries}
-                />
-            )}
+            {
+                isManualModalOpen && (
+                    <ManualInvoiceModal
+                        categories={categories}
+                        ingredients={ingredients}
+                        contractors={contractors}
+                        onClose={() => setIsManualModalOpen(false)}
+                        onSuccess={async () => {
+                            setIsManualModalOpen(false);
+                            await fetchInvoices();
+                        }}
+                        onRefreshDictionaries={fetchDictionaries}
+                    />
+                )
+            }
 
             {/* Uniwersalny View Modal - obsługuje poprawnie zarówno kosztowe jak i sprzedażowe */}
-            {selectedDoc && (
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in"
-                    onClick={() => setSelectedDoc(null)}
-                >
+            {
+                selectedDoc && (
                     <div
-                        className="bg-ui-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl border border-ui-accent flex flex-col relative overflow-hidden"
-                        onClick={(e) => e.stopPropagation()}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in"
+                        onClick={() => setSelectedDoc(null)}
                     >
-                        <div className="border-b border-ui-accent p-5 flex items-start justify-between bg-ui-white rounded-t-2xl shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold text-ui-primary flex items-center gap-2">
-                                    {selectedDoc.docNumber}
-                                    {selectedDoc.isSales && (
-                                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md uppercase tracking-wider">Sprzedaż</span>
-                                    )}
-                                </h2>
-                                <p className="text-xs text-ui-secondary mt-1">{selectedDoc.contractorName}</p>
-                            </div>
-                            <button onClick={() => setSelectedDoc(null)} className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors cursor-pointer">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-6 text-sm flex-1 bg-ui-white rounded-b-2xl overflow-y-auto min-h-0">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-ui-accent/10 p-4 rounded-xl border border-ui-accent/40">
+                        <div
+                            className="bg-ui-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl border border-ui-accent flex flex-col relative overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="border-b border-ui-accent p-5 flex items-start justify-between bg-ui-white rounded-t-2xl shrink-0">
                                 <div>
-                                    <span className="text-xs text-ui-secondary font-bold block">Data wystawienia:</span>
-                                    <span className="text-ui-primary font-medium">{formatDate(selectedDoc.issueDate)}</span>
+                                    <h2 className="text-xl font-bold text-ui-primary flex items-center gap-2">
+                                        {selectedDoc.docNumber}
+                                        {selectedDoc.isSales && (
+                                            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md uppercase tracking-wider">Sprzedaż</span>
+                                        )}
+                                    </h2>
+                                    <p className="text-xs text-ui-secondary mt-1">{selectedDoc.contractorName}</p>
                                 </div>
-                                <div>
-                                    <span className="text-xs text-ui-secondary font-bold block">Wartość Netto:</span>
-                                    <span className="text-ui-primary">{Number(selectedDoc.netAmount || 0).toFixed(2)} zł</span>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-ui-secondary font-bold block">Wartość Brutto:</span>
-                                    <span className="font-bold text-ui-primary">{Number(selectedDoc.grossAmount || 0).toFixed(2)} zł</span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary mb-3">
-                                    Pozycje na fakturze ({selectedDoc.positions?.length || 0})
-                                </h3>
-                                <div className="border border-ui-accent rounded-xl overflow-hidden">
-                                    <table className="w-full text-left text-xs">
-                                        <thead>
-                                            <tr className="bg-ui-accent/20 text-ui-secondary font-bold uppercase border-b border-ui-accent">
-                                                <th className="p-3 text-left">Nazwa artykułu</th>
-                                                <th className="p-3 text-center whitespace-nowrap w-auto">Ilość</th>
-                                                <th className="p-3 text-right whitespace-nowrap">Cena</th>
-                                                <th className="p-3 text-right">Wartość Brutto</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-ui-accent/40">
-                                            {selectedDoc.positions?.map((pos) => {
-                                                const netPrice = Number(pos.netPrice || 0);
-                                                const vatRate = parseFloat(pos.vatRate || "5") || 5;
-                                                const grossPrice = netPrice > 0 ? netPrice * (1 + vatRate / 100) : (pos.quantity ? Number(pos.grossAmount || 0) / pos.quantity : 0);
-                                                return (
-                                                    <tr key={pos.id} className="hover:bg-ui-accent/5">
-                                                        <td className="p-3 font-semibold text-ui-black text-left">{pos.name}</td>
-                                                        <td className="p-3 text-center font-bold text-ui-primary whitespace-nowrap">
-                                                            {pos.quantity} {pos.unit}
-                                                        </td>
-                                                        <td className="p-3 text-right whitespace-nowrap">
-                                                            {netPrice > 0 ? (
-                                                                <div>
-                                                                    <div className="font-semibold text-ui-black">
-                                                                        {netPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">netto</span>
-                                                                    </div>
-                                                                    <div className="text-[10px] text-ui-secondary font-medium">
-                                                                        {grossPrice.toFixed(2)} zł brutto
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-ui-secondary">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-3 text-right font-bold text-ui-black">{Number(pos.grossAmount || 0).toFixed(2)} zł</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        {selectedDoc.status === "REJECTED" && (
-                            <div className="px-6 py-4 border-t border-ui-accent flex justify-end items-center bg-ui-white rounded-b-2xl shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => handleRestoreInvoice(selectedDoc.id)}
-                                    disabled={restoringDocId === selectedDoc.id}
-                                    className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                                >
-                                    {restoringDocId === selectedDoc.id ? (
-                                        <>
-                                            <Loader2 size={15} className="animate-spin" />
-                                            Przywracam...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <RotateCcw size={15} />
-                                            Przywróć do weryfikacji
-                                        </>
-                                    )}
+                                <button onClick={() => setSelectedDoc(null)} className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors cursor-pointer">
+                                    <X size={20} />
                                 </button>
                             </div>
-                        )}
+
+                            <div className="p-6 space-y-6 text-sm flex-1 bg-ui-white rounded-b-2xl overflow-y-auto min-h-0">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-ui-accent/10 p-4 rounded-xl border border-ui-accent/40">
+                                    <div>
+                                        <span className="text-xs text-ui-secondary font-bold block">Data wystawienia:</span>
+                                        <span className="text-ui-primary font-medium">{formatDate(selectedDoc.issueDate)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-ui-secondary font-bold block">Wartość Netto:</span>
+                                        <span className="text-ui-primary">{Number(selectedDoc.netAmount || 0).toFixed(2)} zł</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-ui-secondary font-bold block">Wartość Brutto:</span>
+                                        <span className="font-bold text-ui-primary">{Number(selectedDoc.grossAmount || 0).toFixed(2)} zł</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary mb-3">
+                                        Pozycje na fakturze ({selectedDoc.positions?.length || 0})
+                                    </h3>
+                                    <div className="border border-ui-accent rounded-xl overflow-hidden">
+                                        <table className="w-full text-left text-xs">
+                                            <thead>
+                                                <tr className="bg-ui-accent/20 text-ui-secondary font-bold uppercase border-b border-ui-accent">
+                                                    <th className="p-3 text-left">Nazwa artykułu</th>
+                                                    <th className="p-3 text-center whitespace-nowrap w-auto">Ilość</th>
+                                                    <th className="p-3 text-right whitespace-nowrap">Cena</th>
+                                                    <th className="p-3 text-right">Wartość Brutto</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-ui-accent/40">
+                                                {selectedDoc.positions?.map((pos) => {
+                                                    const netPrice = Number(pos.netPrice || 0);
+                                                    const vatRate = parseFloat(pos.vatRate || "5") || 5;
+                                                    const grossPrice = netPrice > 0 ? netPrice * (1 + vatRate / 100) : (pos.quantity ? Number(pos.grossAmount || 0) / pos.quantity : 0);
+                                                    return (
+                                                        <tr key={pos.id} className="hover:bg-ui-accent/5">
+                                                            <td className="p-3 font-semibold text-ui-black text-left">{pos.name}</td>
+                                                            <td className="p-3 text-center font-bold text-ui-primary whitespace-nowrap">
+                                                                {pos.quantity} {pos.unit}
+                                                            </td>
+                                                            <td className="p-3 text-right whitespace-nowrap">
+                                                                {netPrice > 0 ? (
+                                                                    <div>
+                                                                        <div className="font-semibold text-ui-black">
+                                                                            {netPrice.toFixed(2)} zł <span className="text-[10px] font-semibold text-ui-black">netto</span>
+                                                                        </div>
+                                                                        <div className="text-[10px] text-ui-secondary font-medium">
+                                                                            {grossPrice.toFixed(2)} zł brutto
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-ui-secondary">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3 text-right font-bold text-ui-black">{Number(pos.grossAmount || 0).toFixed(2)} zł</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {selectedDoc.status === "REJECTED" && (
+                                <div className="px-6 py-4 border-t border-ui-accent flex justify-end items-center bg-ui-white rounded-b-2xl shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRestoreInvoice(selectedDoc.id)}
+                                        disabled={restoringDocId === selectedDoc.id}
+                                        className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                        {restoringDocId === selectedDoc.id ? (
+                                            <>
+                                                <Loader2 size={15} className="animate-spin" />
+                                                Przywracam...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <RotateCcw size={15} />
+                                                Przywróć do weryfikacji
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 
@@ -1157,8 +1172,8 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                     KSeF: {doc.docNumber}
                                 </span>
                                 {doc.issueDate && (
-                                    <span className="text-xs text-ui-secondary">
-                                        • Data wystawienia: <b className="text-ui-black font-semibold">{formatDate(doc.issueDate)}</b>
+                                    <span className="text-xs text-ui-black">
+                                        Data wystawienia: <b className="text-ui-black font-semibold">{formatDate(doc.issueDate)}</b>
                                     </span>
                                 )}
                             </div>
@@ -1166,7 +1181,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
-                            <div className="text-[10px] font-bold text-ui-secondary uppercase tracking-wider">
+                            <div className="text-[10px] font-bold text-ui-black uppercase tracking-wider">
                                 {doc.status === "IMPORTED" ? "Edycja Mapowania" : "Do zapłaty (Brutto)"}
                             </div>
                             <div className="text-3xl font-black text-ui-black mt-0.5">{Number(doc.grossAmount || 0).toFixed(2)} zł</div>
@@ -1252,9 +1267,9 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                 {netPrice > 0 ? (
                                                     <div>
                                                         <div className="font-bold text-ui-black">
-                                                            {netPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">netto</span>
+                                                            {netPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">netto</span>
                                                         </div>
-                                                        <div className="text-[10px] text-ui-secondary font-medium">
+                                                        <div className="text-[10px] text-ui-black font-medium">
                                                             {grossPrice.toFixed(2)} zł brutto
                                                         </div>
                                                     </div>
@@ -1871,8 +1886,8 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                         disabled={isSubmitting}
                         className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
                     >
-                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                        Dodaj
+                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                        Zapisz
                     </button>
                 </div>
             </div>

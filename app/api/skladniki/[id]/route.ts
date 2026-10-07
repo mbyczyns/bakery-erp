@@ -316,11 +316,12 @@ export async function GET(
             const prodType = rec.bakeryProduct.type;
 
             for (const prod of rec.bakeryProduct.productions) {
-                if (!prod.producedAmount || prod.producedAmount <= 0) continue;
+                const producedUnits = Number(prod.producedAmount || 0);
+                if (producedUnits <= 0) continue;
                 const prodDate = new Date(prod.date);
                 const daily = getOrCreateDaily(prodDate);
 
-                const consumed = prod.producedAmount * amountPerUnit;
+                const consumed = producedUnits * amountPerUnit;
                 daily.totalConsumed += consumed;
 
                 let pUsage = daily.productsMap.get(prodId);
@@ -329,7 +330,7 @@ export async function GET(
                         productId: prodId,
                         productName: prodName,
                         productType: prodType,
-                        producedUnits: prod.producedAmount,
+                        producedUnits: producedUnits,
                         consumedAmount: 0,
                         isDirect: true,
                         isSemiFinished: false,
@@ -365,11 +366,12 @@ export async function GET(
                 const prodType = rec.bakeryProduct.type;
 
                 for (const prod of rec.bakeryProduct.productions) {
-                    if (!prod.producedAmount || prod.producedAmount <= 0) continue;
+                    const producedUnits = Number(prod.producedAmount || 0);
+                    if (producedUnits <= 0) continue;
                     const prodDate = new Date(prod.date);
                     const daily = getOrCreateDaily(prodDate);
 
-                    const consumed = prod.producedAmount * multiplier;
+                    const consumed = producedUnits * multiplier;
                     daily.totalConsumed += consumed;
 
                     let pUsage = daily.productsMap.get(prodId);
@@ -378,7 +380,7 @@ export async function GET(
                             productId: prodId,
                             productName: prodName,
                             productType: prodType,
-                            producedUnits: prod.producedAmount,
+                            producedUnits: producedUnits,
                             consumedAmount: 0,
                             isDirect: false,
                             isSemiFinished: true,
@@ -403,7 +405,7 @@ export async function GET(
         // C. Zakupy przypisane do dni
         for (const pos of allPositions) {
             const daily = getOrCreateDaily(pos.rawDate);
-            daily.totalPurchased += pos.quantity;
+            daily.totalPurchased += Number(pos.quantity || 0);
         }
 
         // Przekształcamy dzienną mapę w tablicę posortowaną chronologicznie malejąco (najnowsze na początku)
@@ -418,15 +420,15 @@ export async function GET(
                 productId: p.productId,
                 productName: p.productName,
                 productType: p.productType,
-                producedUnits: p.producedUnits,
-                consumedAmount: Math.round(p.consumedAmount * 100) / 100,
+                producedUnits: Math.round(Number(p.producedUnits || 0)),
+                consumedAmount: Math.round(Number(p.consumedAmount || 0) * 100) / 100,
                 isDirect: p.isDirect,
                 isSemiFinished: p.isSemiFinished,
                 details: p.details.map((dt) => ({
                     type: dt.type,
                     semiFinishedName: dt.semiFinishedName || null,
-                    amountPerUnit: Math.round(dt.amountPerUnit * 1000) / 1000,
-                    consumed: Math.round(dt.consumed * 100) / 100,
+                    amountPerUnit: Math.round(Number(dt.amountPerUnit || 0) * 1000) / 1000,
+                    consumed: Math.round(Number(dt.consumed || 0) * 100) / 100,
                 })),
             })).sort((a, b) => b.consumedAmount - a.consumedAmount),
         }));
@@ -538,7 +540,8 @@ export async function GET(
             daysWithProduction: w.daysWithProduction,
             products: Array.from(w.productsMap.values()).map((p) => ({
                 ...p,
-                consumedAmount: Math.round(p.consumedAmount * 100) / 100,
+                producedUnits: Math.round(Number(p.producedUnits || 0)),
+                consumedAmount: Math.round(Number(p.consumedAmount || 0) * 100) / 100,
             })).sort((a, b) => b.consumedAmount - a.consumedAmount),
         }));
         weeklyHistory.sort((a, b) => b.mondayDate.getTime() - a.mondayDate.getTime());
@@ -599,8 +602,8 @@ export async function GET(
                     };
                     m.productsMap.set(p.productId, mp);
                 }
-                mp.producedUnits += p.producedUnits;
-                mp.consumedAmount += p.consumedAmount;
+                mp.producedUnits += Number(p.producedUnits || 0);
+                mp.consumedAmount += Number(p.consumedAmount || 0);
             }
         }
 
@@ -621,7 +624,8 @@ export async function GET(
             daysWithProduction: m.daysWithProduction,
             products: Array.from(m.productsMap.values()).map((p) => ({
                 ...p,
-                consumedAmount: Math.round(p.consumedAmount * 100) / 100,
+                producedUnits: Math.round(Number(p.producedUnits || 0)),
+                consumedAmount: Math.round(Number(p.consumedAmount || 0) * 100) / 100,
             })).sort((a, b) => b.consumedAmount - a.consumedAmount),
         }));
         monthlyHistory.sort((a, b) => b.monthDate.getTime() - a.monthDate.getTime());
@@ -659,15 +663,16 @@ export async function GET(
                     if (p.isDirect) pr.isDirect = true;
                     if (p.isSemiFinished) pr.isSemiFinished = true;
                 }
-                pr.totalConsumed += p.consumedAmount;
-                pr.totalProducedUnits += p.producedUnits;
-                grandTotalConsumed += p.consumedAmount;
+                pr.totalConsumed += Number(p.consumedAmount || 0);
+                pr.totalProducedUnits += Number(p.producedUnits || 0);
+                grandTotalConsumed += Number(p.consumedAmount || 0);
             }
         }
 
         const productRanking = Array.from(productRankingMap.values())
             .map((pr) => ({
                 ...pr,
+                totalProducedUnits: Math.round(Number(pr.totalProducedUnits || 0)),
                 totalConsumed: Math.round(pr.totalConsumed * 100) / 100,
                 percentage: grandTotalConsumed > 0 ? Math.round((pr.totalConsumed / grandTotalConsumed) * 1000) / 10 : 0,
             }))

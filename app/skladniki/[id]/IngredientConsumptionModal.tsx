@@ -199,7 +199,7 @@ export default function IngredientConsumptionModal({
 
     // --- FILTROWANIE DANYCH DZIENNYCH ---
     const filteredDailyData = useMemo(() => {
-        let list = [...dailyHistory];
+        let list = dailyHistory.filter((d) => d.totalConsumed > 0);
 
         if (dailyCustomRange) {
             list = list.filter(
@@ -221,7 +221,7 @@ export default function IngredientConsumptionModal({
                         products: matchedProds,
                     };
                 })
-                .filter((d) => d.totalConsumed > 0 || d.totalPurchased > 0);
+                .filter((d) => d.totalConsumed > 0);
         }
 
         if (searchQuery.trim()) {
@@ -414,7 +414,7 @@ export default function IngredientConsumptionModal({
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ---------------- NAGŁÓWEK MODALU ---------------- */}
-                <div className="px-6 py-5 border-b border-ui-accent/30 flex items-center justify-between">
+                <div className="px-6 py-5 border-b border-ui-accent/30 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3.5">
                         <div className="p-2.5 bg-ui-secondary/20 rounded-xl text-ui-secondary shadow-sm">
                             <Scale size={24} />
@@ -430,8 +430,6 @@ export default function IngredientConsumptionModal({
                             </div>
                             <p className="text-xs text-ui-secondary font-medium mt-0.5 flex items-center gap-2">
                                 <span className="text-ui-primary font-bold">{ingredientName}</span>
-                                <span>•</span>
-                                Kategoria: <span className="font-semibold text-ui-primary">{type}</span>
                             </p>
                         </div>
                     </div>
@@ -446,58 +444,64 @@ export default function IngredientConsumptionModal({
                 </div>
 
                 {/* ---------------- PRZEŁĄCZNIK WIDOKÓW (TABS) ---------------- */}
-                <div className="px-6 py-3 border-b border-ui-accent/20 bg-ui-white flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 p-1 bg-ui-accent/10 rounded-2xl border border-ui-accent/30">
+                <div className="px-6 border-b border-ui-accent bg-ui-white flex items-center justify-between gap-4 shrink-0 overflow-x-auto">
+                    <div className="flex gap-1.5 sm:gap-2 -mb-px">
                         <button
                             onClick={() => setView("DAILY")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "DAILY"
-                                ? "bg-ui-primary text-ui-white shadow-sm"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${view === "DAILY"
+                                ? "border-ui-secondary text-ui-secondary font-bold"
+                                : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >
-                            <Calendar size={14} />
-                            Dzienne
+                            <Calendar size={15} />
+                            <span>Dzienne</span>
                         </button>
                         <button
                             onClick={() => setView("WEEKLY")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "WEEKLY"
-                                ? "bg-ui-primary text-ui-white shadow-sm"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${view === "WEEKLY"
+                                ? "border-ui-secondary text-ui-secondary font-bold"
+                                : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >
-                            <BarChart3 size={14} />
-                            Tygodniowe
+                            <BarChart3 size={15} />
+                            <span>Tygodniowe</span>
                         </button>
                         <button
                             onClick={() => setView("MONTHLY")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "MONTHLY"
-                                ? "bg-ui-primary text-ui-white shadow-sm"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${view === "MONTHLY"
+                                ? "border-ui-secondary text-ui-secondary font-bold"
+                                : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >
-                            <CalendarDays size={14} />
-                            Miesięczne
+                            <CalendarDays size={15} />
+                            <span>Miesięczne</span>
                         </button>
                         <button
                             onClick={() => setView("PRODUCTS")}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${view === "PRODUCTS"
-                                ? "bg-ui-primary text-ui-white shadow-sm"
-                                : "text-ui-secondary hover:text-ui-primary"
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${view === "PRODUCTS"
+                                ? "border-ui-secondary text-ui-secondary font-bold"
+                                : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >
-                            <Wheat size={14} />
-                            Wyroby ({productRanking.length})
+                            <Wheat size={15} />
+                            <span>Wyroby</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${view === "PRODUCTS"
+                                ? "bg-ui-secondary text-ui-white"
+                                : "bg-ui-accent/25 text-ui-primary/70"
+                                }`}>
+                                {productRanking.length}
+                            </span>
                         </button>
                     </div>
 
                     {/* Filtr wg konkretnego produktu oraz szukajka */}
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        {availableProducts.length > 1 && view !== "PRODUCTS" && (
+                    {availableProducts.length > 1 && view !== "PRODUCTS" && (
+                        <div className="flex items-center py-2 shrink-0">
                             <div className="relative">
                                 <select
                                     value={selectedProductFilter}
                                     onChange={(e) => setSelectedProductFilter(e.target.value)}
-                                    className="text-xs font-semibold pl-2.5 pr-7 py-1.5 rounded-xl border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary cursor-pointer appearance-none"
+                                    className="text-xs font-semibold pl-2.5 pr-7 py-1.5 rounded-xl border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary cursor-pointer appearance-none shadow-2xs"
                                 >
                                     <option value="ALL">Wszystkie wyroby</option>
                                     {availableProducts.map((p) => (
@@ -508,8 +512,8 @@ export default function IngredientConsumptionModal({
                                 </select>
                                 <ChevronDown size={12} className="absolute right-2 top-2.5 text-ui-secondary pointer-events-none" />
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ---------------- ZAWARTOŚĆ GŁÓWNA ---------------- */}
@@ -563,7 +567,7 @@ export default function IngredientConsumptionModal({
                                                 if (startStr && endStr) {
                                                     return (
                                                         <>
-                                                            <span>Zakres: <b>{startStr}</b> do <b>{endStr}</b></span>
+                                                            <span><b>{startStr}</b> - <b>{endStr}</b></span>
                                                             <span className="text-[10px] bg-ui-accent/30 text-ui-primary font-bold px-2 py-0.5 rounded-full">
                                                                 {count} {view === "DAILY" ? (count === 1 ? "dzień" : count < 5 ? "dni" : "dni") : view === "WEEKLY" ? (count === 1 ? "tydzień" : count < 5 ? "tygodnie" : "tygodni") : (count === 1 ? "miesiąc" : count < 5 ? "miesiące" : "miesięcy")}
                                                             </span>
@@ -904,7 +908,7 @@ export default function IngredientConsumptionModal({
                         <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                    <BarChart3 size={15} className="text-ui-secondary" />
+                                    <BarChart3 size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                     {view === "DAILY" && "Zużycie dzienne w czasie"}
                                     {view === "WEEKLY" && "Zużycie tygodniowe w czasie"}
                                     {view === "MONTHLY" && "Zużycie miesięczne vs Zakupy"}
@@ -946,14 +950,6 @@ export default function IngredientConsumptionModal({
                                                             <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2">
                                                                 {tooltipTitle}
                                                             </div>
-                                                            {dataPoint.purchased > 0 && (
-                                                                <div className="flex items-center justify-between text-ui-primary font-bold mb-1">
-                                                                    <span>Zakupiono:</span>
-                                                                    <span className="font-semibold">
-                                                                        {dataPoint.purchased} {unit}
-                                                                    </span>
-                                                                </div>
-                                                            )}
                                                             <div className="flex items-center justify-between text-emerald-700 font-semibold mb-1">
                                                                 <span>Zużyto:</span>
                                                                 <span className="font-bold">
@@ -1008,11 +1004,8 @@ export default function IngredientConsumptionModal({
                         <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
                             <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                    <Calendar size={14} /> Dzienny rejestr zużycia
+                                    <Calendar size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Dzienny rejestr zużycia
                                 </h3>
-                                <span className="text-[11px] font-semibold text-ui-secondary">
-                                    {filteredDailyData.length} pozycji
-                                </span>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -1023,7 +1016,6 @@ export default function IngredientConsumptionModal({
                                             <th className="p-3.5">Dzień</th>
                                             <th className="p-3.5 text-right">Zużycie ({unit})</th>
                                             <th className="p-3.5 text-center">Wypieki (liczba wyrobów)</th>
-                                            <th className="p-3.5 text-right">Dostawy ({unit})</th>
                                             <th className="p-3.5 text-center w-10">Szczegóły</th>
                                         </tr>
                                     </thead>
@@ -1053,18 +1045,17 @@ export default function IngredientConsumptionModal({
                                                                     {d.products.length} {d.products.length === 1 ? "wyrób" : "wyrobów"}
                                                                 </span>
                                                             </td>
-                                                            <td className="p-3.5 text-right text-ui-primary">
-                                                                {d.totalPurchased > 0 ? `${d.totalPurchased.toFixed(2)} ${unit}` : "-"}
-                                                            </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
-                                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                                <div className="flex items-center justify-center">
+                                                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                                </div>
                                                             </td>
                                                         </tr>
 
                                                         {/* ROZWINIĘCIE WIERSZA ZE SZCZEGÓŁAMI WYROBÓW */}
                                                         {isExpanded && (
                                                             <tr className="bg-emerald-50/20">
-                                                                <td colSpan={6} className="p-4 border-b border-ui-accent/30">
+                                                                <td colSpan={5} className="p-4 border-b border-ui-accent/30">
                                                                     <div className="space-y-2">
                                                                         <div className="text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
                                                                             Rozbicie zużycia na wyroby w dniu {formatDate(d.date)}:
@@ -1083,11 +1074,6 @@ export default function IngredientConsumptionModal({
                                                                                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-ui-accent/15 text-ui-secondary">
                                                                                                 {prod.producedUnits} szt.
                                                                                             </span>
-                                                                                        </div>
-                                                                                        <div className="text-[10px] text-ui-secondary mt-0.5">
-                                                                                            {prod.isDirect && !prod.isSemiFinished && "Receptura bezpośrednia"}
-                                                                                            {prod.isSemiFinished && !prod.isDirect && "Przez półprodukt / zaczyn"}
-                                                                                            {prod.isDirect && prod.isSemiFinished && "Bezpośrednio + półprodukt"}
                                                                                         </div>
                                                                                     </div>
                                                                                     <div className="mt-2 pt-1 border-t border-ui-accent/20 flex items-center justify-between text-xs">
@@ -1108,7 +1094,7 @@ export default function IngredientConsumptionModal({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={6} className="p-8 text-center text-ui-secondary italic">
+                                                <td colSpan={5} className="p-8 text-center text-ui-secondary italic">
                                                     Brak danych o zużyciu w wybranym okresie
                                                 </td>
                                             </tr>
@@ -1124,7 +1110,7 @@ export default function IngredientConsumptionModal({
                         <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
                             <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                    <BarChart3 size={14} /> Tygodniowy rejestr zużycia
+                                    <BarChart3 size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Tygodniowy rejestr zużycia
                                 </h3>
                                 <span className="text-[11px] font-semibold text-ui-secondary">
                                     {filteredWeeklyData.length} tygodni
@@ -1139,7 +1125,6 @@ export default function IngredientConsumptionModal({
                                             <th className="p-3.5 text-center">Dni produkcji</th>
                                             <th className="p-3.5 text-right">Łączne zużycie ({unit})</th>
                                             <th className="p-3.5 text-right">Średnia dzienna ({unit}/d)</th>
-                                            <th className="p-3.5 text-right">Zakupy ({unit})</th>
                                             <th className="p-3.5 text-center w-10">Szczegóły</th>
                                         </tr>
                                     </thead>
@@ -1171,17 +1156,16 @@ export default function IngredientConsumptionModal({
                                                             <td className="p-3.5 text-right font-bold text-ui-primary">
                                                                 {w.avgDailyConsumed.toFixed(2)} {unit}
                                                             </td>
-                                                            <td className="p-3.5 text-right font-semibold text-ui-primary">
-                                                                {w.totalPurchased > 0 ? `${w.totalPurchased.toFixed(2)} ${unit}` : "-"}
-                                                            </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
-                                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                                <div className="flex items-center justify-center">
+                                                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                                </div>
                                                             </td>
                                                         </tr>
 
                                                         {isExpanded && (
                                                             <tr className="bg-emerald-50/20">
-                                                                <td colSpan={6} className="p-4 border-b border-ui-accent/30">
+                                                                <td colSpan={5} className="p-4 border-b border-ui-accent/30">
                                                                     <div className="space-y-2">
                                                                         <div className="text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
                                                                             Wyroby wypiekane w tym tygodniu:
@@ -1217,7 +1201,7 @@ export default function IngredientConsumptionModal({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={6} className="p-8 text-center text-ui-secondary italic">
+                                                <td colSpan={5} className="p-8 text-center text-ui-secondary italic">
                                                     Brak danych dla wybranego okresu
                                                 </td>
                                             </tr>
@@ -1233,7 +1217,7 @@ export default function IngredientConsumptionModal({
                         <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
                             <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                    <CalendarDays size={14} /> Miesięczny bilans zużycia i zakupów
+                                    <CalendarDays size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" /> Miesięczny bilans zużycia i zakupów
                                 </h3>
                                 <span className="text-[11px] font-semibold text-ui-secondary">
                                     {filteredMonthlyData.length} miesięcy
@@ -1289,13 +1273,15 @@ export default function IngredientConsumptionModal({
                                                                 </span>
                                                             </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
-                                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                                <div className="flex items-center justify-center">
+                                                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                                </div>
                                                             </td>
                                                         </tr>
 
                                                         {isExpanded && (
                                                             <tr className="bg-emerald-50/20">
-                                                                <td colSpan={7} className="p-4 border-b border-ui-accent/30">
+                                                                <td colSpan={6} className="p-4 border-b border-ui-accent/30">
                                                                     <div className="space-y-2">
                                                                         <div className="text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
                                                                             Wyroby w miesiącu {m.label}:
@@ -1331,7 +1317,7 @@ export default function IngredientConsumptionModal({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={7} className="p-8 text-center text-ui-secondary italic">
+                                                <td colSpan={6} className="p-8 text-center text-ui-secondary italic">
                                                     Brak danych dla wybranego okresu
                                                 </td>
                                             </tr>
@@ -1346,8 +1332,8 @@ export default function IngredientConsumptionModal({
                     {view === "PRODUCTS" && (
                         <div className="space-y-4">
                             <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2 mb-4">
-                                    <PieIcon size={15} className="text-emerald-600" />
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2 mb-3">
+                                    <PieIcon size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                     Podział zużycia składnika wg wyrobów piekarniczych
                                 </h3>
 
@@ -1357,7 +1343,7 @@ export default function IngredientConsumptionModal({
                                             key={p.productId}
                                             className="p-3.5 rounded-2xl border border-ui-accent/40 bg-ui-white/80 hover:bg-emerald-50/30 transition-colors"
                                         >
-                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                            <div className="flex items-center justify-between gap-3 mb-1">
                                                 <div className="flex items-center gap-2.5">
                                                     <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
                                                         {idx + 1}
@@ -1366,12 +1352,6 @@ export default function IngredientConsumptionModal({
                                                         <div className="font-bold text-ui-black text-sm">{p.productName}</div>
                                                         <div className="text-[10px] text-ui-secondary flex items-center gap-2 mt-0.5">
                                                             <span>Łącznie upieczono: {p.totalProducedUnits} szt.</span>
-                                                            <span>•</span>
-                                                            <span className="font-semibold">
-                                                                {p.isDirect && !p.isSemiFinished && "Receptura bezpośrednia"}
-                                                                {p.isSemiFinished && !p.isDirect && "Z półproduktu / zaczynu"}
-                                                                {p.isDirect && p.isSemiFinished && "Bezpośrednia + Półprodukt"}
-                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1380,18 +1360,7 @@ export default function IngredientConsumptionModal({
                                                         {p.totalConsumed.toFixed(2)}{" "}
                                                         <span className="text-xs font-semibold">{unit}</span>
                                                     </div>
-                                                    <div className="text-[11px] font-bold text-emerald-600">
-                                                        {p.percentage}% całości
-                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            {/* Pasek postępu */}
-                                            <div className="w-full bg-ui-accent/20 h-2.5 rounded-full overflow-hidden">
-                                                <div
-                                                    className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-                                                    style={{ width: `${Math.min(Math.max(p.percentage, 2), 100)}%` }}
-                                                />
                                             </div>
                                         </div>
                                     ))}

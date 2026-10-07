@@ -245,7 +245,7 @@ export default function SkladnikiPage() {
                                 <tr>
                                     <td colSpan={6} className="p-12 text-center text-ui-secondary">
                                         <div className="flex items-center justify-center gap-2">
-                                            <Loader2 size={18} className="animate-spin text-emerald-600" />
+                                            <Loader2 size={18} className="animate-spin text-ui-secondary" />
                                             Pobieranie składników...
                                         </div>
                                     </td>
@@ -300,7 +300,7 @@ export default function SkladnikiPage() {
                                                     <div>
                                                         <div className="font-semibold text-ui-black whitespace-nowrap">
                                                             {Number(priceNet).toFixed(2)} zł{" "}
-                                                            <span className="text-xs font-normal text-ui-secondary">/ {item.unit}</span>
+                                                            <span className="text-xs font-normal text-ui-black">/ {item.unit}</span>
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -313,7 +313,7 @@ export default function SkladnikiPage() {
                                                     <div>
                                                         <div className="font-semibold text-ui-black whitespace-nowrap">
                                                             {Number(priceGross).toFixed(2)} zł{" "}
-                                                            <span className="text-xs font-normal text-ui-secondary">/ {item.unit}</span>
+                                                            <span className="text-xs font-normal text-ui-black">/ {item.unit}</span>
                                                         </div>
                                                     </div>
                                                 ) : (

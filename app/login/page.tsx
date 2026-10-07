@@ -65,7 +65,7 @@ export default function LoginPage() {
     if (isAuthLoading) {
         return (
             <div className="min-h-screen bg-ui-white flex items-center justify-center">
-                <Loader2 size={32} className="animate-spin text-ui-primary" />
+                <Loader2 size={32} className="animate-spin text-ui-secondary" />
             </div>
         );
     }

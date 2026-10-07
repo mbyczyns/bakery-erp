@@ -1240,58 +1240,56 @@ export default function ProdukcjaPage() {
             )}
 
             {/* ---------------- 4 GŁÓWNE ZAKŁADKI STRONY RAPORTÓW ---------------- */}
-            <div className="bg-white border border-ui-accent rounded-2xl p-2 shadow-xs">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-ui-accent/10 rounded-xl border border-ui-accent/30">
-                    <button
-                        onClick={() => setActiveTab("CALENDAR")}
-                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "CALENDAR"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <CalendarIcon size={16} />
-                        <span>Kalendarz</span>
-                    </button>
+            <div className="flex gap-1.5 sm:gap-2 border-b border-ui-accent pb-px mb-6 overflow-x-auto">
+                <button
+                    onClick={() => setActiveTab("CALENDAR")}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "CALENDAR"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <CalendarIcon size={15} />
+                    <span>Kalendarz</span>
+                </button>
 
-                    <button
-                        onClick={() => {
-                            setActiveTab("LAST_7_DAYS");
-                            setDaysOffset(0);
-                        }}
-                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "LAST_7_DAYS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <span>Raporty dzienne</span>
-                    </button>
+                <button
+                    onClick={() => {
+                        setActiveTab("LAST_7_DAYS");
+                        setDaysOffset(0);
+                    }}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "LAST_7_DAYS"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <span>Raporty dzienne</span>
+                </button>
 
-                    <button
-                        onClick={() => {
-                            setActiveTab("LAST_WEEKS");
-                            setWeeksOffset(0);
-                        }}
-                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "LAST_WEEKS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <span>Raporty tygodniowe</span>
-                    </button>
+                <button
+                    onClick={() => {
+                        setActiveTab("LAST_WEEKS");
+                        setWeeksOffset(0);
+                    }}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "LAST_WEEKS"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <span>Raporty tygodniowe</span>
+                </button>
 
-                    <button
-                        onClick={() => {
-                            setActiveTab("LAST_MONTHS");
-                            setMonthsOffset(0);
-                        }}
-                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeTab === "LAST_MONTHS"
-                            ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
-                            : "text-ui-secondary hover:text-ui-primary"
-                            }`}
-                    >
-                        <span>Raporty miesięczne</span>
-                    </button>
-                </div>
+                <button
+                    onClick={() => {
+                        setActiveTab("LAST_MONTHS");
+                        setMonthsOffset(0);
+                    }}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${activeTab === "LAST_MONTHS"
+                        ? "border-ui-secondary text-ui-secondary font-bold"
+                        : "border-transparent text-ui-primary/60 hover:text-ui-primary"
+                        }`}
+                >
+                    <span>Raporty miesięczne</span>
+                </button>
             </div>
 
             {/* ========================================================= */}
@@ -1824,8 +1822,8 @@ export default function ProdukcjaPage() {
                                 </div>
                             </div>
                             {isLoadingCurrent && (
-                                <div className="flex items-center gap-1.5 text-xs text-ui-primary font-bold">
-                                    <Loader2 size={14} className="animate-spin" /> Ładowanie danych...
+                                <div className="flex items-center gap-1.5 text-xs text-ui-secondary font-bold">
+                                    <Loader2 size={14} className="animate-spin text-ui-secondary" /> Ładowanie danych...
                                 </div>
                             )}
 
@@ -1940,7 +1938,7 @@ export default function ProdukcjaPage() {
                                 <table className="w-full text-center text-xs border-collapse">
                                     <thead>
                                         <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
-                                            <th className="py-3 px-3.5 text-center">Okres / Data</th>
+                                            <th className="py-3 px-3.5 text-center sticky left-0 bg-ui-accent/10">Okres / Data</th>
                                             <th className="py-3 px-2 text-center">
                                                 <span className="text-amber-800">Chleby</span>
                                             </th>
@@ -1985,7 +1983,7 @@ export default function ProdukcjaPage() {
                                                     }}
                                                     className="hover:bg-ui-accent/10 transition-colors cursor-pointer"
                                                 >
-                                                    <td className="py-3 px-3.5 font-bold text-ui-black text-center">
+                                                    <td className="py-3 px-3.5 font-bold text-ui-black text-left sticky left-0 bg-ui-accent/10">
                                                         <div className="text-sm">{b.label}</div>
                                                         <div className="text-[11px] text-ui-secondary font-normal">
                                                             {b.startDate === b.endDate ? formatDate(b.startDate) : `${formatDate(b.startDate)} do ${formatDate(b.endDate)}`}
@@ -2148,7 +2146,7 @@ export default function ProdukcjaPage() {
                                     title="Wypełnij kolumnę 'Wyprodukowano' ilościami z poprzedniego dnia"
                                 >
                                     {isCopyingPrevious ? (
-                                        <Loader2 size={13} className="animate-spin text-ui-primary" />
+                                        <Loader2 size={13} className="animate-spin text-ui-secondary" />
                                     ) : (
                                         <Copy size={13} />
                                     )}
@@ -2183,7 +2181,7 @@ export default function ProdukcjaPage() {
                         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                             {isLoadingFormData ? (
                                 <div className="p-20 flex flex-col items-center justify-center gap-3 text-ui-secondary text-sm">
-                                    <Loader2 size={28} className="animate-spin text-ui-primary" />
+                                    <Loader2 size={28} className="animate-spin text-ui-secondary" />
                                     Wczytywanie pozycji wypieków...
                                 </div>
                             ) : (
@@ -2460,7 +2458,7 @@ export default function ProdukcjaPage() {
                         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
                             {isLoadingPlan ? (
                                 <div className="p-16 flex flex-col items-center justify-center gap-3 text-ui-secondary text-sm">
-                                    <Loader2 size={28} className="animate-spin text-amber-600" />
+                                    <Loader2 size={28} className="animate-spin text-ui-secondary" />
                                     Generowanie rekomendacji produkcyjnych...
                                 </div>
                             ) : planData ? (
