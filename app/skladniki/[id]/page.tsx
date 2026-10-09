@@ -112,7 +112,33 @@ export default function SkladnikDetailPage({
             };
         }).sort((a: any, b: any) => a.timestamp - b.timestamp);
 
-        return { chartData, ticks, minTime, maxTime };
+        // Obliczenie proporcjonalnego zakresu osi Y (aby groszowe wahania nie wyglądały dramatycznie)
+        const prices = data.priceHistory
+            .map((p: any) => Number(p.priceNet ?? p.price ?? 0))
+            .filter((p: number) => !isNaN(p) && p > 0);
+
+        let yDomain: [number, number] = [0, 10];
+        if (prices.length > 0) {
+            const minP = Math.min(...prices);
+            const maxP = Math.max(...prices);
+            const diff = maxP - minP;
+            const avgP = (minP + maxP) / 2;
+
+            // Zapewniamy proporcjonalny margines: minimum 15% średniej ceny lub 0.40 zł, oraz 35% rzeczywistej różnicy
+            const padding = Math.max(diff * 0.35, avgP * 0.15, 0.40);
+
+            const rawMin = Math.max(0, minP - padding);
+            const rawMax = maxP + padding;
+
+            // Zaokrąglenie do czytelnych przedziałów
+            const roundStep = rawMax > 100 ? 10 : rawMax > 20 ? 1 : rawMax > 5 ? 0.5 : 0.1;
+            const yMin = Math.max(0, Math.floor(rawMin / roundStep) * roundStep);
+            const yMax = Math.ceil(rawMax / roundStep) * roundStep;
+
+            yDomain = [Number(yMin.toFixed(2)), Number(yMax.toFixed(2))];
+        }
+
+        return { chartData, ticks, minTime, maxTime, yDomain };
     }, [data?.priceHistory]);
 
     const handleOpenInvoiceModal = async (invoiceId: string) => {
@@ -294,24 +320,25 @@ export default function SkladnikDetailPage({
                                         <div className="flex items-center gap-2">
                                             {sup.isBest && <span className="flex items-center justify-center w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] font-black">1</span>}
                                             {!sup.isBest && <span className="flex items-center justify-center w-5 h-5 bg-ui-accent text-ui-secondary rounded-full text-[10px] font-black">{index + 1}</span>}
-                                            <span className={`text-sm ${sup.isBest ? "text-emerald-900" : "text-ui-black"}`}>{sup.name}</span>
+                                            <span className={`text-sm font-semibold whitespace-nowrap ${sup.isBest ? "text-ui-black" : "text-ui-black"}`}>{sup.name}</span>
                                         </div>
-                                        <div className="text-[10px] text-ui-secondary font-semibold ml-7 mt-0.5">
-                                            Ost. zakup: {sup.lastBuy && sup.lastBuy !== "Brak zakupów" ? formatDate(sup.lastBuy) : "Brak zakupów"}
+                                        <div className="text-sm text-ui-secondary ml-7 mt-0.5">
+                                            <div className="text-left">
+                                                <div className="text-sm text-ui-black">
+                                                    {sup.lastPrice.toFixed(2)} zł <span className="text-sm text-ui-black">netto</span>
+                                                </div>
+                                                <div className={`text-sm ${sup.isBest ? "text-ui-black" : "text-ui-black"}`}>
+                                                    {(sup.lastPrice * 1.05).toFixed(2)} zł brutto
+                                                </div>
+
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className={`font-bold ${sup.isBest ? "text-emerald-700 text-sm" : "text-ui-primary text-sm"}`}>
-                                            {sup.lastPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">netto</span>
-                                        </div>
-                                        <div className="text-[10px] text-ui-secondary font-medium">
-                                            {(sup.lastPrice * 1.05).toFixed(2)} zł brutto
-                                        </div>
-                                    </div>
+
                                 </div>
                             ))
                         ) : (
-                            <div className="p-6 text-center text-xs text-ui-secondary italic">
+                            <div className="p-6 text-center text-xs text-ui-secondary ">
                                 Brak przypisanych dostawców
                             </div>
                         )}
@@ -369,10 +396,10 @@ export default function SkladnikDetailPage({
                                                     )}
                                                 </td>
                                                 <td className="p-4 text-center text-ui-black whitespace-nowrap">{del.quantity} {data.unit}</td>
-                                                <td className="p-4 text-right  font-semibold text-ui-black whitespace-nowrap">
+                                                <td className="p-4 text-right text-ui-black whitespace-nowrap">
                                                     {typeof priceNet === "number" ? `${priceNet.toFixed(2)} zł` : "—"}
                                                 </td>
-                                                <td className="p-4 text-right font-semibold text-ui-black whitespace-nowrap">
+                                                <td className="p-4 text-right text-ui-black whitespace-nowrap">
                                                     {typeof priceGross === "number" && priceGross > 0 ? `${priceGross.toFixed(2)} zł` : "—"}
                                                 </td>
                                             </tr>
@@ -380,7 +407,7 @@ export default function SkladnikDetailPage({
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-xs text-ui-secondary italic">
+                                        <td colSpan={5} className="p-8 text-center text-xs text-ui-secondary ">
                                             Brak historii zakupów dla tego składnika
                                         </td>
                                     </tr>
@@ -430,7 +457,7 @@ export default function SkladnikDetailPage({
                         {data.priceHistory && data.priceHistory.length > 0 ? (
                             <div className="h-[250px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={priceChartTimeline.chartData} margin={{ top: 10, right: 15, left: -15, bottom: 5 }}>
+                                    <LineChart data={priceChartTimeline.chartData} margin={{ top: 10, right: 15, left: -5, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                         <XAxis
                                             type="number"
@@ -447,11 +474,12 @@ export default function SkladnikDetailPage({
                                             dy={10}
                                         />
                                         <YAxis
+                                            width={45}
                                             axisLine={false}
                                             tickLine={false}
                                             tick={{ fontSize: 11, fill: '#6B7280' }}
                                             tickFormatter={(value) => `${Number(value).toFixed(2)}`}
-                                            domain={['auto', 'auto']}
+                                            domain={priceChartTimeline.yDomain || ['auto', 'auto']}
                                         />
                                         <Tooltip
                                             content={({ active, payload }) => {
@@ -459,31 +487,34 @@ export default function SkladnikDetailPage({
                                                     const point = payload[0].payload;
                                                     return (
                                                         <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-lg text-xs">
-                                                            <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-1.5 flex items-center justify-between gap-3">
+                                                            <div className="text-ui-black border-b border-ui-accent/40 pb-1 mb-1.5 flex items-center justify-between gap-3">
                                                                 <span>{point.displayDate || formatDate(point.date)}</span>
                                                                 {point.doc && (
-                                                                    <span className="text-[10px] font-mono text-ui-secondary font-normal">
+                                                                    <span className="text-[11px] font-mono text-ui-black font-normal">
                                                                         {point.doc}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                             {point.supplier && (
-                                                                <div className="text-ui-primary text-[11px] font-medium mb-1 truncate max-w-[200px]" title={point.supplier}>
+                                                                <div
+                                                                    className="text-ui-black font-semibold text-[11px] mb-1 max-w-[200px] break-words leading-tight"
+                                                                    title={point.supplier}
+                                                                >
                                                                     {point.supplier}
                                                                 </div>
                                                             )}
                                                             <div className="flex items-center justify-between gap-4 text-ui-black mb-0.5">
                                                                 <span>Cena netto:</span>
-                                                                <span className="font-semibold text-[#265ff0]">{Number(point.priceNet ?? point.price).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">/ {data.unit}</span></span>
+                                                                <span className="text-ui-black">{Number(point.priceNet ?? point.price).toFixed(2)} zł <span className="text-[11px] font-normal text-ui-black">/ {data.unit}</span></span>
                                                             </div>
                                                             {point.priceGross ? (
                                                                 <div className="flex items-center justify-between gap-4 text-ui-black mb-0.5">
                                                                     <span>Cena brutto:</span>
-                                                                    <span className="font-semibold">{Number(point.priceGross).toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">/ {data.unit}</span></span>
+                                                                    <span className="text-ui-black">{Number(point.priceGross).toFixed(2)} zł <span className="text-[11px] font-normal text-ui-black">/ {data.unit}</span></span>
                                                                 </div>
                                                             ) : null}
                                                             {point.quantity ? (
-                                                                <div className="flex items-center justify-between gap-4 text-ui-secondary text-[11px] mt-1 pt-1 border-t border-ui-accent/30">
+                                                                <div className="flex items-center justify-between gap-4 text-ui-black text-[11px] mt-1 pt-1 border-t border-ui-accent/30">
                                                                     <span>Ilość:</span>
                                                                     <span className="font-medium text-ui-black">{point.quantity} {data.unit}</span>
                                                                 </div>
@@ -507,7 +538,7 @@ export default function SkladnikDetailPage({
                                 </ResponsiveContainer>
                             </div>
                         ) : (
-                            <div className="h-[250px] flex items-center justify-center text-xs text-ui-secondary italic">
+                            <div className="h-[250px] flex items-center justify-center text-xs text-ui-secondary ">
                                 Brak historii zakupów dla tego składnika
                             </div>
                         )}
@@ -558,13 +589,13 @@ export default function SkladnikDetailPage({
                                                         <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-2">
                                                             {tooltipTitle}
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-4 text-[#3B82F6] mb-1.5">
+                                                        <div className="flex items-center justify-between gap-4 text-[#38bdf8] mb-1.5">
                                                             <span className="font-medium">Zakupiono:</span>
-                                                            <span className="font-bold">{dataPoint?.purchased ?? 0} {data.unit}</span>
+                                                            <span className="font-medium">{dataPoint?.purchased ?? 0} {data.unit}</span>
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-4 text-[#059669] mb-1">
+                                                        <div className="flex items-center justify-between gap-4 text-[#042043] mb-1">
                                                             <span className="font-medium">Zużyto:</span>
-                                                            <span className="font-bold">{dataPoint?.consumed ?? 0} {data.unit}</span>
+                                                            <span className="font-medium ">{dataPoint?.consumed ?? 0} {data.unit}</span>
                                                         </div>
                                                     </div>
                                                 );
@@ -577,13 +608,13 @@ export default function SkladnikDetailPage({
                                         wrapperStyle={{ paddingTop: '10px', fontSize: '12px', fontWeight: '500' }}
                                         iconType="circle"
                                         payload={[
-                                            { value: 'Zakupiono', type: 'circle', id: 'purchased', color: '#3B82F6' },
-                                            { value: 'Zużyto', type: 'circle', id: 'consumed', color: '#059669' }
+                                            { value: 'Zakupiono', type: 'circle', id: 'purchased', color: '#38bdf8' },
+                                            { value: 'Zużyto', type: 'circle', id: 'consumed', color: '#042043' }
                                         ]}
                                     />
 
-                                    <Bar dataKey="purchased" name="Zakupiono" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                    <Bar dataKey="consumed" name="Zużyto" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Bar dataKey="purchased" name="Zakupiono" fill="#38bdf8" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Bar dataKey="consumed" name="Zużyto" fill="#042043" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -728,7 +759,7 @@ export default function SkladnikDetailPage({
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h2 className="text-lg sm:text-xl font-bold text-ui-black">
-                                            {selectedInvoice.invoiceNumber}
+                                            {selectedInvoice.contractor?.name}
                                         </h2>
                                         {selectedInvoice.isSales && (
                                             <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
@@ -746,11 +777,8 @@ export default function SkladnikDetailPage({
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-ui-secondary mt-1 font-medium">
-                                        Dostawca: <strong className="text-ui-black">{selectedInvoice.contractor?.name || "Nieznany"}</strong>
-                                        {selectedInvoice.contractor?.nip && (
-                                            <span className="ml-1 text-ui-secondary">(NIP: {selectedInvoice.contractor.nip})</span>
-                                        )}
+                                    <p className="text-xs text-ui-black mt-1">
+                                        {selectedInvoice.invoiceNumber}
                                     </p>
                                 </div>
                             </div>
@@ -768,19 +796,19 @@ export default function SkladnikDetailPage({
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-ui-accent/10 p-3.5 rounded-xl border border-ui-accent/40 text-xs">
                                 <div>
                                     <span className="text-[10px] text-ui-secondary uppercase font-bold block">Data wystawienia:</span>
-                                    <span className="text-ui-black font-extrabold text-sm">{formatDate(selectedInvoice.issuedDate)}</span>
+                                    <span className="text-ui-black text-sm">{formatDate(selectedInvoice.issuedDate)}</span>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-ui-secondary uppercase font-bold block">Wartość Netto:</span>
-                                    <span className="text-ui-black font-extrabold text-sm">{Number(selectedInvoice.netAmount || 0).toFixed(2)} zł</span>
+                                    <span className="text-ui-black text-sm">{Number(selectedInvoice.netAmount || 0).toFixed(2)} zł</span>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-ui-secondary uppercase font-bold block">Wartość VAT:</span>
-                                    <span className="text-ui-secondary font-bold text-sm">{Number(selectedInvoice.vatAmount || 0).toFixed(2)} zł</span>
+                                    <span className="text-ui-black text-sm">{Number(selectedInvoice.vatAmount || 0).toFixed(2)} zł</span>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-ui-secondary uppercase font-bold block">Wartość Brutto:</span>
-                                    <span className="text-ui-primary font-black text-sm">{Number(selectedInvoice.grossAmount || 0).toFixed(2)} zł</span>
+                                    <span className="text-ui-black text-sm">{Number(selectedInvoice.grossAmount || 0).toFixed(2)} zł</span>
                                 </div>
                             </div>
 
@@ -798,7 +826,7 @@ export default function SkladnikDetailPage({
                                             <thead>
                                                 <tr className="bg-ui-accent/15 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent">
                                                     <th className="py-2.5 px-3">Lp.</th>
-                                                    <th className="py-2.5 px-3 text-left">Nazwa artykułu z faktury</th>
+                                                    <th className="py-2.5 px-3 text-left">Nazwa artykułu</th>
                                                     <th className="py-2.5 px-3 text-center whitespace-nowrap">Ilość</th>
                                                     <th className="py-2.5 px-3 text-right whitespace-nowrap">Cena Netto</th>
                                                     <th className="py-2.5 px-3 text-right whitespace-nowrap">Wartość Netto</th>
@@ -814,30 +842,30 @@ export default function SkladnikDetailPage({
                                                             <tr
                                                                 key={pos.id || idx}
                                                                 className={`transition-colors ${isMatchingThisIngredient
-                                                                    ? "bg-amber-50/90 font-medium"
+                                                                    ? "bg-ui-accent/10 font-medium"
                                                                     : "hover:bg-ui-accent/5"
                                                                     }`}
                                                             >
                                                                 <td className="py-2.5 px-3 text-ui-secondary font-mono text-[11px]">{idx + 1}</td>
-                                                                <td className="py-2.5 px-3 text-ui-black font-semibold">
+                                                                <td className="py-2.5 px-3 text-ui-black">
                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                         <span>{pos.name}</span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="py-2.5 px-3 text-center font-bold text-ui-black whitespace-nowrap">
+                                                                <td className="py-2.5 px-3 text-center text-ui-black whitespace-nowrap">
                                                                     {pos.quantity} {pos.unit || "szt"}
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                                                    <div className="font-medium text-ui-black">{Number(pos.netPrice || 0).toFixed(2)} zł <span className="text-[10px] text-ui-black">netto</span></div>
-                                                                    <div className="text-[10px] text-ui-black">{(Number(pos.netPrice || 0) * (1 + (parseFloat(pos.vatRate || "5") || 5) / 100)).toFixed(2)} zł brutto</div>
+                                                                    <div className=" text-[11px] text-ui-black">{Number(pos.netPrice || 0).toFixed(2)} zł <span className="text-[11px] text-ui-black">netto</span></div>
+                                                                    <div className="text-[11px] text-ui-black">{(Number(pos.netPrice || 0) * (1 + (parseFloat(pos.vatRate || "5") || 5) / 100)).toFixed(2)} zł brutto</div>
                                                                 </td>
-                                                                <td className="py-2.5 px-3 text-right font-medium text-ui-black whitespace-nowrap">
+                                                                <td className="py-2.5 px-3 text-right text-ui-black whitespace-nowrap">
                                                                     {Number(pos.netAmount || (Number(pos.quantity || 0) * Number(pos.netPrice || 0))).toFixed(2)} zł
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-center text-ui-black whitespace-nowrap">
                                                                     {pos.vatRate ? `${pos.vatRate}%` : "—"}
                                                                 </td>
-                                                                <td className="py-2.5 px-3 text-right font-black text-ui-primary whitespace-nowrap">
+                                                                <td className="py-2.5 px-3 text-right text-ui-black whitespace-nowrap">
                                                                     {Number(pos.grossAmount || 0).toFixed(2)} zł
                                                                 </td>
                                                             </tr>
@@ -845,7 +873,7 @@ export default function SkladnikDetailPage({
                                                     })
                                                 ) : (
                                                     <tr>
-                                                        <td colSpan={7} className="p-6 text-center text-xs text-ui-secondary italic">
+                                                        <td colSpan={7} className="p-6 text-center text-xs text-ui-secondary ">
                                                             Brak szczegółowych pozycji na fakturze.
                                                         </td>
                                                     </tr>

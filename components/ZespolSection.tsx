@@ -372,7 +372,7 @@ export default function ZespolSection() {
                         <span>Pobieranie listy użytkowników...</span>
                     </div>
                 ) : filteredUsers.length === 0 ? (
-                    <div className="p-10 text-center text-ui-secondary italic">
+                    <div className="p-10 text-center text-ui-secondary">
                         Nie znaleziono pracowników spełniających kryteria.
                     </div>
                 ) : (

@@ -258,7 +258,7 @@ export default function KontrahenciPage() {
                                 </tr>
                             ) : filteredContractors.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="p-8 text-center text-ui-secondary italic">
+                                    <td colSpan={4} className="p-8 text-center text-ui-secondary">
                                         Brak kontrahentów w wybranej zakładce.
                                     </td>
                                 </tr>

@@ -311,7 +311,7 @@ function SearchableContractorSelect({ contractors, value, onChange }: Searchable
 
                         <div className="overflow-y-auto divide-y divide-ui-accent/30 pr-1 flex-1">
                             {filtered.length === 0 ? (
-                                <div className="text-center py-4 text-ui-secondary text-xs italic">
+                                <div className="text-center py-4 text-ui-secondary text-xs ">
                                     Brak dostawcy. Dodaj go w bazie kontrahentów.
                                 </div>
                             ) : (
@@ -662,7 +662,7 @@ export default function FakturyPage() {
                                 </tr>
                             ) : displayedDocs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-ui-secondary italic text-sm">
+                                    <td colSpan={5} className="p-8 text-center text-ui-secondary text-sm">
                                         {invoiceDirection === "COST"
                                             ? "Brak faktur zakupowych w wybranej zakładce."
                                             : "Brak wystawionych faktur sprzedażowych."}
@@ -827,90 +827,96 @@ export default function FakturyPage() {
             {
                 selectedDoc && (
                     <div
-                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in"
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/50 backdrop-blur-xs animate-fade-in"
                         onClick={() => setSelectedDoc(null)}
                     >
                         <div
-                            className="bg-ui-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl border border-ui-accent flex flex-col relative overflow-hidden"
+                            className="bg-ui-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="border-b border-ui-accent p-5 flex items-start justify-between bg-ui-white rounded-t-2xl shrink-0">
-                                <div>
-                                    <h2 className="text-xl font-bold text-ui-primary flex items-center gap-2">
-                                        {selectedDoc.docNumber}
-                                        {selectedDoc.isSales && (
-                                            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md uppercase tracking-wider">Sprzedaż</span>
-                                        )}
-                                    </h2>
-                                    <p className="text-xs text-ui-secondary mt-1">{selectedDoc.contractorName}</p>
+                            <div className="px-6 py-5 border-b border-ui-accent flex flex-col sm:flex-row items-start sm:items-center justify-between bg-ui-white rounded-t-2xl gap-4 shrink-0">
+                                <div className="flex items-start gap-4 min-w-0 flex-1">
+                                    <div className="bg-ui-accent/20 p-3 rounded-2xl text-ui-primary hidden sm:block mt-1 shrink-0">
+                                        <FileText size={28} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h2 className="text-2xl font-black text-ui-black tracking-tight flex items-center gap-2 flex-wrap">
+                                            <span className="truncate">{selectedDoc.contractorName}</span>
+                                        </h2>
+                                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                            {selectedDoc.issueDate && (
+                                                <span className="text-xs text-ui-black font-normal">
+                                                    Data wystawienia: <b className="text-ui-black font-normal">{formatDate(selectedDoc.issueDate)}</b>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                                <button onClick={() => setSelectedDoc(null)} className="p-2 bg-ui-accent/20 hover:bg-ui-accent/40 text-ui-primary rounded-full transition-colors cursor-pointer">
-                                    <X size={20} />
-                                </button>
+                                <div className="flex items-center gap-4 sm:gap-6 shrink-0 self-end sm:self-center">
+                                    <div className="text-right whitespace-nowrap">
+                                        <div className="text-[10px] font-bold text-ui-black uppercase tracking-wider">
+                                            {selectedDoc.isSales ? "Wartość faktury (Brutto)" : (selectedDoc.status === "IMPORTED" ? "Edycja Mapowania" : "Do zapłaty (Brutto)")}
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-ui-black mt-0.5 whitespace-nowrap tabular-nums">
+                                            {Number(selectedDoc.grossAmount || 0).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer self-start sm:self-center shrink-0">
+                                        <X size={24} />
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="p-6 space-y-6 text-sm flex-1 bg-ui-white rounded-b-2xl overflow-y-auto min-h-0">
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-ui-accent/10 p-4 rounded-xl border border-ui-accent/40">
-                                    <div>
-                                        <span className="text-xs text-ui-secondary font-bold block">Data wystawienia:</span>
-                                        <span className="text-ui-primary font-medium">{formatDate(selectedDoc.issueDate)}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-ui-secondary font-bold block">Wartość Netto:</span>
-                                        <span className="text-ui-primary">{Number(selectedDoc.netAmount || 0).toFixed(2)} zł</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-ui-secondary font-bold block">Wartość Brutto:</span>
-                                        <span className="font-bold text-ui-primary">{Number(selectedDoc.grossAmount || 0).toFixed(2)} zł</span>
-                                    </div>
-                                </div>
+                            <div className="p-6 space-y-4 flex-1 bg-ui-white rounded-b-2xl overflow-y-auto min-h-0">
+                                <div className="border border-ui-accent rounded-xl shadow-sm overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase border-b border-ui-accent whitespace-nowrap">
+                                                <th className="p-3.5 text-left">Nazwa artykułu</th>
+                                                <th className="p-3.5 text-right">Cena jedn. netto</th>
+                                                <th className="p-3.5 text-center">Ilość</th>
+                                                <th className="p-3.5 text-center">Miara</th>
+                                                <th className="p-3.5 text-center">Stawka podatku</th>
+                                                <th className="p-3.5 text-right">Sprzedaż netto</th>
+                                                <th className="p-3.5 text-right">Sprzedaż brutto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-ui-accent/40">
+                                            {selectedDoc.positions?.map((pos) => {
+                                                const netPrice = Number(pos.netPrice || 0);
+                                                const quantity = Number(pos.quantity || 0);
+                                                const vatRateNum = parseFloat(String(pos.vatRate || "23")) || 0;
+                                                const netAmount = Number(pos.netAmount || 0) || Number((netPrice * quantity).toFixed(2));
+                                                const grossAmount = Number(pos.grossAmount || 0) || Number((netAmount * (1 + vatRateNum / 100)).toFixed(2));
 
-                                <div>
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary mb-3">
-                                        Pozycje na fakturze ({selectedDoc.positions?.length || 0})
-                                    </h3>
-                                    <div className="border border-ui-accent rounded-xl overflow-hidden">
-                                        <table className="w-full text-left text-xs">
-                                            <thead>
-                                                <tr className="bg-ui-accent/20 text-ui-secondary font-bold uppercase border-b border-ui-accent">
-                                                    <th className="p-3 text-left">Nazwa artykułu</th>
-                                                    <th className="p-3 text-center whitespace-nowrap w-auto">Ilość</th>
-                                                    <th className="p-3 text-right whitespace-nowrap">Cena</th>
-                                                    <th className="p-3 text-right">Wartość Brutto</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-ui-accent/40">
-                                                {selectedDoc.positions?.map((pos) => {
-                                                    const netPrice = Number(pos.netPrice || 0);
-                                                    const vatRate = parseFloat(pos.vatRate || "5") || 5;
-                                                    const grossPrice = netPrice > 0 ? netPrice * (1 + vatRate / 100) : (pos.quantity ? Number(pos.grossAmount || 0) / pos.quantity : 0);
-                                                    return (
-                                                        <tr key={pos.id} className="hover:bg-ui-accent/5">
-                                                            <td className="p-3 font-semibold text-ui-black text-left">{pos.name}</td>
-                                                            <td className="p-3 text-center font-bold text-ui-primary whitespace-nowrap">
-                                                                {pos.quantity} {pos.unit}
-                                                            </td>
-                                                            <td className="p-3 text-right whitespace-nowrap">
-                                                                {netPrice > 0 ? (
-                                                                    <div>
-                                                                        <div className="font-semibold text-ui-black">
-                                                                            {netPrice.toFixed(2)} zł <span className="text-[10px] font-semibold text-ui-black">netto</span>
-                                                                        </div>
-                                                                        <div className="text-[10px] text-ui-secondary font-medium">
-                                                                            {grossPrice.toFixed(2)} zł brutto
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="text-ui-secondary">—</span>
-                                                                )}
-                                                            </td>
-                                                            <td className="p-3 text-right font-bold text-ui-black">{Number(pos.grossAmount || 0).toFixed(2)} zł</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                return (
+                                                    <tr key={pos.id} className="hover:bg-ui-accent/5 transition-colors">
+                                                        <td className="p-3.5 text-ui-black text-left  min-w-[180px]">
+                                                            {pos.name}
+                                                        </td>
+                                                        <td className="p-3.5 text-right text-ui-black whitespace-nowrap tabular-nums">
+                                                            {netPrice.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                                                        </td>
+                                                        <td className="p-3.5 text-center text-ui-primary whitespace-nowrap tabular-nums ">
+                                                            {quantity}
+                                                        </td>
+                                                        <td className="p-3.5 text-center text-ui-black whitespace-nowrap">
+                                                            {pos.unit || "szt"}
+                                                        </td>
+                                                        <td className="p-3.5 text-center text-ui-black whitespace-nowrap ">
+                                                            {pos.vatRate !== undefined && String(pos.vatRate) !== "" ? `${pos.vatRate}%` : "23%"}
+                                                        </td>
+                                                        <td className="p-3.5 text-right text-ui-black whitespace-nowrap tabular-nums">
+                                                            {netAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                                                        </td>
+                                                        <td className="p-3.5 text-right text-ui-black whitespace-nowrap tabular-nums">
+                                                            {grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
@@ -1153,40 +1159,36 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/50 backdrop-blur-xs animate-fade-in">
-            <div className="bg-ui-white w-full max-w-5xl max-h-[92vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden">
+            <div className="bg-ui-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden">
 
                 <div className="px-6 py-5 border-b border-ui-accent flex flex-col sm:flex-row items-start sm:items-center justify-between bg-ui-white rounded-t-2xl gap-4 shrink-0">
-                    <div className="flex items-start gap-4">
-                        <div className="bg-ui-accent/20 p-3 rounded-2xl text-ui-primary hidden sm:block mt-1">
+                    <div className="flex items-start gap-4 min-w-0 flex-1">
+                        <div className="bg-ui-accent/20 p-3 rounded-2xl text-ui-primary hidden sm:block mt-1 shrink-0">
                             <FileText size={28} />
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-black text-ui-black tracking-tight flex items-center gap-2">
-                                {doc.contractorName}
-                                {doc.status === "IMPORTED" && (
-                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md uppercase tracking-wider">Edycja</span>
-                                )}
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-2xl font-black text-ui-black tracking-tight flex items-center gap-2 flex-wrap">
+                                <span className="truncate">{doc.contractorName}</span>
                             </h2>
                             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                <span className="text-sm font-semibold text-ui-primary">
-                                    KSeF: {doc.docNumber}
-                                </span>
                                 {doc.issueDate && (
-                                    <span className="text-xs text-ui-black">
-                                        Data wystawienia: <b className="text-ui-black font-semibold">{formatDate(doc.issueDate)}</b>
+                                    <span className="text-xs text-ui-black font-normal">
+                                        Data wystawienia: <b className="text-ui-black font-normal">{formatDate(doc.issueDate)}</b>
                                     </span>
                                 )}
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                        <div className="text-right">
+                    <div className="flex items-center gap-4 sm:gap-6 shrink-0 self-end sm:self-center">
+                        <div className="text-right whitespace-nowrap">
                             <div className="text-[10px] font-bold text-ui-black uppercase tracking-wider">
                                 {doc.status === "IMPORTED" ? "Edycja Mapowania" : "Do zapłaty (Brutto)"}
                             </div>
-                            <div className="text-3xl font-black text-ui-black mt-0.5">{Number(doc.grossAmount || 0).toFixed(2)} zł</div>
+                            <div className="text-2xl sm:text-3xl font-black text-ui-black mt-0.5 whitespace-nowrap tabular-nums">
+                                {Number(doc.grossAmount || 0).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                            </div>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer self-start sm:self-center">
+                        <button onClick={onClose} className="p-2 hover:bg-ui-accent/20 rounded-full transition-colors text-ui-primary cursor-pointer self-start sm:self-center shrink-0">
                             <X size={24} />
                         </button>
                     </div>
@@ -1225,9 +1227,9 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase border-b border-ui-accent">
-                                    <th className="p-3.5 w-1/4 text-left">Nazwa</th>
+                                    <th className="p-3.5 w-1/4 text-left">Nazwa artykułu</th>
                                     <th className="p-3.5 text-center whitespace-nowrap w-auto">Ilość</th>
-                                    <th className="p-3.5 text-right whitespace-nowrap">Cena</th>
+                                    <th className="p-3.5 text-left whitespace-nowrap">Cena</th>
                                     <th className="p-3.5 w-[25%] text-left">Kategoria</th>
                                     <th className="p-3.5 w-[28%] text-left">Surowiec</th>
                                 </tr>
@@ -1256,20 +1258,20 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                 }`}
                                         >
                                             <td className="p-3.5 text-left">
-                                                <div className="font-bold text-ui-black text-sm">{pos.name}</div>
+                                                <div className="text-ui-black">{pos.name}</div>
                                             </td>
 
                                             <td className="p-3.5 text-center whitespace-nowrap align-center">
-                                                <div className="text-ui-primary text-sm font-semibold">{pos.quantity} {pos.unit}</div>
+                                                <div className="text-ui-primary">{pos.quantity} {pos.unit}</div>
                                             </td>
 
-                                            <td className="p-3.5 text-right whitespace-nowrap align-center">
+                                            <td className="p-3.5 text-left whitespace-nowrap align-center">
                                                 {netPrice > 0 ? (
                                                     <div>
-                                                        <div className="font-bold text-ui-black">
-                                                            {netPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">netto</span>
+                                                        <div className=" text-ui-black">
+                                                            {netPrice.toFixed(2)} zł netto
                                                         </div>
-                                                        <div className="text-[10px] text-ui-black font-medium">
+                                                        <div className=" text-ui-black">
                                                             {grossPrice.toFixed(2)} zł brutto
                                                         </div>
                                                     </div>
@@ -1278,7 +1280,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                 )}
                                             </td>
 
-                                            <td className="p-3.5 align-center text-left">
+                                            <td className="p-3.5 align-center text-left font-normal [&_*]:font-normal">
                                                 <CategorySelect
                                                     categories={categories}
                                                     value={currentMapping.categoryId}
@@ -1288,7 +1290,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                 />
                                             </td>
 
-                                            <td className="p-3.5 align-center text-left">
+                                            <td className="p-3.5 align-center font-normal [&_*]:font-normal text-left">
                                                 {(() => {
                                                     let SelectorComponent = null;
 
@@ -1309,7 +1311,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                         );
                                                     } else {
                                                         SelectorComponent = (
-                                                            <div className="text-[11px] text-ui-secondary px-3 py-2 bg-ui-accent/10 border border-ui-accent/40 rounded-xl block text-center font-medium animate-fade-in">
+                                                            <div className="text-[11px] text-ui-secondary px-3 py-2 bg-ui-accent/10 border border-ui-accent/40 rounded-xl block text-center animate-fade-in">
                                                                 Nie dotyczy (brak surowca)
                                                             </div>
                                                         );
@@ -1321,7 +1323,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
 
                                                             {needsMultiplier && (
                                                                 <div className="flex items-center justify-between bg-blue-50/60 border border-blue-200 p-2 rounded-xl animate-fade-in">
-                                                                    <span className="text-[10px] font-bold text-black leading-tight">
+                                                                    <span className="text-[10px] text-black leading-tight">
                                                                         1 {pos.unit} =
                                                                     </span>
                                                                     <div className="flex items-center gap-1.5">
@@ -1329,9 +1331,9 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                                                                             type="text"
                                                                             value={currentMapping.multiplier}
                                                                             onChange={(e) => handleMultiplierChange(pos.productId, e.target.value)}
-                                                                            className="w-16 bg-ui-white border border-blue-300 rounded-lg px-2 py-1 text-center text-xs font-bold text-blue-950 focus:outline-none focus:border-blue-500 transition-colors"
+                                                                            className="w-16 bg-ui-white border border-blue-300 rounded-lg px-2 py-1 text-center text-xs text-blue-950 focus:outline-none focus:border-blue-500 transition-colors"
                                                                         />
-                                                                        <span className="text-[10px] font-bold text-black">{selectedIngredient.unit}</span>
+                                                                        <span className="text-[10px] text-black">{selectedIngredient.unit}</span>
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -1377,7 +1379,7 @@ function VerificationModal({ doc, categories, ingredients, onClose, onSuccess, o
                             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
                         >
                             {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                            {doc.status === "IMPORTED" ? "Zapisz poprawki" : "Zatwierdź"}
+                            {doc.status === "IMPORTED" ? "Zapisz" : "Zatwierdź"}
                         </button>
                     </div>
                 </div>
@@ -1655,7 +1657,7 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/50 backdrop-blur-xs animate-fade-in">
-            <div className="bg-ui-white w-full max-w-6xl max-h-[92vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden">
+            <div className="bg-ui-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl border border-ui-accent flex flex-col relative overflow-hidden">
 
                 <div className="px-6 py-5 border-b border-ui-accent bg-ui-white rounded-t-2xl shrink-0">
                     <div className="flex items-center justify-between mb-6">
@@ -1690,12 +1692,12 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                             />
                         </div>
                         <div>
-                            <label className="block text-[11px] font-bold text-ui-secondary uppercase tracking-wider mb-1">Data Wystawienia</label>
+                            <label className="block text-[11px] text-ui-secondary uppercase tracking-wider mb-1">Data Wystawienia</label>
                             <input
                                 type="date"
                                 value={header.issueDate}
                                 onChange={(e) => setHeader({ ...header, issueDate: e.target.value })}
-                                className="w-full bg-ui-accent/10 border border-transparent focus:border-ui-primary rounded-xl px-4 py-2.5 text-sm text-ui-black focus:outline-none transition-all h-[42px]"
+                                className="w-full bg-ui-accent/10 border border-transparent focus:border-ui-primary rounded-xl px-4 py-2.5 text-[11px] focus:outline-none transition-all h-[42px]"
                             />
                         </div>
                     </div>
@@ -1704,9 +1706,11 @@ function ManualInvoiceModal({ categories, ingredients, contractors, onClose, onS
                 <div className="p-6 space-y-4 flex-1 overflow-y-auto min-h-0">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Pozycje Kosztowe</h3>
-                        <div className="text-right">
+                        <div className="text-right whitespace-nowrap">
                             <span className="text-[10px] font-bold text-ui-secondary uppercase mr-3">Wartość całkowita:</span>
-                            <span className="text-lg font-black text-ui-black">{totalGross.toFixed(2)} zł</span>
+                            <span className="text-lg font-black text-ui-black whitespace-nowrap tabular-nums">
+                                {totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                            </span>
                         </div>
                     </div>
 

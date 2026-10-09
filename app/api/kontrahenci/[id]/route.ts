@@ -64,6 +64,8 @@ export async function GET(
             name: string;
             unit: string;
             lastPrice: number;
+            lastGrossPrice: number;
+            lastVatRate: number;
             totalQuantity: number;
             totalSpent: number;
             purchaseCount: number;
@@ -79,6 +81,10 @@ export async function GET(
                 const qty = Number(pos.quantity || 0);
                 const gross = Number(pos.grossAmount || 0);
                 const price = Number(pos.netPrice || 0);
+                const vatRate = Number(pos.vatRate || 0);
+                const grossPrice = qty > 0 && gross > 0
+                    ? Number((gross / qty).toFixed(2))
+                    : (price > 0 ? Number((price * (1 + vatRate / 100)).toFixed(2)) : 0);
 
                 if (!productsMap.has(key)) {
                     productsMap.set(key, {
@@ -86,6 +92,8 @@ export async function GET(
                         name: displayName,
                         unit: pos.unit || "szt",
                         lastPrice: price,
+                        lastGrossPrice: grossPrice,
+                        lastVatRate: vatRate,
                         totalQuantity: qty,
                         totalSpent: gross,
                         purchaseCount: 1,
@@ -104,11 +112,14 @@ export async function GET(
         contractor.products.forEach((prod) => {
             const key = prod.name.trim().toLowerCase();
             if (!productsMap.has(key)) {
+                const price = Number(prod.price || 0);
                 productsMap.set(key, {
                     id: prod.id,
                     name: prod.name,
                     unit: prod.unit || "szt",
-                    lastPrice: Number(prod.price || 0),
+                    lastPrice: price,
+                    lastGrossPrice: Number((price * 1.23).toFixed(2)),
+                    lastVatRate: 23,
                     totalQuantity: 0,
                     totalSpent: 0,
                     purchaseCount: 0,
@@ -164,6 +175,7 @@ export async function GET(
                     quantity: Number(p.quantity),
                     unit: p.unit,
                     netPrice: Number(p.netPrice),
+                    vatRate: Number(p.vatRate || 0),
                     grossAmount: Number(p.grossAmount),
                 })),
             })),

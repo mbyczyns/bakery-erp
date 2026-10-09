@@ -659,7 +659,7 @@ export default function PowiadomieniaPage() {
                                             </div>
 
                                             {pa.affectedProducts.length === 0 ? (
-                                                <div className="text-xs text-ui-secondary italic py-2">
+                                                <div className="text-xs text-ui-secondary py-2">
                                                     Ten surowiec nie jest obecnie przypisany do żadnego aktywnego przepisu.
                                                 </div>
                                             ) : (

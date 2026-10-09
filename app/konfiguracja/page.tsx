@@ -461,7 +461,7 @@ export default function KonfiguracjaPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="text-xs font-semibold text-ui-secondary italic">
+                                            <div className="text-xs font-semibold text-ui-secondary">
                                                 Piekarnia nieczynna
                                             </div>
                                         )}

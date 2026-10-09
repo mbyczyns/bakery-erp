@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     try {
         const user = await getUserFromRequest(request);
         const body = await request.json();
-        const { name, type, sellingPrice, packagingCost, ingredients } = body;
+        const { name, type, sellingPrice, packagingCost, batchSize, ingredients } = body;
 
         if (!name || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
             return NextResponse.json(
@@ -48,12 +48,14 @@ export async function POST(request: NextRequest) {
                 type: (type as ProductType) || "BREAD",
                 sellingPrice: Number(sellingPrice || 0),
                 packagingCost: Number(packagingCost || 0),
+                ...(batchSize !== undefined ? { batchSize: Number(batchSize) || 1 } : {}),
                 ...(user?.id ? { createdById: user.id } : {}),
                 ingredients: {
                     create: ingredients.map((ing: any, index: number) => ({
                         amount: Number(ing.amount),
                         ingredientUnit: ing.unit || "kg",
                         order: ing.order !== undefined ? Number(ing.order) : index,
+                        notes: ing.notes ? String(ing.notes).trim() : null,
                         ingredientId: ing.ingredientId || null,
                         semiFinishedId: ing.semiFinishedId || null,
                     })),

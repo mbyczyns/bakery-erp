@@ -252,7 +252,7 @@ export default function SkladnikiPage() {
                                 </tr>
                             ) : filteredIngredients.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-ui-secondary italic">
+                                    <td colSpan={6} className="p-8 text-center text-ui-secondary">
                                         Nie znaleziono składników.
                                     </td>
                                 </tr>
@@ -286,7 +286,7 @@ export default function SkladnikiPage() {
                                             <td className="p-4 truncate">
                                                 {item.lastSupplierName ? (
                                                     <div>
-                                                        <div className="text-ui-primary truncate">
+                                                        <div className="text-ui-black truncate">
                                                             {item.lastSupplierName}
                                                         </div>
                                                     </div>
@@ -298,9 +298,9 @@ export default function SkladnikiPage() {
                                             <td className="p-4 text-right">
                                                 {priceNet ? (
                                                     <div>
-                                                        <div className="font-semibold text-ui-black whitespace-nowrap">
+                                                        <div className=" text-ui-black whitespace-nowrap">
                                                             {Number(priceNet).toFixed(2)} zł{" "}
-                                                            <span className="text-xs font-normal text-ui-black">/ {item.unit}</span>
+                                                            <span className="font-normal text-ui-black">/ {item.unit}</span>
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -311,9 +311,9 @@ export default function SkladnikiPage() {
                                             <td className="p-4 text-right">
                                                 {priceGross ? (
                                                     <div>
-                                                        <div className="font-semibold text-ui-black whitespace-nowrap">
+                                                        <div className="text-ui-black whitespace-nowrap">
                                                             {Number(priceGross).toFixed(2)} zł{" "}
-                                                            <span className="text-xs font-normal text-ui-black">/ {item.unit}</span>
+                                                            <span className=" font-normal text-ui-black">/ {item.unit}</span>
                                                         </div>
                                                     </div>
                                                 ) : (

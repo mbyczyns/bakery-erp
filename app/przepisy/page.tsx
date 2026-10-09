@@ -11,7 +11,6 @@ import {
     Trash2,
     ChevronRight,
     Calculator,
-    Layers,
     ChefHat,
     BadgePercent,
     ChevronDown,
@@ -20,7 +19,8 @@ import {
     CheckCircle2,
     ArrowUp,
     ArrowDown,
-    Star
+    Star,
+    Layers
 } from "lucide-react";
 
 type ProductType = "BREAD" | "ROLL" | "SWEET" | "SAVORY";
@@ -49,6 +49,7 @@ interface SemiFinishedItem {
         id: string;
         amount: number | string;
         unit: string;
+        notes?: string | null;
         ingredientId?: string | null;
         ingredient?: DictionaryIngredient | null;
         childSemiFinishedId?: string | null;
@@ -61,6 +62,7 @@ interface RecipeIngredientItem {
     amount: number | string;
     ingredientUnit: string;
     order?: number;
+    notes?: string | null;
     ingredientId?: string | null;
     ingredient?: DictionaryIngredient | null;
     semiFinishedId?: string | null;
@@ -74,6 +76,7 @@ interface Recipe {
     productionCost: number | string;
     sellingPrice: number | string;
     packagingCost?: number | string;
+    batchSize?: number | string;
     ingredients: RecipeIngredientItem[];
 }
 
@@ -121,16 +124,19 @@ export default function PrzepisyPage() {
     const [newSemiUnit, setNewSemiUnit] = useState<string>("kg");
     const [batchSize, setBatchSize] = useState<string>("10");
 
-    // Pozycje w formularzu (mogą być surowcem lub półproduktem)
+    // Pozycje w formularzu (mogą być surowcem lub półproduktem, dopuszczalne duplikaty z osobnymi adnotacjami)
     const [formItems, setFormItems] = useState<
         {
+            rowId: string;
             id: string;
             kind: "INGREDIENT" | "SEMI_FINISHED";
             name: string;
             unit: string;
             batchAmount: string;
+            notes?: string;
         }[]
     >([]);
+    const [openNotesRowIds, setOpenNotesRowIds] = useState<Record<string, boolean>>({});
 
     const [searchInput, setSearchInput] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -222,18 +228,17 @@ export default function PrzepisyPage() {
         return Math.round(totalKg * 1000) / 1000;
     };
 
-    // Dodanie surowca lub półproduktu do formularza
+    // Dodanie surowca lub półproduktu do formularza (dopuszczalne wielokrotne dodanie tego samego składnika z osobną adnotacją)
     const handleSelectItem = (
         id: string,
         kind: "INGREDIENT" | "SEMI_FINISHED",
         name: string,
         unit: string
     ) => {
-        if (formItems.some((i) => i.id === id && i.kind === kind)) return;
-
+        const rowId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
         const updated = [
             ...formItems,
-            { id, kind, name, unit, batchAmount: "1.0" },
+            { rowId, id, kind, name, unit, batchAmount: "1.0", notes: "" },
         ];
         setFormItems(updated);
         setSearchInput("");
@@ -246,8 +251,8 @@ export default function PrzepisyPage() {
         }
     };
 
-    const handleRemoveItem = (id: string, kind: string) => {
-        const updated = formItems.filter((i) => !(i.id === id && i.kind === kind));
+    const handleRemoveItem = (rowId: string) => {
+        const updated = formItems.filter((i) => i.rowId !== rowId);
         setFormItems(updated);
         if (creationKind === "SEMI_FINISHED" && (newSemiUnit === "kg" || newSemiUnit === "g")) {
             const weight = calculateTotalWeight(updated, newSemiUnit);
@@ -255,9 +260,9 @@ export default function PrzepisyPage() {
         }
     };
 
-    const handleAmountChange = (id: string, kind: string, amount: string) => {
+    const handleAmountChange = (rowId: string, amount: string) => {
         const updated = formItems.map((i) =>
-            i.id === id && i.kind === kind ? { ...i, batchAmount: amount } : i
+            i.rowId === rowId ? { ...i, batchAmount: amount } : i
         );
         setFormItems(updated);
         if (creationKind === "SEMI_FINISHED" && (newSemiUnit === "kg" || newSemiUnit === "g")) {
@@ -266,6 +271,12 @@ export default function PrzepisyPage() {
                 setBatchSize(String(weight));
             }
         }
+    };
+
+    const handleNotesChange = (rowId: string, notes: string) => {
+        setFormItems((prev) =>
+            prev.map((i) => (i.rowId === rowId ? { ...i, notes } : i))
+        );
     };
 
     const handleMoveItem = (index: number, direction: "UP" | "DOWN") => {
@@ -291,11 +302,13 @@ export default function PrzepisyPage() {
             const isChildSemi = Boolean(item.childSemiFinished || item.childSemiFinishedId);
             const entity = item.childSemiFinished || item.ingredient;
             return {
+                rowId: item.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 id: entity?.id || item.ingredientId || item.childSemiFinishedId || item.id,
                 kind: (isChildSemi ? "SEMI_FINISHED" : "INGREDIENT") as "SEMI_FINISHED" | "INGREDIENT",
                 name: entity?.name || (isChildSemi ? "Półprodukt" : "Składnik"),
                 unit: item.unit || entity?.unit || "kg",
                 batchAmount: Number(item.amount || 0).toString(),
+                notes: item.notes || "",
             };
         });
         setFormItems(items);
@@ -316,17 +329,21 @@ export default function PrzepisyPage() {
         setNewProductType(recipe.type);
         setNewPackagingCost(Number(recipe.packagingCost || 0).toString());
         setNewSellingPrice(Number(recipe.sellingPrice || 0).toString());
-        setBatchSize("10");
+        const recipeBatchSize = Number(recipe.batchSize) || 10;
+        setBatchSize(String(recipeBatchSize));
         const items = recipe.ingredients.map((item) => {
             const isSemi = Boolean(item.semiFinished || item.semiFinishedId);
             const entity = item.semiFinished || item.ingredient;
             const singleAmount = Number(item.amount || 0);
+            const batchAmt = Number((singleAmount * recipeBatchSize).toFixed(4));
             return {
+                rowId: item.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 id: entity?.id || item.ingredientId || item.semiFinishedId || item.id || "",
                 kind: (isSemi ? "SEMI_FINISHED" : "INGREDIENT") as "SEMI_FINISHED" | "INGREDIENT",
                 name: entity?.name || (isSemi ? "Półprodukt" : "Składnik"),
                 unit: item.ingredientUnit || entity?.unit || "kg",
-                batchAmount: (singleAmount * 10).toString(),
+                batchAmount: String(batchAmt),
+                notes: item.notes || "",
             };
         });
         setFormItems(items);
@@ -424,6 +441,7 @@ export default function PrzepisyPage() {
                             amount: amtNum / batchNum,
                             unit: item.unit,
                             order: index,
+                            notes: item.notes ? item.notes.trim() : null,
                         };
                     }),
                 };
@@ -447,6 +465,7 @@ export default function PrzepisyPage() {
                         amount: amtNum / batchNum,
                         ingredientUnit: item.unit,
                         order: index,
+                        notes: item.notes ? item.notes.trim() : null,
                         ingredientId: item.kind === "INGREDIENT" ? item.id : null,
                         semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
                     };
@@ -461,6 +480,7 @@ export default function PrzepisyPage() {
                         name: newName.trim(),
                         type: newProductType,
                         packagingCost: cleanPackagingCost,
+                        batchSize: batchNum,
                         ingredients: singleUnitIngredients,
                     }),
                 });
@@ -478,6 +498,7 @@ export default function PrzepisyPage() {
                         amount: amtNum / batchNum,
                         ingredientUnit: item.unit,
                         order: index,
+                        notes: item.notes ? item.notes.trim() : null,
                         ingredientId: item.kind === "INGREDIENT" ? item.id : null,
                         semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
                     };
@@ -493,6 +514,7 @@ export default function PrzepisyPage() {
                         type: newProductType,
                         sellingPrice: 0,
                         packagingCost: cleanPackagingCost,
+                        batchSize: batchNum,
                         ingredients: singleUnitIngredients,
                     }),
                 });
@@ -516,6 +538,7 @@ export default function PrzepisyPage() {
                             amount: amtNum / batchNum,
                             unit: item.unit,
                             order: index,
+                            notes: item.notes ? item.notes.trim() : null,
                         };
                     }),
                 };
@@ -577,12 +600,10 @@ export default function PrzepisyPage() {
 
     // Wyszukiwarka elementów w modalu (surowce + ewentualnie inne półprodukty)
     const availableIngredients = dbIngredients
-        .filter((i) => !formItems.some((fi) => fi.id === i.id && fi.kind === "INGREDIENT"))
         .filter((i) => matchesSearch(i.name, searchInput));
 
     const availableSemiFinished = semiFinishedList
         .filter((s) => !editingSemiFinishedId || s.id !== editingSemiFinishedId)
-        .filter((s) => !formItems.some((fi) => fi.id === s.id && fi.kind === "SEMI_FINISHED"))
         .filter((s) => matchesSearch(s.name, searchInput));
 
     return (
@@ -722,7 +743,7 @@ export default function PrzepisyPage() {
                         ) : activeTab === "SEMI_FINISHED" ? (
                             sortedSemiFinished.length === 0 ? (
                                 <tr>
-                                    <td colSpan={3} className="p-8 text-center text-ui-secondary italic">
+                                    <td colSpan={3} className="p-8 text-center text-ui-secondary">
                                         Nie znaleziono półproduktów.
                                     </td>
                                 </tr>
@@ -764,9 +785,9 @@ export default function PrzepisyPage() {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="font-semibold text-ui-black">
-                                                    {costNet.toFixed(2)} zł <span className="text-xs font-normal text-ui-secondary">netto</span>
+                                                    {costNet.toFixed(2)} zł <span className="text-xs font-normal text-ui-black">netto</span>
                                                 </div>
-                                                <div className="text-xs text-ui-secondary">
+                                                <div className="text-xs text-ui-black">
                                                     {costGross.toFixed(2)} zł brutto / {semi.unit}
                                                 </div>
                                             </td>
@@ -802,7 +823,7 @@ export default function PrzepisyPage() {
                             )
                         ) : sortedRecipes.length === 0 ? (
                             <tr>
-                                <td colSpan={3} className="p-8 text-center text-ui-secondary italic">
+                                <td colSpan={3} className="p-8 text-center text-ui-secondary">
                                     Nie znaleziono przepisów.
                                 </td>
                             </tr>
@@ -831,7 +852,7 @@ export default function PrzepisyPage() {
                                                         className={isFav ? "fill-amber-400 text-amber-500" : "transition-transform hover:scale-110"}
                                                     />
                                                 </button>
-                                                <span className="font-semibold">{recipe.name}</span>
+                                                <span >{recipe.name}</span>
                                                 {activeTab === "ALL" && (
                                                     <span className="text-[10px] bg-ui-accent/20 text-ui-secondary border border-ui-accent/40 px-2 py-0.5 rounded-md font-bold">
                                                         {PRODUCT_TYPE_LABELS[recipe.type] || recipe.type}
@@ -840,25 +861,16 @@ export default function PrzepisyPage() {
                                             </div>
                                         </td>
                                         <td className="p-4 text-right">
-                                            <div className="font-semibold text-ui-black">
-                                                {Number(recipe.sellingPrice || 0).toFixed(2)} zł <span className="text-xs font-normal text-ui-secondary">brutto</span>
-                                            </div>
-                                            <div className="text-xs text-ui-secondary">
+                                            <div className="text-ui-black">
                                                 {(Number(recipe.sellingPrice || 0) / 1.05).toFixed(2)} zł netto
                                             </div>
+                                            <div className="text-ui-black">
+                                                {Number(recipe.sellingPrice || 0).toFixed(2)} zł brutto
+                                            </div>
+
                                         </td>
                                         <td className="p-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        router.push(`/przepisy/${recipe.id}`);
-                                                    }}
-                                                    className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                                                >
-                                                    Foodcost
-                                                    <ChevronRight size={14} />
-                                                </button>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -892,7 +904,6 @@ export default function PrzepisyPage() {
                         <div className="p-5 border-b border-ui-accent bg-amber-50/50 flex items-center justify-between">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <Layers size={20} className="text-amber-800" />
                                     <h2 className="text-xl font-bold text-ui-black">{selectedSemiFinished.name}</h2>
                                 </div>
                                 <p className="text-xs text-ui-secondary mt-0.5">
@@ -947,11 +958,16 @@ export default function PrzepisyPage() {
                                             return (
                                                 <tr key={idx} className="hover:bg-ui-accent/5">
                                                     <td className="p-3 font-extrabold text-ui-black">
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span>{name}</span>
                                                             {isChildSemi && (
                                                                 <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded font-bold">
                                                                     Półprodukt
+                                                                </span>
+                                                            )}
+                                                            {item.notes && (
+                                                                <span className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded">
+                                                                    {item.notes}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1009,7 +1025,7 @@ export default function PrzepisyPage() {
                     }}
                 >
                     <div
-                        className="bg-ui-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[92vh] flex flex-col"
+                        className="bg-ui-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[92vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Modalu */}
@@ -1064,8 +1080,7 @@ export default function PrzepisyPage() {
                                             : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/10"
                                             }`}
                                     >
-                                        <ChefHat size={17} />
-                                        Wypiek gotowy
+                                        Produkt
                                     </button>
                                     <button
                                         type="button"
@@ -1078,7 +1093,6 @@ export default function PrzepisyPage() {
                                             : "text-ui-secondary hover:text-ui-primary hover:bg-ui-accent/10"
                                             }`}
                                     >
-                                        <Layers size={17} />
                                         Półprodukt
                                     </button>
                                 </div>
@@ -1089,7 +1103,7 @@ export default function PrzepisyPage() {
                                 {/* Nazwa wyrobu / półproduktu */}
                                 <div className={creationKind === "PRODUCT" ? "md:col-span-4" : "md:col-span-6"}>
                                     <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider mb-1.5">
-                                        Nazwa {creationKind === "PRODUCT" ? "wyrobu" : "półproduktu"}
+                                        Nazwa {creationKind === "PRODUCT" ? "produktu" : "półproduktu"}
                                     </label>
                                     <input
                                         type="text"
@@ -1140,7 +1154,7 @@ export default function PrzepisyPage() {
                                                     value={newPackagingCost}
                                                     onChange={(e) => setNewPackagingCost(e.target.value)}
                                                     placeholder="0.00"
-                                                    className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-11 py-2 text-sm font-semibold text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
+                                                    className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3 pr-11 py-2 text-sm  text-ui-black focus:outline-none focus:border-amber-600 transition-all shadow-sm"
                                                 />
                                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-ui-secondary bg-ui-accent/15 px-1.5 py-0.5 rounded pointer-events-none font-bold">
                                                     zł
@@ -1164,7 +1178,7 @@ export default function PrzepisyPage() {
                                                         if (weight > 0) setBatchSize(String(weight));
                                                     }
                                                 }}
-                                                className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm font-semibold"
+                                                className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm"
                                             >
                                                 <option value="kg">kg (kilogram)</option>
                                                 <option value="l">l (litr)</option>
@@ -1202,7 +1216,7 @@ export default function PrzepisyPage() {
                             {/* Składniki i Półprodukty w przepisie */}
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <label className="block text-xs font-bold text-ui-black uppercase tracking-wider">
+                                    <label className="block text-xs font-bold text-ui-secondary uppercase tracking-wider">
                                         Składniki dla partii ({batchSize || "1"} {creationKind === "PRODUCT" ? "szt." : newSemiUnit})
                                     </label>
                                     <div className="flex items-center gap-3">
@@ -1214,9 +1228,6 @@ export default function PrzepisyPage() {
                                             <Plus size={13} />
                                             Nowy składnik
                                         </button>
-                                        <span className="text-xs text-ui-secondary font-medium">
-                                            Pozycji: <b>{formItems.length}</b>
-                                        </span>
                                     </div>
                                 </div>
 
@@ -1235,7 +1246,7 @@ export default function PrzepisyPage() {
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-ui-white border border-ui-accent rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-ui-accent/40">
                                             {availableIngredients.length === 0 && availableSemiFinished.length === 0 ? (
                                                 <div className="p-4 text-center text-ui-secondary text-xs">
-                                                    <p className="italic mb-2">Nie znaleziono pozycji &quot;{searchInput}&quot;</p>
+                                                    <p className=" mb-2">Nie znaleziono pozycji &quot;{searchInput}&quot;</p>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -1260,7 +1271,6 @@ export default function PrzepisyPage() {
                                                             className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors flex items-center justify-between font-bold text-amber-950 cursor-pointer bg-amber-50/40"
                                                         >
                                                             <div className="flex items-center gap-2">
-                                                                <Layers size={15} className="text-amber-700" />
                                                                 <span>{semi.name}</span>
                                                                 <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">
                                                                     PÓŁPRODUKT
@@ -1297,7 +1307,7 @@ export default function PrzepisyPage() {
                                 {/* Lista zadeklarowanych składników */}
                                 <div className="border border-ui-accent rounded-xl overflow-hidden bg-ui-white shadow-sm">
                                     {formItems.length === 0 ? (
-                                        <div className="p-8 text-center text-ui-secondary text-xs italic">
+                                        <div className="p-8 text-center text-ui-secondary text-xs">
                                             Wyszukaj i wybierz składniki powyżej, aby dodać je do receptury.
                                         </div>
                                     ) : (
@@ -1325,8 +1335,8 @@ export default function PrzepisyPage() {
                                                     const perUnitAmt = currentItemAmt / currentBatchNum;
 
                                                     return (
-                                                        <tr key={`${item.kind}-${item.id}`} className="hover:bg-ui-accent/5 focus-within:bg-amber-500/10 transition-colors">
-                                                            <td className="py-2.5 px-3 min-w-0">
+                                                        <tr key={item.rowId} className="hover:bg-ui-accent/5 focus-within:bg-amber-500/10 transition-colors">
+                                                            <td className="py-2.5 px-3 min-w-0 align-middle">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <div className="flex items-center gap-0.5 shrink-0 bg-ui-accent/10 p-0.5 rounded-lg border border-ui-accent/40">
                                                                         <button
@@ -1353,25 +1363,62 @@ export default function PrzepisyPage() {
                                                                         {index + 1}.
                                                                     </span>
 
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="font-bold text-ui-black text-xs sm:text-sm truncate" title={item.name}>
-                                                                            {item.name}
+                                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <span className="text-ui-black text-xs sm:text-sm truncate" title={item.name}>
+                                                                                {item.name}
+                                                                            </span>
+
+                                                                            {!openNotesRowIds[item.rowId] && (!item.notes || !item.notes.trim()) && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setOpenNotesRowIds((prev) => ({ ...prev, [item.rowId]: true }))}
+                                                                                    className="inline-flex items-center gap-1 text-[11px] text-ui-secondary hover:text-amber-800 bg-ui-accent/10 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-dashed border-ui-accent/60 hover:border-amber-300 transition-colors cursor-pointer"
+                                                                                    title="Dodaj informację do tego składnika"
+                                                                                >
+                                                                                    <Plus size={10} />
+                                                                                </button>
+                                                                            )}
                                                                         </div>
-                                                                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold inline-block ${item.kind === "SEMI_FINISHED" ? "bg-amber-100 text-amber-900 border border-amber-200" : "bg-slate-100 text-slate-700 border border-slate-200"}`}>
-                                                                            {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
-                                                                        </span>
+
+                                                                        {(openNotesRowIds[item.rowId] || (item.notes && item.notes.trim())) && (
+                                                                            <div className="flex items-center gap-1.5 pt-0.5">
+                                                                                <span className="text-[10px] font-semibold text-amber-900 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                                                                                    Adnotacja:
+                                                                                </span>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    autoFocus={openNotesRowIds[item.rowId] && !item.notes}
+                                                                                    value={item.notes || ""}
+                                                                                    onChange={(e) => handleNotesChange(item.rowId, e.target.value)}
+                                                                                    placeholder="np. do ciasta, do posmarowania..."
+                                                                                    className="text-[11px] px-2 py-0.5 rounded-md border border-amber-300 bg-amber-50/40 focus:bg-white focus:border-amber-600 focus:outline-none placeholder:text-ui-secondary/60 text-ui-black w-full max-w-sm shadow-2xs"
+                                                                                />
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        handleNotesChange(item.rowId, "");
+                                                                                        setOpenNotesRowIds((prev) => ({ ...prev, [item.rowId]: false }));
+                                                                                    }}
+                                                                                    className="p-1 text-ui-secondary hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0"
+                                                                                    title="Usuń adnotację"
+                                                                                >
+                                                                                    <X size={12} />
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </td>
 
-                                                            <td className="py-2.5 px-3 text-center">
+                                                            <td className="py-2.5 px-3 text-center align-middle">
                                                                 <div className="relative inline-block w-28">
                                                                     <input
                                                                         id={`new-recipe-qty-${index}`}
                                                                         type="text"
                                                                         inputMode="decimal"
                                                                         value={item.batchAmount}
-                                                                        onChange={(e) => handleAmountChange(item.id, item.kind, e.target.value)}
+                                                                        onChange={(e) => handleAmountChange(item.rowId, e.target.value)}
                                                                         onFocus={(e) => {
                                                                             e.target.select();
                                                                             e.target.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -1396,15 +1443,15 @@ export default function PrzepisyPage() {
                                                                             }
                                                                         }}
                                                                         placeholder="1.0"
-                                                                        className="w-full bg-amber-50/70 border border-amber-300 rounded-lg px-2 py-1 text-center font-bold text-xs sm:text-sm text-amber-950 focus:outline-none focus:border-amber-600 focus:bg-white transition-all shadow-2xs tabular-nums"
+                                                                        className="w-full bg-ui-accent/10 border border-ui-accent rounded-lg pl-2 pr-8 py-1.5 text-center text-sm text-ui-black focus:outline-none focus:border-amber-600 focus:bg-white transition-all shadow-2xs tabular-nums"
                                                                     />
-                                                                    <span className="absolute right-2 top-1.5 text-[10px] font-bold text-ui-secondary pointer-events-none">
+                                                                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-ui-secondary pointer-events-none select-none">
                                                                         {item.unit}
                                                                     </span>
                                                                 </div>
                                                             </td>
 
-                                                            <td className="py-2.5 px-3 text-right hidden sm:table-cell text-[11px] text-ui-secondary tabular-nums">
+                                                            <td className="py-2.5 px-3 text-right hidden sm:table-cell text-[11px] text-ui-secondary tabular-nums align-middle">
                                                                 <span className="bg-ui-accent/10 px-2 py-0.5 rounded font-medium inline-block">
                                                                     ≈ {perUnitAmt < 1 && item.unit === "kg"
                                                                         ? `${(perUnitAmt * 1000).toFixed(1)} g`
@@ -1412,10 +1459,10 @@ export default function PrzepisyPage() {
                                                                 </span>
                                                             </td>
 
-                                                            <td className="py-2.5 px-3 text-center">
+                                                            <td className="py-2.5 px-3 text-center align-middle">
                                                                 <button
                                                                     type="button"
-                                                                    onClick={() => handleRemoveItem(item.id, item.kind)}
+                                                                    onClick={() => handleRemoveItem(item.rowId)}
                                                                     className="p-1 hover:bg-rose-50 text-rose-600 rounded transition-colors cursor-pointer"
                                                                     title="Usuń z receptury"
                                                                 >
@@ -1476,9 +1523,8 @@ export default function PrzepisyPage() {
                         className="bg-ui-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-ui-accent"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-5 border-b border-ui-accent bg-amber-50/60 flex items-center justify-between">
+                        <div className="p-5 border-b border-ui-accent bg-ui-accent/10 flex items-center justify-between">
                             <h3 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                                <Sparkles size={18} className="text-amber-700" />
                                 Nowy składnik / surowiec
                             </h3>
                             <button
@@ -1561,7 +1607,8 @@ export default function PrzepisyPage() {
                                     className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                                 >
                                     {isCreatingQuickIngredient && <Loader2 size={14} className="animate-spin" />}
-                                    Dodaj i wstaw do receptury
+                                    <CheckCircle2 size={14} />
+                                    Dodaj
                                 </button>
                             </div>
                         </form>

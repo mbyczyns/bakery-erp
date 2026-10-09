@@ -190,6 +190,7 @@ model SemiFinished {
   name               String
   cost               Decimal                  @default(0.00)
   unit               String
+  batchSize          Decimal                  @default(1.00)
   ingredients        SemiFinishedIngredient[] @relation("ParentSemiFinished")
   usedInSemiFinished SemiFinishedIngredient[] @relation("ChildSemiFinished")
   bakeryRecipes      RecipeIngredient[]
@@ -205,6 +206,7 @@ model SemiFinishedIngredient {
   amount Decimal
   unit   String
   order  Int     @default(0)
+  notes  String?
 
   semiFinishedId String
   semiFinished   SemiFinished @relation("ParentSemiFinished", fields: [semiFinishedId], references: [id], onDelete: Cascade)
@@ -223,6 +225,7 @@ model BakeryProduct {
   productionCost Decimal            @default(0.00)
   sellingPrice   Decimal            @default(0.00)
   packagingCost  Decimal            @default(0.00)
+  batchSize      Decimal            @default(1.00)
   ingredients    RecipeIngredient[]
   productions    DailyProduction[]
 
@@ -237,6 +240,7 @@ model RecipeIngredient {
   amount         Decimal
   ingredientUnit String
   order          Int     @default(0)
+  notes          String?
 
   bakeryProductId String
   bakeryProduct   BakeryProduct @relation(fields: [bakeryProductId], references: [id], onDelete: Cascade)

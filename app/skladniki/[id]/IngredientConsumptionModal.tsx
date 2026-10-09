@@ -234,7 +234,7 @@ export default function IngredientConsumptionModal({
             );
         }
 
-        return list;
+        return list.sort((a, b) => a.date.localeCompare(b.date));
     }, [dailyHistory, dailyCustomRange, dailyOffset, dailyCount, selectedProductFilter, searchQuery]);
 
     // --- FILTROWANIE DANYCH TYGODNIOWYCH ---
@@ -270,11 +270,14 @@ export default function IngredientConsumptionModal({
             list = list.filter(
                 (w) =>
                     w.label.toLowerCase().includes(q) ||
+                    `tydzień ${w.weekNumber}`.toLowerCase().includes(q) ||
+                    w.startDate.includes(q) ||
+                    w.endDate.includes(q) ||
                     w.products.some((p) => p.productName.toLowerCase().includes(q))
             );
         }
 
-        return list;
+        return list.sort((a, b) => a.startDate.localeCompare(b.startDate));
     }, [weeklyHistory, weeklyCustomRange, weeklyOffset, weeklyCount, selectedProductFilter, searchQuery]);
 
     // --- FILTROWANIE DANYCH MIESIĘCZNYCH ---
@@ -313,13 +316,13 @@ export default function IngredientConsumptionModal({
             );
         }
 
-        return list;
+        return list.sort((a, b) => a.key.localeCompare(b.key));
     }, [monthlyHistory, monthlyCustomRange, monthlyOffset, monthlyCount, selectedProductFilter, searchQuery]);
 
-    // Dane do wykresu (odwrócone chronologicznie: od najstarszego do najnowszego)
+    // Dane do wykresu (chronologicznie: od najwcześniejszego do najpóźniejszego)
     const chartData = useMemo(() => {
         if (view === "DAILY") {
-            return [...filteredDailyData].reverse().map((d) => ({
+            return filteredDailyData.map((d) => ({
                 label: `${d.shortDay} ${d.date.slice(8, 10)}.${d.date.slice(5, 7)}`,
                 consumed: d.totalConsumed,
                 purchased: d.totalPurchased,
@@ -329,7 +332,7 @@ export default function IngredientConsumptionModal({
             }));
         }
         if (view === "WEEKLY") {
-            return [...filteredWeeklyData].reverse().map((w) => ({
+            return filteredWeeklyData.map((w) => ({
                 label: w.shortLabel,
                 fullLabel: w.label,
                 consumed: w.totalConsumed,
@@ -339,7 +342,7 @@ export default function IngredientConsumptionModal({
             }));
         }
         if (view === "MONTHLY") {
-            return [...filteredMonthlyData].reverse().map((m) => ({
+            return filteredMonthlyData.map((m) => ({
                 label: m.shortLabel,
                 fullLabel: m.label,
                 consumed: m.totalConsumed,
@@ -483,7 +486,7 @@ export default function IngredientConsumptionModal({
                                 : "border-transparent text-ui-primary/60 hover:text-ui-primary"
                                 }`}
                         >
-                            <Wheat size={15} />
+                            <Wheat className="text-ui-primary" size={15} />
                             <span>Wyroby</span>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${view === "PRODUCTS"
                                 ? "bg-ui-secondary text-ui-white"
@@ -493,44 +496,23 @@ export default function IngredientConsumptionModal({
                             </span>
                         </button>
                     </div>
-
-                    {/* Filtr wg konkretnego produktu oraz szukajka */}
-                    {availableProducts.length > 1 && view !== "PRODUCTS" && (
-                        <div className="flex items-center py-2 shrink-0">
-                            <div className="relative">
-                                <select
-                                    value={selectedProductFilter}
-                                    onChange={(e) => setSelectedProductFilter(e.target.value)}
-                                    className="text-xs font-semibold pl-2.5 pr-7 py-1.5 rounded-xl border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-primary cursor-pointer appearance-none shadow-2xs"
-                                >
-                                    <option value="ALL">Wszystkie wyroby</option>
-                                    {availableProducts.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown size={12} className="absolute right-2 top-2.5 text-ui-secondary pointer-events-none" />
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* ---------------- ZAWARTOŚĆ GŁÓWNA ---------------- */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {/* 1. PASEK NAWIGACJI PO OKRESACH I WYBÓR ZAKRESU */}
                     {view !== "PRODUCTS" && (
-                        <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2.5 bg-ui-secondary/20 rounded-xl text-ui-secondary shadow-sm">
-                                        {view === "DAILY" ? <BarChart3 size={20} /> : view === "WEEKLY" ? <BarChart3 size={20} /> : <CalendarDays size={20} />}
+                        <div className="bg-white border border-ui-accent rounded-xl p-3 shadow-xs space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2.5">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-2xs">
+                                        <BarChart3 size={16} />
                                     </div>
                                     <div>
-                                        <h2 className="text-sm sm:text-base font-extrabold text-ui-black">
+                                        <h2 className="text-xs sm:text-sm font-bold text-ui-black leading-tight">
                                             {view === "DAILY" ? "Zużycie dzienne" : view === "WEEKLY" ? "Zużycie tygodniowe" : "Zużycie miesięczne"}
                                         </h2>
-                                        <div className="text-xs text-ui-secondary font-medium flex items-center gap-1.5 flex-wrap">
+                                        <div className="text-[11px] text-ui-secondary font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
                                             {(() => {
                                                 let startStr = "";
                                                 let endStr = "";
@@ -541,8 +523,8 @@ export default function IngredientConsumptionModal({
                                                         startStr = formatDate(dailyCustomRange.startDate);
                                                         endStr = formatDate(dailyCustomRange.endDate);
                                                     } else if (filteredDailyData.length > 0) {
-                                                        startStr = formatDate(filteredDailyData[filteredDailyData.length - 1].date);
-                                                        endStr = formatDate(filteredDailyData[0].date);
+                                                        startStr = formatDate(filteredDailyData[0].date);
+                                                        endStr = formatDate(filteredDailyData[filteredDailyData.length - 1].date);
                                                     }
                                                 } else if (view === "WEEKLY") {
                                                     count = filteredWeeklyData.length;
@@ -550,8 +532,8 @@ export default function IngredientConsumptionModal({
                                                         startStr = formatDate(weeklyCustomRange.startDate);
                                                         endStr = formatDate(weeklyCustomRange.endDate);
                                                     } else if (filteredWeeklyData.length > 0) {
-                                                        startStr = formatDate(filteredWeeklyData[filteredWeeklyData.length - 1].startDate);
-                                                        endStr = formatDate(filteredWeeklyData[0].endDate);
+                                                        startStr = formatDate(filteredWeeklyData[0].startDate);
+                                                        endStr = formatDate(filteredWeeklyData[filteredWeeklyData.length - 1].endDate);
                                                     }
                                                 } else if (view === "MONTHLY") {
                                                     count = filteredMonthlyData.length;
@@ -559,8 +541,8 @@ export default function IngredientConsumptionModal({
                                                         startStr = formatDate(monthlyCustomRange.startDate);
                                                         endStr = formatDate(monthlyCustomRange.endDate);
                                                     } else if (filteredMonthlyData.length > 0) {
-                                                        startStr = filteredMonthlyData[filteredMonthlyData.length - 1].label;
-                                                        endStr = filteredMonthlyData[0].label;
+                                                        startStr = filteredMonthlyData[0].label;
+                                                        endStr = filteredMonthlyData[filteredMonthlyData.length - 1].label;
                                                     }
                                                 }
 
@@ -568,7 +550,7 @@ export default function IngredientConsumptionModal({
                                                     return (
                                                         <>
                                                             <span><b>{startStr}</b> - <b>{endStr}</b></span>
-                                                            <span className="text-[10px] bg-ui-accent/30 text-ui-primary font-bold px-2 py-0.5 rounded-full">
+                                                            <span className="text-[9px] bg-ui-accent/30 text-ui-primary font-bold px-1.5 py-0.5 rounded-full">
                                                                 {count} {view === "DAILY" ? (count === 1 ? "dzień" : count < 5 ? "dni" : "dni") : view === "WEEKLY" ? (count === 1 ? "tydzień" : count < 5 ? "tygodnie" : "tygodni") : (count === 1 ? "miesiąc" : count < 5 ? "miesiące" : "miesięcy")}
                                                             </span>
                                                         </>
@@ -580,124 +562,107 @@ export default function IngredientConsumptionModal({
                                     </div>
                                 </div>
 
-                                {/* Przyciski presetów & Własny zakres */}
-                                <div className="flex flex-wrap items-center gap-1.5 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40 text-xs font-bold">
-                                    {view === "DAILY" && (
-                                        <>
-                                            {[7, 14, 30].map((cnt) => (
-                                                <button
-                                                    key={cnt}
-                                                    onClick={() => {
+                                {/* Selektor zakresu (rozwijana lista) */}
+                                <div className="flex items-center gap-1.5">
+
+                                    <div className="relative">
+                                        <select
+                                            value={
+                                                view === "DAILY"
+                                                    ? dailyCustomRange
+                                                        ? dailyCustomRange.startDate === `${todayStr.slice(0, 7)}-01` && dailyCustomRange.endDate === todayStr
+                                                            ? "THIS_MONTH"
+                                                            : "CUSTOM"
+                                                        : String(dailyCount)
+                                                    : view === "WEEKLY"
+                                                        ? weeklyCustomRange
+                                                            ? "CUSTOM"
+                                                            : String(weeklyCount)
+                                                        : monthlyCustomRange
+                                                            ? monthlyCustomRange.startDate === `${todayStr.slice(0, 4)}-01` && monthlyCustomRange.endDate === `${todayStr.slice(0, 4)}-12`
+                                                                ? "THIS_YEAR"
+                                                                : "CUSTOM"
+                                                            : String(monthlyCount)
+                                            }
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (view === "DAILY") {
+                                                    if (val === "THIS_MONTH") {
+                                                        const s = `${todayStr.slice(0, 7)}-01`;
+                                                        const eStr = todayStr;
+                                                        setDailyInputStart(s);
+                                                        setDailyInputEnd(eStr);
+                                                        setDailyCustomRange({ startDate: s, endDate: eStr });
+                                                    } else if (val === "CUSTOM") {
+                                                        setDailyCustomRange({ startDate: dailyInputStart, endDate: dailyInputEnd });
+                                                    } else {
                                                         setDailyCustomRange(null);
                                                         setDailyOffset(0);
-                                                        setDailyCount(cnt);
-                                                    }}
-                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!dailyCustomRange && dailyCount === cnt
-                                                        ? "bg-white text-ui-primary shadow-xs font-black"
-                                                        : "text-ui-secondary hover:text-ui-primary"
-                                                        }`}
-                                                >
-                                                    {cnt} dni
-                                                </button>
-                                            ))}
-                                            <button
-                                                onClick={() => {
-                                                    const s = `${todayStr.slice(0, 7)}-01`;
-                                                    const e = todayStr;
-                                                    setDailyInputStart(s);
-                                                    setDailyInputEnd(e);
-                                                    setDailyCustomRange({ startDate: s, endDate: e });
-                                                }}
-                                                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${dailyCustomRange?.startDate === `${todayStr.slice(0, 7)}-01` && dailyCustomRange?.endDate === todayStr
-                                                    ? "bg-white text-ui-primary shadow-xs font-black"
-                                                    : "text-ui-secondary hover:text-ui-primary"
-                                                    }`}
-                                            >
-                                                Ten miesiąc
-                                            </button>
-                                        </>
-                                    )}
-
-                                    {view === "WEEKLY" && (
-                                        <>
-                                            {[4, 6, 8, 12].map((cnt) => (
-                                                <button
-                                                    key={cnt}
-                                                    onClick={() => {
+                                                        setDailyCount(parseInt(val, 10));
+                                                    }
+                                                } else if (view === "WEEKLY") {
+                                                    if (val === "CUSTOM") {
+                                                        setWeeklyCustomRange({ startDate: weeklyInputStart, endDate: weeklyInputEnd });
+                                                    } else {
                                                         setWeeklyCustomRange(null);
                                                         setWeeklyOffset(0);
-                                                        setWeeklyCount(cnt);
-                                                    }}
-                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!weeklyCustomRange && weeklyCount === cnt
-                                                        ? "bg-white text-ui-primary shadow-xs font-black"
-                                                        : "text-ui-secondary hover:text-ui-primary"
-                                                        }`}
-                                                >
-                                                    {cnt} tyg.
-                                                </button>
-                                            ))}
-                                        </>
-                                    )}
-
-                                    {view === "MONTHLY" && (
-                                        <>
-                                            {[3, 6, 12].map((cnt) => (
-                                                <button
-                                                    key={cnt}
-                                                    onClick={() => {
+                                                        setWeeklyCount(parseInt(val, 10));
+                                                    }
+                                                } else if (view === "MONTHLY") {
+                                                    if (val === "THIS_YEAR") {
+                                                        const s = `${todayStr.slice(0, 4)}-01`;
+                                                        const eStr = `${todayStr.slice(0, 4)}-12`;
+                                                        setMonthlyInputStart(s);
+                                                        setMonthlyInputEnd(eStr);
+                                                        setMonthlyCustomRange({ startDate: s, endDate: eStr });
+                                                    } else if (val === "CUSTOM") {
+                                                        setMonthlyCustomRange({ startDate: monthlyInputStart, endDate: monthlyInputEnd });
+                                                    } else {
                                                         setMonthlyCustomRange(null);
                                                         setMonthlyOffset(0);
-                                                        setMonthlyCount(cnt);
-                                                    }}
-                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!monthlyCustomRange && monthlyCount === cnt
-                                                        ? "bg-white text-ui-primary shadow-xs font-black"
-                                                        : "text-ui-secondary hover:text-ui-primary"
-                                                        }`}
-                                                >
-                                                    {cnt} mies.
-                                                </button>
-                                            ))}
-                                            <button
-                                                onClick={() => {
-                                                    const s = `${todayStr.slice(0, 4)}-01`;
-                                                    const e = `${todayStr.slice(0, 4)}-12`;
-                                                    setMonthlyInputStart(s);
-                                                    setMonthlyInputEnd(e);
-                                                    setMonthlyCustomRange({ startDate: s, endDate: e });
-                                                }}
-                                                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${monthlyCustomRange?.startDate === `${todayStr.slice(0, 4)}-01` && monthlyCustomRange?.endDate === `${todayStr.slice(0, 4)}-12`
-                                                    ? "bg-white text-ui-primary shadow-xs font-black"
-                                                    : "text-ui-secondary hover:text-ui-primary"
-                                                    }`}
-                                            >
-                                                Ten rok
-                                            </button>
-                                        </>
-                                    )}
-
-                                    <button
-                                        onClick={() => {
-                                            if (view === "DAILY" && !dailyCustomRange) {
-                                                setDailyCustomRange({ startDate: dailyInputStart, endDate: dailyInputEnd });
-                                            } else if (view === "WEEKLY" && !weeklyCustomRange) {
-                                                setWeeklyCustomRange({ startDate: weeklyInputStart, endDate: weeklyInputEnd });
-                                            } else if (view === "MONTHLY" && !monthlyCustomRange) {
-                                                setMonthlyCustomRange({ startDate: monthlyInputStart, endDate: monthlyInputEnd });
-                                            }
-                                        }}
-                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${(view === "DAILY" && dailyCustomRange) || (view === "WEEKLY" && weeklyCustomRange) || (view === "MONTHLY" && monthlyCustomRange)
-                                            ? "bg-white text-ui-primary shadow-xs font-black border border-ui-accent/40"
-                                            : "text-ui-secondary hover:text-ui-primary"
-                                            }`}
-                                    >
-                                        <CalendarDays size={13} />
-                                        <span>Własny zakres</span>
-                                    </button>
+                                                        setMonthlyCount(parseInt(val, 10));
+                                                    }
+                                                }
+                                            }}
+                                            className="bg-ui-white border border-ui-accent text-ui-primary text-xs font-semibold rounded-lg pl-2.5 pr-7 py-1 sm:py-1.5 shadow-2xs focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none min-w-[140px]"
+                                        >
+                                            {view === "DAILY" && (
+                                                <>
+                                                    <option value="7">Ostatnie 7 dni</option>
+                                                    <option value="14">Ostatnie 14 dni</option>
+                                                    <option value="30">Ostatnie 30 dni</option>
+                                                    <option value="THIS_MONTH">Bieżący miesiąc</option>
+                                                    <option value="CUSTOM">Własny zakres dat...</option>
+                                                </>
+                                            )}
+                                            {view === "WEEKLY" && (
+                                                <>
+                                                    <option value="4">Ostatnie 4 tygodnie</option>
+                                                    <option value="6">Ostatnie 6 tygodni</option>
+                                                    <option value="8">Ostatnie 8 tygodni</option>
+                                                    <option value="12">Ostatnie 12 tygodni</option>
+                                                    <option value="CUSTOM">Własny zakres dat...</option>
+                                                </>
+                                            )}
+                                            {view === "MONTHLY" && (
+                                                <>
+                                                    <option value="3">Ostatnie 3 miesiące</option>
+                                                    <option value="6">Ostatnie 6 miesięcy</option>
+                                                    <option value="12">Ostatnie 12 miesięcy</option>
+                                                    <option value="THIS_YEAR">Bieżący rok</option>
+                                                    <option value="CUSTOM">Własny zakres dat...</option>
+                                                </>
+                                            )}
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                            <ChevronDown size={13} />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Wiersz drugorzędny: Kontrolki nawigacji paginacji lub selektor własnego zakresu dat */}
-                            <div className="pt-2.5 border-t border-ui-accent/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div className="pt-2 border-t border-ui-accent/30 flex flex-wrap items-center justify-between gap-2 text-xs">
                                 {((view === "DAILY" && dailyCustomRange) || (view === "WEEKLY" && weeklyCustomRange) || (view === "MONTHLY" && monthlyCustomRange)) ? (
                                     <div className="flex flex-wrap items-center gap-2.5 w-full justify-between">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -801,9 +766,6 @@ export default function IngredientConsumptionModal({
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-between w-full">
-                                        <div className="text-ui-secondary text-[11px] font-medium">
-                                            Użyj przycisków, aby przeglądać wcześniejsze lub późniejsze okresy:
-                                        </div>
                                         <div className="flex items-center gap-1.5">
                                             <button
                                                 onClick={() => {
@@ -880,7 +842,7 @@ export default function IngredientConsumptionModal({
                                 {view === "DAILY" && "Średnia dzienna"}
                                 {view === "WEEKLY" && "Średnia tygodniowa"}
                                 {view === "MONTHLY" && "Średnia miesięczna"}
-                                {view === "PRODUCTS" && "Liczba wyrobów"}
+                                {view === "PRODUCTS" && "Liczba produktów"}
                                 <TrendingUp size={14} className="text-ui-secondary font-bold" />
                             </div>
                             <div className="mt-2 text-2xl font-black text-ui-primary">
@@ -895,7 +857,7 @@ export default function IngredientConsumptionModal({
                                 {view === "DAILY" && "W wybranym zakresie dni"}
                                 {view === "WEEKLY" && "W wybranym zakresie tygodni"}
                                 {view === "MONTHLY" && "W wybranym zakresie miesięcy"}
-                                {view === "PRODUCTS" && "Wyrobów korzysta z tego składnika"}
+                                {view === "PRODUCTS" && "Produktów korzysta z tego składnika"}
                             </div>
                         </div>
 
@@ -950,7 +912,15 @@ export default function IngredientConsumptionModal({
                                                             <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2">
                                                                 {tooltipTitle}
                                                             </div>
-                                                            <div className="flex items-center justify-between text-emerald-700 font-semibold mb-1">
+                                                            {view === "MONTHLY" && (
+                                                                <div className="flex items-center justify-between text-[#38bdf8] font-semibold mb-1">
+                                                                    <span>Zakupiono:</span>
+                                                                    <span className="font-bold">
+                                                                        {dataPoint.purchased ?? 0} {unit}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-center justify-between text-[#042043] font-semibold mb-1">
                                                                 <span>Zużyto:</span>
                                                                 <span className="font-bold">
                                                                     {dataPoint.consumed} {unit}
@@ -959,7 +929,7 @@ export default function IngredientConsumptionModal({
                                                             {dataPoint.products && dataPoint.products.length > 0 && (
                                                                 <div className="mt-2.5 pt-2 border-t border-ui-accent/30 space-y-1">
                                                                     <div className="text-[10px] text-ui-secondary font-bold uppercase tracking-wider mb-1">
-                                                                        Wyroby ({dataPoint.products.length}):
+                                                                        Produkty ({dataPoint.products.length}):
                                                                     </div>
                                                                     <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
                                                                         {dataPoint.products.map((p: ProductUsage) => (
@@ -990,9 +960,9 @@ export default function IngredientConsumptionModal({
                                             />
                                         )}
                                         {view === "MONTHLY" && (
-                                            <Bar dataKey="purchased" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                                            <Bar dataKey="purchased" fill="#38bdf8" radius={[4, 4, 0, 0]} maxBarSize={36} />
                                         )}
-                                        <Bar dataKey="consumed" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                                        <Bar dataKey="consumed" fill="#042043" radius={[4, 4, 0, 0]} maxBarSize={36} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -1015,7 +985,7 @@ export default function IngredientConsumptionModal({
                                             <th className="p-3.5">Data</th>
                                             <th className="p-3.5">Dzień</th>
                                             <th className="p-3.5 text-right">Zużycie ({unit})</th>
-                                            <th className="p-3.5 text-center">Wypieki (liczba wyrobów)</th>
+                                            <th className="p-3.5 text-center">Wypieki (liczba produktów)</th>
                                             <th className="p-3.5 text-center w-10">Szczegóły</th>
                                         </tr>
                                     </thead>
@@ -1027,7 +997,7 @@ export default function IngredientConsumptionModal({
                                                     <React.Fragment key={d.date}>
                                                         <tr
                                                             onClick={() => toggleRow(d.date)}
-                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${isExpanded ? "bg-emerald-50/30" : ""
+                                                            className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
                                                                 }`}
                                                         >
                                                             <td className="p-3.5 text-ui-black">
@@ -1036,13 +1006,13 @@ export default function IngredientConsumptionModal({
                                                             <td className="p-3.5 text-ui-black">
                                                                 {d.dayOfWeek}
                                                             </td>
-                                                            <td className="p-3.5 text-right font-black text-emerald-700 text-sm">
+                                                            <td className="p-3.5 text-right text-[#042043] font-bold ">
                                                                 {d.totalConsumed.toFixed(2)} {unit}
                                                             </td>
                                                             <td className="p-3.5 text-center">
                                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-ui-accent/20 text-ui-primary text-[11px]">
-                                                                    <Wheat size={12} className="text-amber-700" />
-                                                                    {d.products.length} {d.products.length === 1 ? "wyrób" : "wyrobów"}
+                                                                    <Wheat className="text-ui-secondary" size={12} />
+                                                                    {d.products.length} {d.products.length === 1 ? "produkt" : "produktów"}
                                                                 </span>
                                                             </td>
                                                             <td className="p-3.5 text-center text-ui-secondary">
@@ -1054,11 +1024,11 @@ export default function IngredientConsumptionModal({
 
                                                         {/* ROZWINIĘCIE WIERSZA ZE SZCZEGÓŁAMI WYROBÓW */}
                                                         {isExpanded && (
-                                                            <tr className="bg-emerald-50/20">
+                                                            <tr className="bg-ui-accent/10">
                                                                 <td colSpan={5} className="p-4 border-b border-ui-accent/30">
                                                                     <div className="space-y-2">
                                                                         <div className="text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
-                                                                            Rozbicie zużycia na wyroby w dniu {formatDate(d.date)}:
+                                                                            Rozbicie zużycia na produkty w dniu {formatDate(d.date)}:
                                                                         </div>
                                                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                                                             {d.products.map((prod) => (
@@ -1078,7 +1048,7 @@ export default function IngredientConsumptionModal({
                                                                                     </div>
                                                                                     <div className="mt-2 pt-1 border-t border-ui-accent/20 flex items-center justify-between text-xs">
                                                                                         <span className="text-ui-secondary text-[10px]">Zużyto składnika:</span>
-                                                                                        <span className="font-black text-emerald-700">
+                                                                                        <span className="font-black text-ui-primary">
                                                                                             {prod.consumedAmount.toFixed(2)} {unit}
                                                                                         </span>
                                                                                     </div>
@@ -1094,7 +1064,7 @@ export default function IngredientConsumptionModal({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={5} className="p-8 text-center text-ui-secondary italic">
+                                                <td colSpan={5} className="p-8 text-center text-ui-secondary ">
                                                     Brak danych o zużyciu w wybranym okresie
                                                 </td>
                                             </tr>
@@ -1136,11 +1106,11 @@ export default function IngredientConsumptionModal({
                                                     <React.Fragment key={w.key}>
                                                         <tr
                                                             onClick={() => toggleRow(w.key)}
-                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${isExpanded ? "bg-emerald-50/30" : ""
+                                                            className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
                                                                 }`}
                                                         >
                                                             <td className="p-3.5">
-                                                                <div className="font-bold text-ui-black">{w.label}</div>
+                                                                <div className="font-bold text-ui-black">Tydzień {w.weekNumber}</div>
                                                                 <div className="text-[10px] text-ui-secondary mt-0.5">
                                                                     {formatDate(w.startDate)} — {formatDate(w.endDate)}
                                                                 </div>
@@ -1164,7 +1134,7 @@ export default function IngredientConsumptionModal({
                                                         </tr>
 
                                                         {isExpanded && (
-                                                            <tr className="bg-emerald-50/20">
+                                                            <tr className="bg-ui-accent/10">
                                                                 <td colSpan={5} className="p-4 border-b border-ui-accent/30">
                                                                     <div className="space-y-2">
                                                                         <div className="text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
@@ -1181,11 +1151,11 @@ export default function IngredientConsumptionModal({
                                                                                             {prod.productName}
                                                                                         </div>
                                                                                         <div className="text-[10px] text-ui-secondary">
-                                                                                            Upieczono: {prod.producedUnits} szt.
+                                                                                            Wyprodukowano: {prod.producedUnits} szt.
                                                                                         </div>
                                                                                     </div>
                                                                                     <div className="text-right whitespace-nowrap">
-                                                                                        <div className="font-black text-emerald-700 text-xs">
+                                                                                        <div className="font-black text-ui-primary text-xs">
                                                                                             {prod.consumedAmount.toFixed(2)} {unit}
                                                                                         </div>
                                                                                     </div>
@@ -1201,7 +1171,7 @@ export default function IngredientConsumptionModal({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={5} className="p-8 text-center text-ui-secondary italic">
+                                                <td colSpan={5} className="p-8 text-center text-ui-secondary ">
                                                     Brak danych dla wybranego okresu
                                                 </td>
                                             </tr>
@@ -1245,7 +1215,7 @@ export default function IngredientConsumptionModal({
                                                     <React.Fragment key={m.key}>
                                                         <tr
                                                             onClick={() => toggleRow(m.key)}
-                                                            className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${isExpanded ? "bg-emerald-50/30" : ""
+                                                            className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
                                                                 }`}
                                                         >
                                                             <td className="p-3.5 font-bold text-ui-black text-sm">
@@ -1256,10 +1226,10 @@ export default function IngredientConsumptionModal({
                                                                     {m.daysWithProduction} dni
                                                                 </span>
                                                             </td>
-                                                            <td className="p-3.5 text-right font-black text-ui-primary text-sm">
+                                                            <td className="p-3.5 text-right font-bold text-ui-primary">
                                                                 {m.totalConsumed.toFixed(2)} {unit}
                                                             </td>
-                                                            <td className="p-3.5 text-right font-bold text-ui-primary">
+                                                            <td className="p-3.5 text-right font-bold text-[#38bdf8]">
                                                                 {m.totalPurchased.toFixed(2)} {unit}
                                                             </td>
                                                             <td className="p-3.5 text-right font-bold">
@@ -1280,11 +1250,11 @@ export default function IngredientConsumptionModal({
                                                         </tr>
 
                                                         {isExpanded && (
-                                                            <tr className="bg-emerald-50/20">
+                                                            <tr className="bg-ui-accent/10">
                                                                 <td colSpan={6} className="p-4 border-b border-ui-accent/30">
                                                                     <div className="space-y-2">
                                                                         <div className="text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
-                                                                            Wyroby w miesiącu {m.label}:
+                                                                            Produkty w miesiącu {m.label}:
                                                                         </div>
                                                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                                                             {m.products.map((prod) => (
@@ -1297,11 +1267,11 @@ export default function IngredientConsumptionModal({
                                                                                             {prod.productName}
                                                                                         </div>
                                                                                         <div className="text-[10px] text-ui-secondary">
-                                                                                            Upieczono: {prod.producedUnits} szt.
+                                                                                            Wyprodukowano: {prod.producedUnits} szt.
                                                                                         </div>
                                                                                     </div>
                                                                                     <div className="text-right whitespace-nowrap">
-                                                                                        <div className="font-black text-emerald-700 text-xs">
+                                                                                        <div className="font-black text-ui-primary text-xs">
                                                                                             {prod.consumedAmount.toFixed(2)} {unit}
                                                                                         </div>
                                                                                     </div>
@@ -1317,7 +1287,7 @@ export default function IngredientConsumptionModal({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={6} className="p-8 text-center text-ui-secondary italic">
+                                                <td colSpan={6} className="p-8 text-center text-ui-secondary ">
                                                     Brak danych dla wybranego okresu
                                                 </td>
                                             </tr>
@@ -1341,7 +1311,7 @@ export default function IngredientConsumptionModal({
                                     {productRanking.map((p, idx) => (
                                         <div
                                             key={p.productId}
-                                            className="p-3.5 rounded-2xl border border-ui-accent/40 bg-ui-white/80 hover:bg-emerald-50/30 transition-colors"
+                                            className="p-3.5 rounded-2xl border border-ui-accent/40 bg-ui-white/80 hover:bg-ui-accent/10 transition-colors"
                                         >
                                             <div className="flex items-center justify-between gap-3 mb-1">
                                                 <div className="flex items-center gap-2.5">
@@ -1351,14 +1321,14 @@ export default function IngredientConsumptionModal({
                                                     <div>
                                                         <div className="font-bold text-ui-black text-sm">{p.productName}</div>
                                                         <div className="text-[10px] text-ui-secondary flex items-center gap-2 mt-0.5">
-                                                            <span>Łącznie upieczono: {p.totalProducedUnits} szt.</span>
+                                                            <span>Łącznie wyprodukowano: {p.totalProducedUnits} szt.</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="font-black text-emerald-800 text-base">
+                                                    <div className="font-black text-ui-primary text-base">
                                                         {p.totalConsumed.toFixed(2)}{" "}
-                                                        <span className="text-xs font-semibold">{unit}</span>
+                                                        <span className="text-xs text-ui-primary font-semibold">{unit}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1366,7 +1336,7 @@ export default function IngredientConsumptionModal({
                                     ))}
 
                                     {productRanking.length === 0 && (
-                                        <div className="p-8 text-center text-ui-secondary italic">
+                                        <div className="p-8 text-center text-ui-secondary">
                                             Brak wyrobów przypisanych do tego składnika w recepturach
                                         </div>
                                     )}

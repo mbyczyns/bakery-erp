@@ -458,9 +458,7 @@ export async function syncKsefInvoices(force: boolean = false): Promise<KsefSync
         lastSyncTimestamp = Date.now();
         console.log(`[KSeF Sync] Sukces. Zaimportowano nagłówków: ${importedCount}, pobrano szczegółów sprzedaży: ${salesProcessedCount}`);
 
-        const resultMessage = salesProcessedCount > 0
-            ? `Zsynchronizowano pomyślnie. Pobrano szczegóły dla ${salesProcessedCount} faktur sprzedażowych.`
-            : `Zsynchronizowano pomyślnie (${importedCount} faktur).`;
+        const resultMessage = "Zsynchronizowano pomyślnie";
 
         return {
             success: true,
@@ -540,7 +538,7 @@ export async function parseAndSaveInvoiceXml(
             await prisma.contractor.update({
                 where: { id: contractorId },
                 data: { address: fullAddress.trim() },
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }
 
@@ -550,7 +548,7 @@ export async function parseAndSaveInvoiceXml(
             await prisma.contractor.update({
                 where: { id: contractorId },
                 data: { address: '' },
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }
 
@@ -568,11 +566,9 @@ export async function parseAndSaveInvoiceXml(
         const productName = String(row.P_7 || 'Towar/Usługa bez nazwy').trim();
         if (!productName) continue;
 
-        const unit = String(row.P_8A || 'szt');
-        const quantity = parseFloat(String(row.P_8B || '1'));
-        const netPrice = parseFloat(String(row.P_9A || '0'));
-        const netAmount = parseFloat(String(row.P_11 || row.P_11A || '0'));
-        const grossAmount = parseFloat(String(row.P_11A || '0')) || (netAmount * 1.23);
+        const unit = String(row.P_8A || 'szt').trim();
+        const quantity = parseFloat(String(row.P_8B || '1').replace(',', '.')) || 1;
+        const netPrice = parseFloat(String(row.P_9A || '0').replace(',', '.')) || 0;
 
         const rawVat = row.P_12 !== undefined ? String(row.P_12).toLowerCase().trim() : '23';
         let safeVatRate = 0;
@@ -582,6 +578,16 @@ export async function parseAndSaveInvoiceXml(
         } else {
             safeVatRate = parseFloat(rawVat.replace('%', '').replace(',', '.')) || 0;
         }
+
+        const parsedNetAmount = parseFloat(String(row.P_11 || '').replace(',', '.'));
+        const netAmount = !isNaN(parsedNetAmount) && parsedNetAmount !== 0
+            ? parsedNetAmount
+            : (netPrice > 0 ? Number((netPrice * quantity).toFixed(2)) : 0);
+
+        const parsedGrossAmount = parseFloat(String(row.P_11A || '').replace(',', '.'));
+        const grossAmount = !isNaN(parsedGrossAmount) && parsedGrossAmount !== 0
+            ? parsedGrossAmount
+            : Number((netAmount * (1 + safeVatRate / 100)).toFixed(2));
 
         let product = null;
         if (contractorId) {

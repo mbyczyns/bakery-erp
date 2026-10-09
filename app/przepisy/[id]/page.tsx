@@ -62,6 +62,7 @@ interface DetailedIngredient {
     unitPriceNet?: number;
     unitPriceGross?: number;
     costContribution: number;
+    notes?: string | null;
     ingredientDetails?: any;
     semiFinishedDetails?: any;
 }
@@ -84,6 +85,7 @@ interface RecipeData {
         productionCost: number;
         sellingPrice: number;
         packagingCost?: number;
+        batchSize?: number;
         createdAt: string;
     };
     detailedIngredients: DetailedIngredient[];
@@ -202,14 +204,17 @@ export default function PrzepisSzczegolyPage({
     const [editBatchSize, setEditBatchSize] = useState("1");
     const [editItems, setEditItems] = useState<
         Array<{
+            rowId: string;
             id: string;
             kind: "INGREDIENT" | "SEMI_FINISHED";
             name: string;
             unit: string;
             batchAmount: string;
             unitPrice: number;
+            notes?: string;
         }>
     >([]);
+    const [openEditNotesRowIds, setOpenEditNotesRowIds] = useState<Record<string, boolean>>({});
     const [availableIngredients, setAvailableIngredients] = useState<any[]>([]);
     const [availableSemiFinished, setAvailableSemiFinished] = useState<any[]>([]);
     const [editSearchInput, setEditSearchInput] = useState("");
@@ -293,24 +298,30 @@ export default function PrzepisSzczegolyPage({
     // Otwieranie modalu edycji i przygotowanie danych
     const handleOpenEditModal = async () => {
         if (!data) return;
+        const recipeBatchSize = Number(data.recipe.batchSize) || 1;
         setEditName(data.recipe.name);
         setEditType(data.recipe.type);
         setEditPackagingCost(String(data.recipe.packagingCost ?? data.packagingCost ?? 0));
-        setEditBatchSize("1");
+        setEditBatchSize(String(recipeBatchSize));
 
-        // Mapujemy aktualne składniki
+        // Mapujemy aktualne składniki przeliczając ze stawki jednostkowej na wielkość partii bazowej
         setEditItems(
-            data.detailedIngredients.map((ing) => ({
-                id:
-                    ing.kind === "SEMI_FINISHED"
-                        ? ing.semiFinishedDetails?.id || ing.id
-                        : ing.ingredientDetails?.id || ing.id,
-                kind: ing.kind,
-                name: ing.name,
-                unit: ing.unit,
-                batchAmount: String(ing.amount),
-                unitPrice: ing.unitPrice,
-            }))
+            data.detailedIngredients.map((ing) => {
+                const batchAmt = Number((ing.amount * recipeBatchSize).toFixed(4));
+                return {
+                    rowId: ing.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                    id:
+                        ing.kind === "SEMI_FINISHED"
+                            ? ing.semiFinishedDetails?.id || ing.id
+                            : ing.ingredientDetails?.id || ing.id,
+                    kind: ing.kind,
+                    name: ing.name,
+                    unit: ing.unit,
+                    batchAmount: String(batchAmt),
+                    unitPrice: ing.unitPrice,
+                    notes: ing.notes || "",
+                };
+            })
         );
         setEditSearchInput("");
         setIsEditModalOpen(true);
@@ -336,7 +347,7 @@ export default function PrzepisSzczegolyPage({
         }
     };
 
-    // Dodawanie składnika do edytowanego przepisu
+    // Dodawanie składnika do edytowanego przepisu (dopuszczalne wielokrotne z osobną adnotacją)
     const handleSelectEditItem = (
         id: string,
         kind: "INGREDIENT" | "SEMI_FINISHED",
@@ -344,11 +355,10 @@ export default function PrzepisSzczegolyPage({
         unit: string,
         unitPrice: number
     ) => {
-        if (editItems.some((i) => i.id === id && i.kind === kind)) return;
-
+        const rowId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
         setEditItems((prev) => [
             ...prev,
-            { id, kind, name, unit, batchAmount: "1.0", unitPrice },
+            { rowId, id, kind, name, unit, batchAmount: "1.0", unitPrice, notes: "" },
         ]);
         setEditSearchInput("");
     };
@@ -401,14 +411,21 @@ export default function PrzepisSzczegolyPage({
     };
 
     // Usuwanie składnika z edycji
-    const handleRemoveEditItem = (id: string, kind: string) => {
-        setEditItems((prev) => prev.filter((i) => !(i.id === id && i.kind === kind)));
+    const handleRemoveEditItem = (rowId: string) => {
+        setEditItems((prev) => prev.filter((i) => i.rowId !== rowId));
     };
 
     // Zmiana ilości składnika
-    const handleAmountChangeEditItem = (id: string, kind: string, amount: string) => {
+    const handleAmountChangeEditItem = (rowId: string, amount: string) => {
         setEditItems((prev) =>
-            prev.map((i) => (i.id === id && i.kind === kind ? { ...i, batchAmount: amount } : i))
+            prev.map((i) => (i.rowId === rowId ? { ...i, batchAmount: amount } : i))
+        );
+    };
+
+    // Zmiana adnotacji składnika
+    const handleNotesChangeEditItem = (rowId: string, notes: string) => {
+        setEditItems((prev) =>
+            prev.map((i) => (i.rowId === rowId ? { ...i, notes } : i))
         );
     };
 
@@ -454,6 +471,7 @@ export default function PrzepisSzczegolyPage({
                     amount: perPieceAmt,
                     ingredientUnit: item.unit,
                     order: index,
+                    notes: item.notes ? item.notes.trim() : null,
                     ingredientId: item.kind === "INGREDIENT" ? item.id : null,
                     semiFinishedId: item.kind === "SEMI_FINISHED" ? item.id : null,
                 };
@@ -466,6 +484,7 @@ export default function PrzepisSzczegolyPage({
                     name: editName.trim(),
                     type: editType,
                     packagingCost: packagingCostNum,
+                    batchSize: batchNum,
                     ingredients: formattedIngredients,
                 }),
             });
@@ -659,10 +678,10 @@ export default function PrzepisSzczegolyPage({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleOpenEditModal}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ui-accent bg-ui-white hover:bg-ui-accent/20 text-ui-primary font-bold text-xs transition-colors cursor-pointer shadow-sm"
+                            className="flex items-center gap-1 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                             title="Edytuj przepis"
                         >
-                            <Edit3 size={14} className="text-ui-secondary" />
+                            <Edit3 size={14} className="text-ui-amber" />
                             Edytuj przepis
                         </button>
                         <button
@@ -675,38 +694,38 @@ export default function PrzepisSzczegolyPage({
                         </button>
                     </div>
                 </div>
+            </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="bg-ui-accent/10 border border-ui-accent/60 rounded-xl px-4 py-2 text-right">
-                        <div className="text-[11px] uppercase tracking-wider font-bold text-ui-secondary">
-                            Koszt produkcji
-                        </div>
-                        <div className="text-xl font-black text-ui-primary leading-tight">
-                            {totalFoodCost.toFixed(2)} zł <span className="text-xs font-semibold text-ui-secondary">netto</span>
-                        </div>
+            {/* GŁÓWNE KARTY KPI */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {/* Karta 0: Cena sprzedaży */}
+                <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Cena sprzedaży</span>
+                        <ShoppingBag size={18} className="text-ui-secondary" />
                     </div>
-
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 text-right">
-                        <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-800">
-                            Cena sprzedaży
-                        </div>
-                        <div className="text-xl font-bold text-emerald-950">
+                    <div>
+                        <div className="text-2xl font-black text-ui-primary leading-tight">
                             {currentSellingPrice > 0 ? (
                                 <>
-                                    {currentSellingPrice.toFixed(2)} zł{" "}
-                                    <span className="text-xs font-semibold text-emerald-800">brutto</span>
-
+                                    {currentSellingPrice.toFixed(2)} <span className="text-sm font-medium">zł brutto</span>
                                 </>
                             ) : (
-                                <span className="text-sm font-semibold text-emerald-700 italic">Nieustalona</span>
+                                <span className="text-xl font-bold text-ui-secondary">Nieustalona</span>
+                            )}
+                        </div>
+                        <div className="text-xs text-ui-primary mt-1">
+                            {currentSellingPrice > 0 ? (
+                                <>
+                                    {currentNetPrice.toFixed(2)} <span className="font-normal text-xs">zł netto (VAT {VAT_RATE}%)</span>
+                                </>
+                            ) : (
+                                <span className="font-normal text-[11px]">Ustal cenę w kalkulatorze poniżej</span>
                             )}
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* GŁÓWNE KARTY KPI */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 {/* Karta 1: Foodcost */}
                 <div className="bg-ui-white border border-ui-accent rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-ui-secondary mb-2">
@@ -715,10 +734,10 @@ export default function PrzepisSzczegolyPage({
                     </div>
                     <div>
                         <div className="text-2xl font-black text-ui-primary leading-tight">
-                            {totalFoodCost.toFixed(2)} <span className="text-sm font-semibold text-ui-secondary">zł netto</span>
+                            {totalFoodCost.toFixed(2)} <span className="text-sm font-medium">zł netto</span>
                         </div>
-                        <div className="text-xs font-bold text-ui-secondary mt-1">
-                            {totalFoodCostGross.toFixed(2)} zł <span className="font-medium text-[10px]">brutto</span>
+                        <div className="text-xs text-ui-primary mt-1">
+                            {totalFoodCostGross.toFixed(2)} <span className="font-normal text-xs">zł brutto</span>
                         </div>
                     </div>
                 </div>
@@ -730,18 +749,24 @@ export default function PrzepisSzczegolyPage({
                         <Coins size={18} className="text-ui-secondary" />
                     </div>
                     <div>
-                        <div className="text-2xl font-black text-ui-primary">
+                        <div className="text-2xl font-black text-ui-primary leading-tight">
                             {currentSellingPrice > 0 ? (
                                 <>
                                     {currentProfit.toFixed(2)} <span className="text-sm font-medium">zł netto</span>
                                 </>
-                            ) : "—"}
+                            ) : (
+                                <span className="text-xl font-bold text-ui-secondary">—</span>
+                            )}
                         </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            {currentSellingPrice > 0
-                                ? `Cena netto (${currentNetPrice.toFixed(2)} zł) - koszt (${totalFoodCost.toFixed(2)} zł)`
-                                : "Ustal cenę sprzedaży poniżej"}
-                        </p>
+                        <div className="text-xs text-ui-primary mt-1">
+                            {currentSellingPrice > 0 ? (
+                                <span className="font-normal text-xs">
+
+                                </span>
+                            ) : (
+                                <span className="font-normal text-[11px]">Ustal cenę sprzedaży poniżej</span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -752,14 +777,22 @@ export default function PrzepisSzczegolyPage({
                         <Percent size={18} className="text-ui-secondary" />
                     </div>
                     <div>
-                        <div className={`text-2xl font-black text-ui-primary`}>
-                            {currentSellingPrice > 0 ? `${currentMargin.toFixed(1)}%` : "—"}
+                        <div className="text-2xl font-black text-ui-primary leading-tight">
+                            {currentSellingPrice > 0 ? (
+                                <>
+                                    {currentMargin.toFixed(1)} <span className="text-sm font-medium">%</span>
+                                </>
+                            ) : (
+                                <span className="text-xl font-bold text-ui-secondary">—</span>
+                            )}
                         </div>
-                        <p className="text-[11px] text-ui-secondary mt-1">
-                            {currentSellingPrice > 0
-                                ? `Rentowność sprzedaży wyrobu`
-                                : "Ustal cenę sprzedaży poniżej"}
-                        </p>
+                        <div className="text-xs text-ui-primary mt-1">
+                            {currentSellingPrice > 0 ? (
+                                <span className="font-normal text-xs">Rentowność sprzedaży wyrobu</span>
+                            ) : (
+                                <span className="font-normal text-[11px]">Ustal cenę sprzedaży poniżej</span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -826,7 +859,7 @@ export default function PrzepisSzczegolyPage({
                                     <tr className="border-b border-ui-accent text-ui-secondary font-bold uppercase tracking-wider text-[10px]">
                                         <th className="py-3 px-3 text-left">Składnik</th>
                                         <th className="py-3 px-3 text-right">
-                                            {previewBatchSize === 1 ? "Waga na 1 szt." : `Ilość na ${previewBatchSize} szt.`}
+                                            {previewBatchSize === 1 ? "Ilość na 1 szt." : `Ilość na ${previewBatchSize} szt.`}
                                         </th>
                                         <th className="py-3 px-3 text-right">Cena netto</th>
                                         <th className="py-3 px-3 text-right">Cena brutto</th>
@@ -840,23 +873,30 @@ export default function PrzepisSzczegolyPage({
 
                                         return (
                                             <tr key={item.id} className="hover:bg-ui-accent/5 transition-colors">
-                                                <td className="py-3.5 px-3">
-                                                    <span className="font-bold text-ui-black text-xs">
-                                                        {item.name}
-                                                    </span>
+                                                <td className="py-3.5 px-3 align-middle">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-ui-black text-xs">
+                                                            {item.name}
+                                                        </span>
+                                                        {item.notes && (
+                                                            <span className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md">
+                                                                {item.notes}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
 
-                                                <td className="py-3.5 px-3 text-right font-medium text-ui-black">
+                                                <td className="py-3.5 px-3 text-right text-xs text-ui-black align-middle">
                                                     {scaledAmount < 1 && item.unit === "kg"
                                                         ? `${(scaledAmount * 1000).toFixed(1)} g`
                                                         : `${scaledAmount.toFixed(3)} ${item.unit}`}
                                                 </td>
 
-                                                <td className="py-3.5 px-3 text-right font-medium text-ui-black">
+                                                <td className="py-3.5 px-3 text-right text-xs text-ui-black align-middle">
                                                     {priceNet.toFixed(2)} zł / {item.unit}
                                                 </td>
 
-                                                <td className="py-3.5 px-3 text-right font-semibold text-ui-black">
+                                                <td className="py-3.5 px-3 text-right text-xs text-ui-black align-middle">
                                                     {priceGross.toFixed(2)} zł / {item.unit}
                                                 </td>
                                             </tr>
@@ -866,7 +906,7 @@ export default function PrzepisSzczegolyPage({
                                     {/* Koszt opakowania */}
                                     {Number(recipe.packagingCost ?? data.packagingCost ?? 0) > 0 && (
                                         <tr className="hover:bg-amber-50/40 bg-amber-50/20 transition-colors">
-                                            <td className="py-3.5 px-3">
+                                            <td className="py-3.5 px-3 align-middle">
                                                 <div className="flex items-center gap-1.5">
                                                     <PackageCheck size={14} className="text-ui-secondary" />
                                                     <span className="font-bold text-ui-black text-xs">
@@ -874,13 +914,13 @@ export default function PrzepisSzczegolyPage({
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="py-3.5 px-3 text-right font-medium text-ui-secondary">
+                                            <td className="py-3.5 px-3 text-right font-medium text-ui-secondary align-middle">
                                                 {previewBatchSize} szt.
                                             </td>
-                                            <td className="py-3.5 px-3 text-right font-medium text-ui-secondary">
+                                            <td className="py-3.5 px-3 text-right font-medium text-ui-secondary align-middle">
                                                 {Number(recipe.packagingCost ?? data.packagingCost ?? 0).toFixed(2)} zł / szt.
                                             </td>
-                                            <td className="py-3.5 px-3 text-right font-semibold text-amber-950">
+                                            <td className="py-3.5 px-3 text-right font-semibold text-amber-950 align-middle">
                                                 {(Number(recipe.packagingCost ?? data.packagingCost ?? 0) * 1.23).toFixed(2)} zł / szt.
                                             </td>
                                         </tr>
@@ -896,7 +936,7 @@ export default function PrzepisSzczegolyPage({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="py-3 px-3 text-right text-xs text-ui-black">
+                                        <td className="py-3 px-3 text-right font-black text-sm text-ui-black">
                                             {(totalFoodCost * previewBatchSize).toFixed(2)} zł
                                         </td>
                                         <td className="py-3 px-3 text-right font-black text-sm text-ui-black">
@@ -958,7 +998,7 @@ export default function PrzepisSzczegolyPage({
                                         <label className="text-xs font-bold text-ui-black uppercase tracking-wider">
                                             Oczekiwana marża:
                                         </label>
-                                        <span className="text-lg font-black text-ui-secondary">
+                                        <span className="text-lg font-black text-ui-primary">
                                             {targetMargin}%
                                         </span>
                                     </div>
@@ -970,9 +1010,9 @@ export default function PrzepisSzczegolyPage({
                                                 key={preset}
                                                 type="button"
                                                 onClick={() => setTargetMargin(preset)}
-                                                className={`py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${targetMargin === preset
-                                                    ? "bg-emerald-700 text-white border-emerald-700 shadow-sm"
-                                                    : "bg-ui-white border-ui-accent text-ui-secondary hover:border-emerald-500 hover:text-emerald-700"
+                                                className={`py-1.5 text-xs font-bold rounded-lg border border-ui-accent transition-all cursor-pointer ${targetMargin === preset
+                                                    ? "bg-ui-primary text-white shadow-sm"
+                                                    : "bg-ui-white text-ui-primary hover:text-ui-primary"
                                                     }`}
                                             >
                                                 {preset}%
@@ -985,11 +1025,11 @@ export default function PrzepisSzczegolyPage({
                                         <input
                                             type="range"
                                             min="10"
-                                            max="90"
+                                            max="95"
                                             step="1"
                                             value={targetMargin}
                                             onChange={(e) => setTargetMargin(Number(e.target.value))}
-                                            className="flex-1 accent-ui-secondary cursor-pointer"
+                                            className="flex-1 accent-ui-primary cursor-pointer"
                                         />
                                         <div className="w-16 relative">
                                             <input
@@ -1012,7 +1052,7 @@ export default function PrzepisSzczegolyPage({
                                                 }}
                                                 className="w-full h-9 border border-ui-accent rounded-lg pr-5 pl-2 text-center font-bold text-sm text-ui-black focus:outline-none focus:border-emerald-600 shadow-2xs"
                                             />
-                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-ui-secondary pointer-events-none">
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-ui-primary pointer-events-none">
                                                 %
                                             </span>
                                         </div>
@@ -1032,7 +1072,7 @@ export default function PrzepisSzczegolyPage({
                                             onChange={(e) => setCustomGrossPrice(e.target.value)}
                                             className="w-full h-11 border border-ui-accent rounded-xl pl-3.5 pr-12 text-base font-bold text-ui-black focus:outline-none focus:border-emerald-600 shadow-sm"
                                         />
-                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-ui-secondary pointer-events-none">
+                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-ui-primary pointer-events-none">
                                             zł brutto
                                         </span>
                                     </div>
@@ -1047,41 +1087,40 @@ export default function PrzepisSzczegolyPage({
                                     <span className="text-xs font-bold text-ui-black uppercase tracking-wider block">
                                         Sugerowana cena (Brutto):
                                     </span>
-                                    <span className="text-[10px] font-semibold text-ui-secondary">
-                                        Zaokrąglenie: {PRICE_ROUNDING_OPTIONS.find((o) => o.id === priceRounding)?.label || "Brak zaokrąglenia"}
-                                    </span>
                                 </div>
-                                <div className="text-2xl font-black text-ui-black">
+                                <div className="text-2xl font-black text-ui-primary">
                                     {finalGrossToSave.toFixed(2)} zł
                                 </div>
                             </div>
 
                             <div className="pt-2.5 border-t border-ui-accent/40 space-y-2 text-xs text-ui-black">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-ui-secondary font-medium">Cena netto (w tym VAT 5%):</span>
+                                    <span className="text-ui-black">Cena netto (w tym VAT 5%):</span>
                                     <span className="font-bold">{finalNetToSave.toFixed(2)} zł</span>
                                 </div>
 
                                 <div className="flex items-center justify-between">
-                                    <span className="text-ui-secondary font-medium">Koszt surowcowy (Foodcost):</span>
+                                    <span className="text-ui-black">Koszt surowcowy netto:</span>
                                     <span className="font-bold">
-                                        {foodCostPerUnit.toFixed(2)} zł <span className="text-[10px] text-ui-secondary font-normal">netto ({totalFoodCostGross.toFixed(2)} zł brutto)</span>
+                                        {foodCostPerUnit.toFixed(2)} zł
                                     </span>
                                 </div>
 
                                 <div className="flex items-center justify-between">
-                                    <span className="text-ui-secondary font-medium">Zysk netto na 1 sztuce:</span>
+                                    <span className="text-ui-black">Koszt surowcowy brutto:</span>
+                                    <span className="font-bold">
+                                        {totalFoodCostGross.toFixed(2)} zł
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <span className="text-ui-black ">Zysk netto na 1 sztuce:</span>
                                     <span className="font-bold text-emerald-700">
                                         +{(calcMode === "FROM_MARGIN" ? profitPerUnitFromMargin : profitFromPrice).toFixed(2)} zł
                                     </span>
                                 </div>
 
-                                <div className="flex items-center justify-between">
-                                    <span className="text-ui-secondary font-medium">Marża handlowa:</span>
-                                    <span className="font-extrabold text-ui-black rounded">
-                                        {activeMargin.toFixed(1)}%
-                                    </span>
-                                </div>
+
                             </div>
                         </div>
 
@@ -1157,7 +1196,7 @@ export default function PrzepisSzczegolyPage({
                                         <div className="text-xs text-ui-secondary font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
                                             {rangeStartStr && rangeEndStr ? (
                                                 <>
-                                                    <span>Zakres: <b>{rangeStartStr}</b> do <b>{rangeEndStr}</b></span>
+                                                    <span><b>{rangeStartStr}</b> do <b>{rangeEndStr}</b></span>
                                                     <span className="text-[10px] bg-ui-accent/30 text-ui-primary font-bold px-2 py-0.5 rounded-full">
                                                         {count} {count === 1 ? "dzień" : "dni"}
                                                     </span>
@@ -1173,64 +1212,56 @@ export default function PrzepisSzczegolyPage({
                                     {/* Legenda */}
                                     <div className="flex items-center gap-3 text-xs font-semibold">
                                         <div className="flex items-center gap-1.5">
-                                            <div className="w-3 h-3 rounded bg-amber-500" />
+                                            <div className="w-3 h-3 rounded bg-[#38bdf8]" />
                                             <span>Wyprodukowano</span>
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                            <div className="w-3 h-3 rounded bg-emerald-600" />
+                                            <div className="w-3 h-3 rounded bg-[#042043]" />
                                             <span>Sprzedano</span>
                                         </div>
                                     </div>
 
-                                    {/* Przyciski presetów & Własny zakres */}
+                                    {/* Selektor zakresu (rozwijana lista) */}
                                     {allProductions.length > 0 && (
-                                        <div className="flex flex-wrap items-center gap-1.5 bg-ui-accent/10 p-1.5 rounded-xl border border-ui-accent/40 text-xs font-bold">
-                                            {[7, 14, 30].map((cnt) => (
-                                                <button
-                                                    key={cnt}
-                                                    onClick={() => {
-                                                        setProdCustomRange(null);
-                                                        setProdOffset(0);
-                                                        setProdCount(cnt);
-                                                    }}
-                                                    className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${!prodCustomRange && prodCount === cnt
-                                                        ? "bg-white text-ui-primary shadow-xs font-black"
-                                                        : "text-ui-secondary hover:text-ui-primary"
-                                                        }`}
-                                                >
-                                                    {cnt} dni
-                                                </button>
-                                            ))}
-                                            <button
-                                                onClick={() => {
-                                                    const s = `${todayStr.slice(0, 7)}-01`;
-                                                    const e = todayStr;
-                                                    setProdInputStart(s);
-                                                    setProdInputEnd(e);
-                                                    setProdCustomRange({ startDate: s, endDate: e });
-                                                }}
-                                                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${prodCustomRange?.startDate === `${todayStr.slice(0, 7)}-01` && prodCustomRange?.endDate === todayStr
-                                                    ? "bg-white text-ui-primary shadow-xs font-black"
-                                                    : "text-ui-secondary hover:text-ui-primary"
-                                                    }`}
-                                            >
-                                                Ten miesiąc
-                                            </button>
+                                        <div className="flex items-center gap-1.5">
 
-                                            <button
-                                                onClick={() => {
-                                                    if (!prodCustomRange) {
-                                                        setProdCustomRange({ startDate: prodInputStart, endDate: prodInputEnd });
+                                            <div className="relative">
+                                                <select
+                                                    value={
+                                                        prodCustomRange
+                                                            ? prodCustomRange.startDate === `${todayStr.slice(0, 7)}-01` && prodCustomRange.endDate === todayStr
+                                                                ? "THIS_MONTH"
+                                                                : "CUSTOM"
+                                                            : String(prodCount)
                                                     }
-                                                }}
-                                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${prodCustomRange
-                                                    ? "bg-white text-ui-primary shadow-xs font-black border border-ui-accent/40"
-                                                    : "text-ui-secondary hover:text-ui-primary"
-                                                    }`}
-                                            >
-                                                <CalendarDays size={13} />
-                                                <span>Własny zakres</span>
-                                            </button>
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val === "THIS_MONTH") {
+                                                            const s = `${todayStr.slice(0, 7)}-01`;
+                                                            const eStr = todayStr;
+                                                            setProdInputStart(s);
+                                                            setProdInputEnd(eStr);
+                                                            setProdCustomRange({ startDate: s, endDate: eStr });
+                                                        } else if (val === "CUSTOM") {
+                                                            setProdCustomRange({ startDate: prodInputStart, endDate: prodInputEnd });
+                                                        } else {
+                                                            setProdCustomRange(null);
+                                                            setProdOffset(0);
+                                                            setProdCount(parseInt(val, 10));
+                                                        }
+                                                    }}
+                                                    className="bg-ui-white border border-ui-accent text-ui-primary text-xs font-semibold rounded-lg pl-2.5 pr-7 py-1 sm:py-1.5 shadow-2xs focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none min-w-[140px]"
+                                                >
+                                                    <option value="7">Ostatnie 7 dni</option>
+                                                    <option value="14">Ostatnie 14 dni</option>
+                                                    <option value="30">Ostatnie 30 dni</option>
+                                                    <option value="THIS_MONTH">Bieżący miesiąc</option>
+                                                    <option value="CUSTOM">Własny zakres dat...</option>
+                                                </select>
+                                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                                    <ChevronDown size={13} />
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1393,18 +1424,18 @@ export default function PrzepisSzczegolyPage({
                                                                 <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1 mb-2">
                                                                     {formatDate(dataPoint?.date || label)}
                                                                 </div>
-                                                                <div className="flex items-center justify-between gap-4 text-[#f59e0b] mb-1.5">
+                                                                <div className="flex items-center justify-between gap-4 text-[#38bdf8] mb-1.5">
                                                                     <span className="font-medium">Wyprodukowano:</span>
-                                                                    <span className="font-bold">{produced} szt.</span>
+                                                                    <span className="font-medium">{produced} szt.</span>
                                                                 </div>
-                                                                <div className="flex items-center justify-between gap-4 text-[#059669] mb-1">
+                                                                <div className="flex items-center justify-between gap-4 text-[#042043] mb-1">
                                                                     <span className="font-medium">Sprzedano:</span>
-                                                                    <span className="font-bold">{sold} szt.</span>
+                                                                    <span className="font-medium">{sold} szt.</span>
                                                                 </div>
                                                                 {unsold > 0 && (
                                                                     <div className="flex items-center justify-between gap-4 text-rose-600 text-[11px] pt-1 border-t border-ui-accent/30 mt-1">
                                                                         <span className="font-medium">Niesprzedane:</span>
-                                                                        <span className="font-bold">-{unsold} szt.</span>
+                                                                        <span className="font-medium">-{unsold} szt.</span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1413,8 +1444,8 @@ export default function PrzepisSzczegolyPage({
                                                     return null;
                                                 }}
                                             />
-                                            <Bar dataKey="producedAmount" name="producedAmount" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                            <Bar dataKey="soldAmount" name="soldAmount" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                            <Bar dataKey="producedAmount" name="producedAmount" fill="#38bdf8" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                            <Bar dataKey="soldAmount" name="soldAmount" fill="#042043" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -1433,15 +1464,15 @@ export default function PrzepisSzczegolyPage({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-ui-accent/40">
-                                            {filteredList.map((item) => (
+                                            {[...filteredList].reverse().map((item) => (
                                                 <tr key={item.id} className="hover:bg-ui-accent/5 transition-colors">
-                                                    <td className="py-3 px-3 font-semibold text-ui-black">
+                                                    <td className="py-3 px-3 text-ui-black">
                                                         {formatDate(item.date)}
                                                     </td>
-                                                    <td className="py-3 px-3 text-right font-bold text-amber-950">
+                                                    <td className="py-3 px-3 text-right  text-[#38bdf8]">
                                                         {item.producedAmount} szt.
                                                     </td>
-                                                    <td className="py-3 px-3 text-right font-bold text-emerald-950">
+                                                    <td className="py-3 px-3 text-right  text-[#042043]">
                                                         {item.soldAmount} szt.
                                                     </td>
                                                     <td className="py-3 px-3 text-right text-rose-700 font-medium">
@@ -1459,7 +1490,7 @@ export default function PrzepisSzczegolyPage({
                                                             {item.efficiencyRate.toFixed(0)}%
                                                         </span>
                                                     </td>
-                                                    <td className="py-3 px-3 text-right font-extrabold text-ui-black">
+                                                    <td className="py-3 px-3 text-right  text-ui-black">
                                                         {(() => {
                                                             const itemIncome = Number(item.salesIncome) > 0
                                                                 ? Number(item.salesIncome)
@@ -1487,7 +1518,7 @@ export default function PrzepisSzczegolyPage({
                     onClick={() => setIsEditModalOpen(false)}
                 >
                     <div
-                        className="bg-ui-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[92vh] flex flex-col"
+                        className="bg-ui-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-ui-accent max-h-[92vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nagłówek Modalu */}
@@ -1624,7 +1655,7 @@ export default function PrzepisSzczegolyPage({
                                             {availableIngredients.filter((ing) => matchesSearch(ing.name, editSearchInput)).length === 0 &&
                                                 availableSemiFinished.filter((semi) => matchesSearch(semi.name, editSearchInput)).length === 0 ? (
                                                 <div className="p-4 text-center text-ui-secondary text-xs">
-                                                    <p className="italic mb-2">Nie znaleziono pozycji &quot;{editSearchInput}&quot;</p>
+                                                    <p className="mb-2">Nie znaleziono pozycji &quot;{editSearchInput}&quot;</p>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -1746,8 +1777,8 @@ export default function PrzepisSzczegolyPage({
                                                 const totalItemCost = cleanAmt * item.unitPrice;
 
                                                 return (
-                                                    <tr key={`${item.kind}-${item.id}`} className="hover:bg-ui-accent/5 focus-within:bg-amber-500/10 transition-colors">
-                                                        <td className="py-2.5 px-3 min-w-0">
+                                                    <tr key={item.rowId} className="hover:bg-ui-accent/5 focus-within:bg-amber-500/10 transition-colors">
+                                                        <td className="py-2.5 px-3 min-w-0 align-middle">
                                                             <div className="flex items-center gap-2 min-w-0">
                                                                 <div className="flex items-center gap-0.5 shrink-0 bg-ui-accent/10 p-0.5 rounded-lg border border-ui-accent/40">
                                                                     <button
@@ -1774,23 +1805,65 @@ export default function PrzepisSzczegolyPage({
                                                                     {index + 1}.
                                                                 </span>
 
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="font-bold text-ui-black text-xs sm:text-sm truncate" title={item.name}>
-                                                                        {item.name}
+                                                                <div className="min-w-0 flex-1 space-y-1">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="font-bold text-ui-black text-xs sm:text-sm truncate" title={item.name}>
+                                                                            {item.name}
+                                                                        </span>
+                                                                        <span
+                                                                            className={`text-[9px] px-1.5 py-0.2 rounded font-semibold inline-block ${item.kind === "SEMI_FINISHED"
+                                                                                ? "text-amber-800 bg-amber-50 border border-amber-200/60"
+                                                                                : "text-slate-700 bg-slate-100 border border-slate-200/60"
+                                                                                }`}
+                                                                        >
+                                                                            {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
+                                                                        </span>
+
+                                                                        {!openEditNotesRowIds[item.rowId] && (!item.notes || !item.notes.trim()) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setOpenEditNotesRowIds((prev) => ({ ...prev, [item.rowId]: true }))}
+                                                                                className="inline-flex items-center gap-1 text-[11px] text-ui-secondary hover:text-amber-800 bg-ui-accent/10 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-dashed border-ui-accent/60 hover:border-amber-300 transition-colors cursor-pointer"
+                                                                                title="Dodaj informację do tego składnika"
+                                                                            >
+                                                                                <Plus size={10} />
+                                                                            </button>
+                                                                        )}
                                                                     </div>
-                                                                    <span
-                                                                        className={`text-[9px] px-1.5 py-0.2 rounded font-semibold inline-block ${item.kind === "SEMI_FINISHED"
-                                                                            ? "text-amber-800 bg-amber-50 border border-amber-200/60"
-                                                                            : "text-slate-700 bg-slate-100 border border-slate-200/60"
-                                                                            }`}
-                                                                    >
-                                                                        {item.kind === "SEMI_FINISHED" ? "Półprodukt" : "Surowiec"}
-                                                                    </span>
+
+                                                                    {(openEditNotesRowIds[item.rowId] || (item.notes && item.notes.trim())) && (
+                                                                        <div className="flex items-center gap-1.5 pt-0.5">
+                                                                            <span className="text-[10px] font-semibold text-amber-900 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                                                                                Adnotacja:
+                                                                            </span>
+                                                                            <input
+                                                                                type="text"
+                                                                                autoFocus={openEditNotesRowIds[item.rowId] && !item.notes}
+                                                                                value={item.notes || ""}
+                                                                                onChange={(e) =>
+                                                                                    handleNotesChangeEditItem(item.rowId, e.target.value)
+                                                                                }
+                                                                                placeholder="np. do ciasta, do posmarowania..."
+                                                                                className="text-[11px] px-2 py-0.5 rounded-md border border-amber-300 bg-amber-50/40 focus:bg-white focus:border-amber-600 focus:outline-none placeholder:text-ui-secondary/60 text-ui-black w-full max-w-sm shadow-2xs"
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    handleNotesChangeEditItem(item.rowId, "");
+                                                                                    setOpenEditNotesRowIds((prev) => ({ ...prev, [item.rowId]: false }));
+                                                                                }}
+                                                                                className="p-1 text-ui-secondary hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0"
+                                                                                title="Usuń adnotację"
+                                                                            >
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </td>
 
-                                                        <td className="py-2.5 px-3 text-center">
+                                                        <td className="py-2.5 px-3 text-center align-middle">
                                                             <div className="relative inline-block w-28">
                                                                 <input
                                                                     id={`edit-recipe-qty-${index}`}
@@ -1799,8 +1872,7 @@ export default function PrzepisSzczegolyPage({
                                                                     value={item.batchAmount}
                                                                     onChange={(e) =>
                                                                         handleAmountChangeEditItem(
-                                                                            item.id,
-                                                                            item.kind,
+                                                                            item.rowId,
                                                                             e.target.value
                                                                         )
                                                                     }
@@ -1827,26 +1899,26 @@ export default function PrzepisSzczegolyPage({
                                                                             }
                                                                         }
                                                                     }}
-                                                                    className="w-full bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-bold text-xs text-ui-black focus:outline-none focus:border-amber-600 shadow-2xs tabular-nums"
+                                                                    className="w-full bg-ui-white border border-ui-accent rounded-lg pl-2 pr-8 py-1.5 text-center text-sm text-ui-black focus:outline-none focus:border-amber-600 focus:bg-white transition-all shadow-2xs tabular-nums"
                                                                 />
-                                                                <span className="absolute right-2 top-1.5 text-[10px] text-ui-secondary pointer-events-none font-bold">
+                                                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-ui-secondary pointer-events-none font-bold select-none">
                                                                     {item.unit}
                                                                 </span>
                                                             </div>
                                                         </td>
 
-                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums align-middle">
                                                             {item.unitPrice.toFixed(2)} zł
                                                         </td>
 
-                                                        <td className="py-2.5 px-3 text-right font-bold text-ui-black tabular-nums">
+                                                        <td className="py-2.5 px-3 text-right font-bold text-ui-black tabular-nums align-middle">
                                                             {totalItemCost.toFixed(2)} zł
                                                         </td>
 
-                                                        <td className="py-2.5 px-3 text-center">
+                                                        <td className="py-2.5 px-3 text-center align-middle">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleRemoveEditItem(item.id, item.kind)}
+                                                                onClick={() => handleRemoveEditItem(item.rowId)}
                                                                 className="p-1 hover:bg-rose-50 text-rose-600 rounded transition-colors cursor-pointer"
                                                                 title="Usuń składnik"
                                                             >
@@ -1869,10 +1941,10 @@ export default function PrzepisSzczegolyPage({
                                             Szacowany foodcost
                                         </span>
                                         <span className="text-[11px] text-ui-secondary">
-                                            Wyliczony na 1 gotową sztukę wyrobu (surowce + opakowanie)
+                                            Surowce + opakowanie
                                         </span>
                                     </div>
-                                    <div className="text-2xl font-black text-amber-950">
+                                    <div className="text-2xl font-black text-ui-primary">
                                         {(() => {
                                             const batchNum = parseFloat(editBatchSize.replace(",", ".").trim()) || 1;
                                             const totalIngredientsCost = editItems.reduce((sum, item) => {
@@ -1910,7 +1982,7 @@ export default function PrzepisSzczegolyPage({
                                     ) : (
                                         <>
                                             <CheckCircle2 size={15} />
-                                            Zapisz zmiany w przepisie
+                                            Zapisz zmiany
                                         </>
                                     )}
                                 </button>
@@ -1966,7 +2038,7 @@ export default function PrzepisSzczegolyPage({
                                 type="button"
                                 disabled={isDeleting}
                                 onClick={handleDeleteRecipe}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-all cursor-pointer shadow-sm disabled:opacity-50"
                             >
                                 {isDeleting ? (
                                     <>

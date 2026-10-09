@@ -258,6 +258,11 @@ export default function KosztyTab() {
         return Math.round((liveOpTotal + invTotal) * 100) / 100;
     }, [liveOpTotal, costData?.invoicesSummary?.grossTotal]);
 
+    const liveGrandEnterpriseNetTotal = useMemo(() => {
+        const invNet = costData?.invoicesSummary?.netTotal || 0;
+        return Math.round((liveOpTotal + invNet) * 100) / 100;
+    }, [liveOpTotal, costData?.invoicesSummary?.netTotal]);
+
     // Zapis kosztów
     const handleSaveCosts = async () => {
         setIsSaving(true);
@@ -572,16 +577,20 @@ export default function KosztyTab() {
 
                 {/* KARTA 1: ŁĄCZNE KOSZTY FIRMY */}
                 <div className="bg-white border border-ui-accent rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                    <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                            Łączne koszty ({costData?.monthName})
-                        </span>
-                        <DollarSign size={15} className="text-ui-secondary" />
+                    <div>
+                        <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                                Łączne koszty ({costData?.monthName})
+                            </span>
+                            <DollarSign size={15} className="text-ui-secondary" />
+                        </div>
+                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
+                            {formatCurrency(liveGrandEnterpriseTotal)}
+                        </div>
                     </div>
-                    <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
-                        {formatCurrency(liveGrandEnterpriseTotal)}
+                    <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
+                        <span>Netto: {formatCurrency(liveGrandEnterpriseNetTotal)}</span>
                     </div>
-
                 </div>
 
                 {/* KARTA 2: KOSZTY POZAFAKTUROWE */}
@@ -589,7 +598,6 @@ export default function KosztyTab() {
                     <div>
                         <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-
                                 Koszty pozafakturowe ({costData?.monthName})
                             </span>
                             <Briefcase size={15} className="text-ui-secondary" />
@@ -599,12 +607,7 @@ export default function KosztyTab() {
                         </div>
                     </div>
                     <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
-
-                        {costData?.stats?.momChangePercent !== 0 && (
-                            <span className={costData?.stats?.momChangePercent > 0 ? "text-rose-600 font-bold" : "text-emerald-600 font-bold"}>
-                                {costData?.stats?.momChangePercent > 0 ? `+${costData.stats.momChangePercent}%` : `${costData.stats.momChangePercent}%`} MoM
-                            </span>
-                        )}
+                        <span>Netto: {formatCurrency(liveOpTotal)}</span>
                     </div>
                 </div>
 
@@ -922,7 +925,7 @@ export default function KosztyTab() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="h-[220px] flex items-center justify-center text-xs text-ui-secondary italic">
+                                    <div className="h-[220px] flex items-center justify-center text-xs text-ui-secondary ">
                                         Brak zarejestrowanych kosztów w wybranym filtrze
                                     </div>
                                 )}
@@ -1057,7 +1060,7 @@ export default function KosztyTab() {
                                 </table>
                             </div>
                         ) : (
-                            <div className="p-8 text-center text-xs text-ui-secondary italic">
+                            <div className="p-8 text-center text-xs text-ui-secondary ">
                                 Brak zarejestrowanych faktur kosztowych w wybranym miesiącu ({costData?.monthName} {costData?.year})
                             </div>
                         )}
@@ -1082,17 +1085,66 @@ export default function KosztyTab() {
 
                         <div className="h-[340px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={costData?.monthlyChartData || []} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                                <BarChart data={costData?.monthlyChartData || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                    <XAxis dataKey="month" tick={{ fill: "#6B7280", fontSize: 11 }} />
-                                    <YAxis tick={{ fill: "#6B7280", fontSize: 11 }} tickFormatter={(val) => `${val / 1000} tys.`} />
-                                    <Tooltip
-                                        formatter={(val: number) => formatCurrency(val)}
-                                        contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}
+                                    <XAxis
+                                        dataKey="month"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 11, fill: "#6B7280" }}
+                                        dy={8}
                                     />
-                                    <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "12px", fontWeight: "600" }} />
-                                    <Bar dataKey="operationalTotal" name="Koszty pozafakturowe (Wypłaty/ZUS/PIT)" fill="#042043" stackId="a" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="invoiceGross" name="Faktury kosztowe (Brutto)" fill="#10b981" stackId="a" radius={[4, 4, 0, 0]} />
+                                    <YAxis
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 11, fill: "#6B7280" }}
+                                        tickFormatter={(val) => `${(val / 1000).toFixed(0)} tys.`}
+                                    />
+                                    <Tooltip
+                                        cursor={{ fill: "rgba(229, 231, 235, 0.4)" }}
+                                        content={({ active, payload, label }) => {
+                                            if (active && payload && payload.length) {
+                                                const pt = payload[0].payload;
+                                                const op = pt.operationalTotal || 0;
+                                                const inv = pt.invoiceGross || 0;
+                                                const total = pt.total || (op + inv);
+                                                return (
+                                                    <div className="bg-white border border-ui-accent/80 rounded-2xl p-4 shadow-xl text-xs min-w-[240px]">
+                                                        <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2.5">
+                                                            {pt.fullMonth || label} {costData?.year}
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-center justify-between text-ui-black font-bold text-sm border-b border-ui-accent/20 pb-1">
+                                                                <span>Koszty łączne:</span>
+                                                                <span>{formatCurrency(total)}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-ui-primary font-bold">
+                                                                <span className="flex items-center gap-1">
+                                                                    <span className="w-2.5 h-2.5 rounded-full bg-[#042043]" />
+                                                                    Koszty pozafakturowe:
+                                                                </span>
+                                                                <span>{formatCurrency(op)}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-ui-primary font-bold">
+                                                                <span className="flex items-center gap-1">
+                                                                    <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8]" />
+                                                                    Faktury kosztowe (Brutto):
+                                                                </span>
+                                                                <span>{formatCurrency(inv)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <Legend
+                                        wrapperStyle={{ paddingTop: "10px", fontSize: "11px", fontWeight: "600" }}
+                                        iconType="circle"
+                                    />
+                                    <Bar dataKey="operationalTotal" name="Koszty pozafakturowe (Wypłaty/ZUS/PIT)" fill="#042043" stackId="a" radius={[0, 0, 0, 0]} maxBarSize={36} />
+                                    <Bar dataKey="invoiceGross" name="Faktury kosztowe (Brutto)" fill="#38bdf8" stackId="a" radius={[4, 4, 0, 0]} maxBarSize={36} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -1103,12 +1155,9 @@ export default function KosztyTab() {
                         <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                             <div>
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                    <CalendarDays size={14} />
+                                    <CalendarDays size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                     Roczne zestawienie kosztów pozafakturowych – Rok {costData?.year}
                                 </h3>
-                                <p className="text-[11px] text-ui-secondary mt-0.5">
-                                    Wypłaty, ZUS, PIT oraz kategorie własne w ujęciu 12 miesięcy
-                                </p>
                             </div>
                             <span className="text-xs font-bold text-ui-primary bg-ui-accent/20 px-3 py-1 rounded-xl">
                                 Razem w roku: {formatCurrency(costData?.stats?.grandYearOpTotal || 0)}

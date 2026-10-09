@@ -72,6 +72,7 @@ interface InvoicePosition {
     quantity: number;
     unit: string;
     netPrice: number;
+    vatRate?: number;
     grossAmount: number;
 }
 
@@ -95,6 +96,8 @@ interface PurchasedProduct {
     name: string;
     unit: string;
     lastPrice: number;
+    lastGrossPrice?: number;
+    lastVatRate?: number;
     totalQuantity: number;
     totalSpent: number;
     purchaseCount: number;
@@ -575,16 +578,8 @@ export default function ContractorDetailPage() {
             {/* NAGŁÓWEK KONTRAHENTA & DANE TELEADRESOWE                   */}
             {/* ========================================================= */}
             <div className="bg-ui-white border border-ui-accent rounded-2xl p-6 sm:p-7 shadow-sm mb-8">
-                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-stretch justify-between gap-6">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                            {contractor.nip && (
-                                <span className="text-xs text-ui-black">
-                                    NIP: <b className="text-ui-black">{contractor.nip}</b>
-                                </span>
-                            )}
-                        </div>
-
                         <div className="flex flex-wrap items-center gap-3">
                             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ui-black">
                                 {contractor.customName || contractor.name}
@@ -600,12 +595,19 @@ export default function ContractorDetailPage() {
                         </div>
 
                         {/* Informacja o oficjalnej nazwie z faktury */}
-                        <div className="text-xs text-ui-secondary flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="font-semibold text-ui-black">Nazwa z faktury:</span>
+                        <div className="text-xs text-ui-secondary flex flex-wrap items-center gap-2 mt-3.5">
+                            <span className="font-medium text-ui-black">Nazwa z faktury:</span>
                             <span className="text-ui-black font-medium">{contractor.name}</span>
                             {contractor.customName && contractor.customName !== contractor.name && (
                                 <span className="text-[10px] font-bold bg-ui-white text-ui-accent border border-ui-accent px-1.5 py-0.2 rounded">
                                     Własna nazwa aktywna
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-3.5">
+                            {contractor.nip && (
+                                <span className="text-xs text-ui-black">
+                                    NIP: {contractor.nip}
                                 </span>
                             )}
                         </div>
@@ -650,16 +652,16 @@ export default function ContractorDetailPage() {
                     </div>
 
                     {/* KAFELEK ŁĄCZNYCH WYDATKÓW W PRAWYM GÓRNYM ROGU */}
-                    <div className="bg-ui-accent/10 border border-ui-accent/60 rounded-2xl p-4 sm:p-5 text-right shrink-0 w-full lg:w-auto min-w-[220px]">
-                        <div className="flex items-center justify-between lg:justify-end gap-2 text-ui-secondary mb-1.5">
+                    <div className="bg-ui-accent/10 border border-ui-accent/60 rounded-2xl p-5 text-left shrink-0 w-full lg:w-auto min-w-[260px] flex flex-col justify-between self-stretch">
+                        <div className="flex items-center justify-between gap-2 text-ui-secondary">
                             <span className="text-[11px] font-bold uppercase tracking-wider">Łączne wydatki</span>
                             <Coins size={18} className="text-ui-secondary" />
                         </div>
-                        <div>
-                            <div className="text-2xl font-black text-ui-primary">
-                                {stats.totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-ui-secondary">zł brutto</span>
+                        <div className="mt-4">
+                            <div className="text-2xl sm:text-3xl font-black text-ui-primary">
+                                {stats.totalGross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-ui-black">zł brutto</span>
                             </div>
-                            <p className="text-xs text-ui-secondary mt-1">
+                            <p className="text-xs text-ui-black mt-1">
                                 <b className="text-ui-primary">{stats.totalNet.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</b> netto
                             </p>
                         </div>
@@ -714,7 +716,7 @@ export default function ContractorDetailPage() {
                     {monthlySpendingData.length > 0 && (
                         <div className="text-xs font-semibold text-ui-primary bg-ui-accent/15 px-3 py-1.5 rounded-xl self-start sm:self-auto flex items-center gap-1.5">
                             <Calendar size={13} className="text-ui-secondary" />
-                            <span>Okres: <b className="text-ui-black font-bold">{monthlySpendingData[0].month} – {monthlySpendingData[monthlySpendingData.length - 1].month}</b></span>
+                            <span>Okres:  {monthlySpendingData[0].month} – {monthlySpendingData[monthlySpendingData.length - 1].month}</span>
                         </div>
                     )}
                 </div>
@@ -751,20 +753,18 @@ export default function ContractorDetailPage() {
                                                 <div className="bg-ui-white border border-ui-accent rounded-xl p-3.5 shadow-xl text-xs min-w-[190px]">
                                                     <div className="font-black text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2 flex items-center justify-between">
                                                         <span>{item.fullMonth}</span>
-                                                        <span className="text-[10px] text-ui-secondary font-semibold font-mono">
-                                                            {item.count} {item.count === 1 ? "faktura" : item.count < 5 ? "faktury" : "faktur"}
-                                                        </span>
+
                                                     </div>
                                                     <div className="space-y-1.5">
-                                                        <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center justify-between gap-3 text-[11px]">
                                                             <span className="text-ui-black">Wydatki brutto:</span>
-                                                            <span className="font-black text-ui-primary text-sm">
+                                                            <span className=" text-ui-black">
                                                                 {item.gross.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center justify-between gap-3 text-[11px]">
                                                             <span className="text-ui-black">Wydatki netto:</span>
-                                                            <span className="font-semibold text-ui-black">
+                                                            <span className=" text-ui-black">
                                                                 {item.net.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
                                                             </span>
                                                         </div>
@@ -892,10 +892,10 @@ export default function ContractorDetailPage() {
                                     <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider text-[10px] border-b border-ui-accent">
                                         <th className="py-3 px-3 text-center w-12">Zamów</th>
                                         <th className="py-3 px-3">Nazwa Produktu</th>
-                                        <th className="py-3 px-3 text-right">Ostatnia cena</th>
-                                        <th className="py-3 px-3 text-right">Kupiona ilość</th>
-                                        <th className="py-3 px-3 text-right">Wydano łącznie</th>
-                                        <th className="py-3 px-3 text-right">Ostatni zakup</th>
+                                        <th className="py-3 px-3 text-left">Ostatnia cena</th>
+                                        <th className="py-3 px-3 text-left">Kupiona ilość</th>
+                                        <th className="py-3 px-3 text-left">Wydano łącznie</th>
+                                        <th className="py-3 px-3 text-left">Ostatni zakup</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-ui-accent/40">
@@ -920,32 +920,39 @@ export default function ContractorDetailPage() {
 
                                                 {/* Nazwa */}
                                                 <td className="py-3 px-3">
-                                                    <div className="font-bold text-ui-black text-sm">{prod.name}</div>
-                                                    <div className="text-[10px] text-ui-secondary">Jednostka: {prod.unit}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-ui-black text-sm">{prod.name}</span>
+                                                        <span className="text-xs font-normal text-ui-secondary bg-ui-accent/30 px-2 py-0.5 rounded-md">
+                                                            {prod.unit}
+                                                        </span>
+                                                    </div>
                                                 </td>
 
                                                 {/* Ostatnia cena */}
-                                                <td className="py-3 px-3 text-right">
+                                                <td className="py-3 px-3 text-left">
                                                     {prod.lastPrice > 0 ? (
                                                         <div>
-                                                            <div className="font-bold text-ui-black">{prod.lastPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-black">netto</span></div>
-                                                            <div className="text-[10px] text-ui-black">{(prod.lastPrice * 1.05).toFixed(2)} zł brutto</div>
+                                                            <div className="text-ui-black">{prod.lastPrice.toFixed(2)} zł netto</div>
+                                                            <div className="text-ui-black">
+                                                                {(prod.lastGrossPrice ?? (prod.lastPrice * (1 + (prod.lastVatRate ?? 23) / 100))).toFixed(2)} zł brutto
+
+                                                            </div>
                                                         </div>
                                                     ) : "—"}
                                                 </td>
 
                                                 {/* Kupiona ilość */}
-                                                <td className="py-3 px-3 text-right font-medium text-ui-black">
+                                                <td className="py-3 px-3 text-left font-medium text-ui-black">
                                                     {prod.totalQuantity > 0 ? `${prod.totalQuantity.toLocaleString("pl-PL")} ${prod.unit}` : "—"}
                                                 </td>
 
                                                 {/* Wydano łącznie */}
-                                                <td className="py-3 px-3 text-right text-ui-black">
+                                                <td className="py-3 px-3 text-left text-ui-black">
                                                     {prod.totalSpent > 0 ? `${prod.totalSpent.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł` : "—"}
                                                 </td>
 
                                                 {/* Data ostatniego zakupu */}
-                                                <td className="py-3 px-3 text-right text-ui-black  font-medium">
+                                                <td className="py-3 px-3 text-left text-ui-black  font-medium">
                                                     {prod.lastPurchasedDate && prod.lastPurchasedDate !== "-" ? formatDate(prod.lastPurchasedDate) : "—"}
                                                 </td>
                                             </tr>
@@ -995,11 +1002,11 @@ export default function ContractorDetailPage() {
                                             className="p-4 bg-ui-white hover:bg-ui-accent/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-ui-accent/20 text-ui-accent rounded-xl">
+                                                <div className="p-2 bg-ui-accent/20 text-ui-secondary rounded-xl">
                                                     <FileText size={18} />
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-sm text-ui-black flex flex-wrap items-center gap-2">
+                                                    <div className="text-sm text-ui-black flex flex-wrap items-center gap-2">
                                                         <span>{inv.invoiceNumber}</span>
                                                     </div>
                                                     <div className="text-[11px] text-ui-black flex items-center gap-3 mt-0.5">
@@ -1010,11 +1017,14 @@ export default function ContractorDetailPage() {
 
                                             <div className="flex items-center justify-between sm:justify-end gap-6">
                                                 <div className="text-right">
-                                                    <div className="text-base font-black text-ui-black">
-                                                        {inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł
+                                                    <div className="text-sm text-ui-black">
+                                                        {inv.netAmount.toFixed(2)} zł netto
                                                     </div>
-                                                    <div className="text-[11px] text-ui-black">
-                                                        netto: {inv.netAmount.toFixed(2)} zł | VAT: {inv.vatAmount.toFixed(2)} zł
+                                                    <div className="text-sm text-ui-black">
+                                                        {inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł brutto
+                                                    </div>
+                                                    <div className="text-sm text-ui-black">
+                                                        VAT: {inv.vatAmount.toFixed(2)} zł
                                                     </div>
                                                 </div>
 
@@ -1043,17 +1053,22 @@ export default function ContractorDetailPage() {
                                                         <tbody className="divide-y divide-ui-accent/40">
                                                             {inv.positions.map((pos) => (
                                                                 <tr key={pos.id} className="hover:bg-ui-accent/5">
-                                                                    <td className="py-2.5 px-3 font-semibold text-ui-black">
+                                                                    <td className="py-2.5 px-3 text-ui-black">
                                                                         {pos.name}
                                                                     </td>
-                                                                    <td className="py-2.5 px-3 text-right font-medium">
+                                                                    <td className="py-2.5 px-3 text-right">
                                                                         {pos.quantity} {pos.unit}
                                                                     </td>
                                                                     <td className="py-2.5 px-3 text-right">
-                                                                        <div className="text-ui-primary font-medium">{pos.netPrice.toFixed(2)} zł <span className="text-[10px] text-ui-black">netto</span></div>
-                                                                        <div className="text-[10px] text-ui-secondary">{(pos.netPrice * 1.05).toFixed(2)} zł brutto</div>
+                                                                        <div className="text-ui-black">{pos.netPrice.toFixed(2)} zł <span className="text-ui-black">netto</span></div>
+                                                                        <div className="text-ui-black">
+                                                                            {(pos.quantity > 0 && pos.grossAmount > 0
+                                                                                ? pos.grossAmount / pos.quantity
+                                                                                : pos.netPrice * (1 + (pos.vatRate ?? 23) / 100)
+                                                                            ).toFixed(2)} zł brutto
+                                                                        </div>
                                                                     </td>
-                                                                    <td className="py-2.5 px-3 text-right font-bold text-ui-black">
+                                                                    <td className="py-2.5 px-3 text-right text-ui-black">
                                                                         {pos.grossAmount.toFixed(2)} zł
                                                                     </td>
                                                                 </tr>
@@ -1109,6 +1124,7 @@ export default function ContractorDetailPage() {
                                         <tr className="border-b border-ui-accent text-ui-secondary font-bold uppercase text-[9px]">
                                             <th className="py-2.5 px-3 w-10 text-center">Wybór</th>
                                             <th className="py-2.5 px-3">Produkt</th>
+                                            <th className="py-2.5 px-3 text-left">Ostatnia cena</th>
                                             <th className="py-2.5 px-3 text-right w-44">Zamawiana ilość</th>
                                         </tr>
                                     </thead>
@@ -1120,6 +1136,9 @@ export default function ContractorDetailPage() {
                                                 unit: prod.unit,
                                                 note: "",
                                             };
+
+                                            const grossPrice = prod.lastGrossPrice ?? (prod.lastPrice > 0 ? Number((prod.lastPrice * (1 + (prod.lastVatRate ?? 23) / 100)).toFixed(2)) : 0);
+                                            const vatRate = prod.lastVatRate ?? 23;
 
                                             return (
                                                 <tr
@@ -1140,10 +1159,23 @@ export default function ContractorDetailPage() {
                                                         className="py-2.5 px-3 cursor-pointer"
                                                         onClick={() => toggleProductSelection(prod.id, prod.unit)}
                                                     >
-                                                        <div className="font-bold text-ui-black">{prod.name}</div>
-                                                        <div className="text-[10px] text-ui-secondary">
-                                                            Ostatnia cena: {prod.lastPrice > 0 ? `${prod.lastPrice.toFixed(2)} zł netto (${(prod.lastPrice * 1.05).toFixed(2)} zł brutto)` : "—"}
-                                                        </div>
+                                                        <div className="text-ui-black text-sm">{prod.name}</div>
+                                                    </td>
+
+                                                    <td
+                                                        className="py-2.5 px-3 text-left whitespace-nowrap cursor-pointer"
+                                                        onClick={() => toggleProductSelection(prod.id, prod.unit)}
+                                                    >
+                                                        {prod.lastPrice > 0 ? (
+                                                            <div>
+                                                                <div className="text-ui-black">{prod.lastPrice.toFixed(2)} zł netto</div>
+                                                                <div className="text-ui-black">
+                                                                    {grossPrice.toFixed(2)} zł brutto
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-ui-secondary">—</span>
+                                                        )}
                                                     </td>
 
                                                     <td className="py-2.5 px-3 text-right">
@@ -1156,14 +1188,13 @@ export default function ContractorDetailPage() {
                                                                         updateItemQuantity(prod.id, e.target.value)
                                                                     }
                                                                     placeholder="ilość"
-                                                                    className="w-16 bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-sm"
+                                                                    className="w-16 bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-sm"
                                                                 />
                                                                 <select
                                                                     value={itemState.unit === "l" ? "litry" : itemState.unit}
                                                                     onChange={(e) =>
                                                                         updateItemUnit(prod.id, e.target.value)
                                                                     }
-                                                                    className="bg-ui-white border border-ui-accent rounded-lg px-2 py-1 text-center font-semibold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-sm cursor-pointer"
                                                                 >
                                                                     <option value="szt">szt</option>
                                                                     <option value="litry">litry</option>
@@ -1172,7 +1203,7 @@ export default function ContractorDetailPage() {
                                                                 </select>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[11px] text-ui-secondary/50 font-medium">
+                                                            <span className="text-xs font-normal text-ui-secondary bg-ui-accent/30 px-2 py-0.5 rounded-md">
                                                                 {prod.unit}
                                                             </span>
                                                         )}

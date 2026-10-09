@@ -141,6 +141,7 @@ export async function GET(
                 kind: source,
                 amount: amountNum,
                 unit: item.ingredientUnit,
+                notes: (item as any).notes || null,
                 unitPrice,
                 unitPriceNet,
                 unitPriceGross,
@@ -268,7 +269,7 @@ export async function PUT(
         }
 
         const body = await request.json();
-        const { name, type, sellingPrice, packagingCost, ingredients } = body;
+        const { name, type, sellingPrice, packagingCost, batchSize, ingredients } = body;
 
         if (!name || !name.trim()) {
             return NextResponse.json({ error: "Nazwa wyrobu jest wymagana" }, { status: 400 });
@@ -315,6 +316,7 @@ export async function PUT(
                     name: name.trim(),
                     type: type || "BREAD",
                     productionCost: calculatedFoodCost,
+                    ...(batchSize !== undefined && { batchSize: Number(batchSize) || 1 }),
                     ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
                     ...(packagingCost !== undefined && { packagingCost: Number(packagingCost) }),
                     ingredients: {
@@ -322,6 +324,7 @@ export async function PUT(
                             amount: Number(ing.amount),
                             ingredientUnit: ing.ingredientUnit || ing.unit || "kg",
                             order: ing.order !== undefined ? Number(ing.order) : index,
+                            notes: ing.notes ? String(ing.notes).trim() : null,
                             ingredientId: ing.ingredientId || null,
                             semiFinishedId: ing.semiFinishedId || null,
                         })),

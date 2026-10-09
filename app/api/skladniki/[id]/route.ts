@@ -453,9 +453,8 @@ export async function GET(
             sunday.setDate(monday.getDate() + 6);
 
             const pad = (n: number) => String(n).padStart(2, "0");
-            const formatD = (dt: Date) => `${pad(dt.getDate())}.${pad(dt.getMonth() + 1)}`;
-            const label = `Tydzień ${weekNo} (${formatD(monday)} - ${formatD(sunday)}.${sunday.getFullYear()})`;
-            const shortLabel = `T${weekNo} (${formatD(monday)}-${formatD(sunday)})`;
+            const label = `Tydzień ${weekNo}`;
+            const shortLabel = `Tydz. ${weekNo}`;
             const key = `${weekYear}-W${pad(weekNo)}`;
 
             return {

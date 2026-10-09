@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
                         amount: item.amount,
                         unit: item.unit,
                         order: item.order !== undefined ? Number(item.order) : index,
+                        notes: item.notes ? String(item.notes).trim() : null,
                     })),
                 },
             },

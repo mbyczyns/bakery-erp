@@ -182,11 +182,41 @@ interface ProductRankingItem {
     sellThroughRate: number;
 }
 
-const CATEGORY_MAP: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-    BREAD: { label: "Chleby", color: "#d97706", icon: Wheat },
-    ROLL: { label: "Bułki", color: "#9333ea", icon: Layers },
-    SWEET: { label: "Wypieki słodkie", color: "#f59e0b", icon: Croissant },
-    SAVORY: { label: "Wypieki słone", color: "#10b981", icon: Pizza },
+const CATEGORY_MAP: Record<string, {
+    label: string;
+    color: string;
+    badge: string;
+    headerBg: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+}> = {
+    BREAD: {
+        label: "Chleby",
+        color: "#d97706",
+        badge: "bg-amber-100 text-amber-800 border-amber-300",
+        headerBg: "text-amber-800 bg-amber-50 border-amber-200",
+        icon: Wheat,
+    },
+    ROLL: {
+        label: "Bułki",
+        color: "#9333ea",
+        badge: "bg-purple-100 text-purple-800 border-purple-300",
+        headerBg: "text-purple-800 bg-purple-50 border-purple-200",
+        icon: Layers,
+    },
+    SWEET: {
+        label: "Wypieki słodkie",
+        color: "#db2777",
+        badge: "bg-pink-100 text-pink-800 border-pink-300",
+        headerBg: "text-pink-800 bg-pink-50 border-pink-200",
+        icon: Croissant,
+    },
+    SAVORY: {
+        label: "Wypieki słone",
+        color: "#059669",
+        badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        headerBg: "text-emerald-800 bg-emerald-50 border-emerald-200",
+        icon: Pizza,
+    },
 };
 
 function formatCurrency(amount: number): string {
@@ -1075,63 +1105,184 @@ export default function PrzychodyTab() {
                                                 {/* ROZWINIĘCIE DNIA ZE SZCZEGÓŁAMI WYROBÓW */}
                                                 {isExpanded && (
                                                     <tr className="bg-ui-accent/5">
-                                                        <td colSpan={9} className="p-5 border-b border-ui-accent/30 space-y-3">
-                                                            <div className="flex items-center justify-between text-[11px] font-bold text-ui-secondary uppercase tracking-wider">
-                                                                <span className="flex items-center gap-1.5">
-                                                                    <Wheat size={14} className="text-ui-primary" />
-                                                                    Rozbicie sprzedaży wyrobów piekarniczych w dniu {formatDate(d.date)}:
-                                                                </span>
-                                                                <span>Łącznie pozycji: {d.products.length}</span>
-                                                            </div>
-
-                                                            {/* Kategorie w danym dniu */}
-                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                                                                {Object.entries(d.categoryBreakdown).map(([catKey, val]) => {
-                                                                    const catInfo = CATEGORY_MAP[catKey];
-                                                                    const Icon = catInfo?.icon || Wheat;
-                                                                    return (
-                                                                        <div key={catKey} className="p-2.5 rounded-xl bg-white border border-ui-accent/50 shadow-2xs flex items-center justify-between">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <Icon size={14} className="text-ui-secondary" />
-                                                                                <span className="text-[11px] font-bold text-ui-black">{catInfo?.label}</span>
-                                                                            </div>
-                                                                            <span className="text-xs font-bold text-ui-primary">{formatCurrency(val)}</span>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-
-                                                            {/* Lista produktów */}
+                                                        <td colSpan={9} className="p-4 sm:p-5 border-b border-ui-accent/30">
                                                             {d.products.length > 0 ? (
-                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                                                    {d.products.map((prod) => (
-                                                                        <div
-                                                                            key={prod.productId}
-                                                                            className="p-2.5 rounded-xl bg-white border border-ui-accent/40 shadow-2xs flex flex-col justify-between"
-                                                                        >
-                                                                            <div className="flex items-start justify-between gap-1">
-                                                                                <span className="font-bold text-ui-black text-xs truncate" title={prod.productName}>
-                                                                                    {prod.productName}
-                                                                                </span>
-                                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-ui-accent/15 text-ui-secondary whitespace-nowrap">
-                                                                                    {prod.sellingPrice.toFixed(2)} zł
-                                                                                </span>
+                                                                <div className="space-y-3.5">
+                                                                    {Object.entries(CATEGORY_MAP).map(([catKey, catMeta]) => {
+                                                                        const catProducts = d.products.filter((p) => p.productType === catKey);
+                                                                        if (catProducts.length === 0) return null;
+
+                                                                        const catProducedTotal = catProducts.reduce((sum, p) => sum + (p.producedAmount || 0), 0);
+                                                                        const catSoldTotal = catProducts.reduce((sum, p) => sum + (p.soldAmount || 0), 0);
+                                                                        const catRevenueTotal = catProducts.reduce((sum, p) => sum + (p.salesIncome || 0), 0);
+                                                                        const Icon = catMeta.icon;
+
+                                                                        return (
+                                                                            <div key={catKey} className="border border-ui-accent rounded-xl overflow-hidden shadow-2xs bg-white">
+                                                                                {/* Pasek nagłówka kategorii */}
+                                                                                <div className={`px-4 py-2.5 font-bold text-xs flex flex-wrap items-center justify-between gap-2 border-b ${catMeta.headerBg}`}>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Icon size={16} />
+                                                                                        <span className="uppercase tracking-wider">
+                                                                                            {catMeta.label} ({catProducts.length})
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-3 sm:gap-4 text-xs font-semibold">
+                                                                                        <span>Wypiek: <strong className="font-bold">{catProducedTotal} szt.</strong></span>
+                                                                                        <span>Sprzedaż: <strong className="font-bold">{catSoldTotal} szt.</strong></span>
+                                                                                        <span>Przychód: <strong className="font-black text-ui-black">{formatCurrency(catRevenueTotal)}</strong></span>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Tabela produktów w kategorii */}
+                                                                                <div className="overflow-x-auto">
+                                                                                    <table className="w-full text-left text-xs border-collapse">
+                                                                                        <thead>
+                                                                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent/30">
+                                                                                                <th className="py-2.5 px-3">Nazwa wyrobu</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Cena jedn.</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Wypieczono</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Sprzedano</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Niesprzedane</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Skuteczność</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Przychód</th>
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody className="divide-y divide-ui-accent/20 font-medium">
+                                                                                            {catProducts.map((prod) => {
+                                                                                                const unsold = Math.max(0, (prod.producedAmount || 0) - (prod.soldAmount || 0));
+                                                                                                const efficiency = prod.producedAmount > 0
+                                                                                                    ? Math.min(100, Math.round((prod.soldAmount / prod.producedAmount) * 100))
+                                                                                                    : 100;
+
+                                                                                                return (
+                                                                                                    <tr key={prod.productId} className="hover:bg-ui-accent/5 transition-colors">
+                                                                                                        <td className="py-2.5 px-3 font-semibold text-ui-black">
+                                                                                                            {prod.productName}
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                                                                            {prod.sellingPrice.toFixed(2)} zł
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                                                                            {prod.producedAmount} szt.
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right font-bold text-ui-black tabular-nums">
+                                                                                                            {prod.soldAmount} szt.
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right text-rose-600 font-semibold tabular-nums">
+                                                                                                            {unsold > 0 ? `-${unsold} szt.` : "0 szt."}
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right tabular-nums">
+                                                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${efficiency >= 90
+                                                                                                                ? "bg-emerald-100 text-emerald-800"
+                                                                                                                : efficiency >= 70
+                                                                                                                    ? "bg-amber-100 text-amber-800"
+                                                                                                                    : "bg-rose-100 text-rose-800"
+                                                                                                                }`}>
+                                                                                                                {efficiency}%
+                                                                                                            </span>
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right font-black text-ui-primary tabular-nums">
+                                                                                                            {formatCurrency(prod.salesIncome)}
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                );
+                                                                                            })}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="text-[10px] text-ui-secondary mt-1 flex justify-between">
-                                                                                <span>Sprzedano: <strong>{prod.soldAmount} szt.</strong></span>
-                                                                                <span>Wypiek: {prod.producedAmount} szt.</span>
+                                                                        );
+                                                                    })}
+
+                                                                    {/* Ewentualne wyroby spoza 4 głównych kategorii */}
+                                                                    {(() => {
+                                                                        const knownKeys = Object.keys(CATEGORY_MAP);
+                                                                        const otherProducts = d.products.filter((p) => !knownKeys.includes(p.productType));
+                                                                        if (otherProducts.length === 0) return null;
+
+                                                                        const otherProducedTotal = otherProducts.reduce((sum, p) => sum + (p.producedAmount || 0), 0);
+                                                                        const otherSoldTotal = otherProducts.reduce((sum, p) => sum + (p.soldAmount || 0), 0);
+                                                                        const otherRevenueTotal = otherProducts.reduce((sum, p) => sum + (p.salesIncome || 0), 0);
+
+                                                                        return (
+                                                                            <div className="border border-ui-accent rounded-xl overflow-hidden shadow-2xs bg-white">
+                                                                                <div className="px-4 py-2.5 font-bold text-xs flex flex-wrap items-center justify-between gap-2 border-b text-slate-800 bg-slate-100 border-slate-200">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Layers size={16} />
+                                                                                        <span className="uppercase tracking-wider">
+                                                                                            Inne wyroby ({otherProducts.length})
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-3 sm:gap-4 text-xs font-semibold">
+                                                                                        <span>Wypiek: <strong className="font-bold">{otherProducedTotal} szt.</strong></span>
+                                                                                        <span>Sprzedaż: <strong className="font-bold">{otherSoldTotal} szt.</strong></span>
+                                                                                        <span>Przychód: <strong className="font-black text-ui-black">{formatCurrency(otherRevenueTotal)}</strong></span>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="overflow-x-auto">
+                                                                                    <table className="w-full text-left text-xs border-collapse">
+                                                                                        <thead>
+                                                                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent/30">
+                                                                                                <th className="py-2.5 px-3">Nazwa wyrobu</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Cena jedn.</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Wypieczono</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Sprzedano</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Niesprzedane</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Skuteczność</th>
+                                                                                                <th className="py-2.5 px-3 text-right">Przychód</th>
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody className="divide-y divide-ui-accent/20 font-medium">
+                                                                                            {otherProducts.map((prod) => {
+                                                                                                const unsold = Math.max(0, (prod.producedAmount || 0) - (prod.soldAmount || 0));
+                                                                                                const efficiency = prod.producedAmount > 0
+                                                                                                    ? Math.min(100, Math.round((prod.soldAmount / prod.producedAmount) * 100))
+                                                                                                    : 100;
+
+                                                                                                return (
+                                                                                                    <tr key={prod.productId} className="hover:bg-ui-accent/5 transition-colors">
+                                                                                                        <td className="py-2.5 px-3 font-semibold text-ui-black">
+                                                                                                            {prod.productName}
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                                                                            {prod.sellingPrice.toFixed(2)} zł
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                                                                            {prod.producedAmount} szt.
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right font-bold text-ui-black tabular-nums">
+                                                                                                            {prod.soldAmount} szt.
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right text-rose-600 font-semibold tabular-nums">
+                                                                                                            {unsold > 0 ? `-${unsold} szt.` : "0 szt."}
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right tabular-nums">
+                                                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${efficiency >= 90
+                                                                                                                ? "bg-emerald-100 text-emerald-800"
+                                                                                                                : efficiency >= 70
+                                                                                                                    ? "bg-amber-100 text-amber-800"
+                                                                                                                    : "bg-rose-100 text-rose-800"
+                                                                                                                }`}>
+                                                                                                                {efficiency}%
+                                                                                                            </span>
+                                                                                                        </td>
+                                                                                                        <td className="py-2.5 px-3 text-right font-black text-ui-primary tabular-nums">
+                                                                                                            {formatCurrency(prod.salesIncome)}
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                );
+                                                                                            })}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="mt-2 pt-1 border-t border-ui-accent/20 flex items-center justify-between text-xs">
-                                                                                <span className="text-ui-secondary text-[10px]">Przychód:</span>
-                                                                                <span className="font-bold text-ui-primary">
-                                                                                    {formatCurrency(prod.salesIncome)}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             ) : (
-                                                                <div className="text-center py-2 text-xs text-ui-secondary italic">
+                                                                <div className="text-center py-6 text-xs text-ui-secondary  bg-white rounded-xl border border-ui-accent/30">
                                                                     Brak wpisów jednostkowych sprzedaży w tym dniu
                                                                 </div>
                                                             )}
@@ -1143,7 +1294,7 @@ export default function PrzychodyTab() {
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={9} className="p-8 text-center text-ui-secondary italic">
+                                        <td colSpan={9} className="p-8 text-center text-ui-secondary ">
                                             Brak danych o przychodach w wybranym okresie
                                         </td>
                                     </tr>
@@ -1229,7 +1380,7 @@ export default function PrzychodyTab() {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={9} className="p-8 text-center text-ui-secondary italic">
+                                        <td colSpan={9} className="p-8 text-center text-ui-secondary ">
                                             Brak danych dla wybranego okresu
                                         </td>
                                     </tr>
@@ -1374,7 +1525,7 @@ export default function PrzychodyTab() {
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={9} className="p-8 text-center text-ui-secondary italic">
+                                        <td colSpan={9} className="p-8 text-center text-ui-secondary ">
                                             Brak danych dla wybranego okresu
                                         </td>
                                     </tr>
@@ -1450,7 +1601,7 @@ export default function PrzychodyTab() {
                                                         {p.productName}
                                                     </td>
                                                     <td className="p-3.5">
-                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-ui-accent/15 text-ui-primary">
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${catInfo?.badge || "bg-ui-accent/15 text-ui-primary border-ui-accent/30"}`}>
                                                             {catInfo?.label || p.productType}
                                                         </span>
                                                     </td>
@@ -1476,7 +1627,7 @@ export default function PrzychodyTab() {
                                         })
                                     ) : (
                                         <tr>
-                                            <td colSpan={9} className="p-8 text-center text-ui-secondary italic">
+                                            <td colSpan={9} className="p-8 text-center text-ui-secondary ">
                                                 Brak wyrobów spełniających kryteria wyszukiwania
                                             </td>
                                         </tr>
@@ -1607,7 +1758,7 @@ export default function PrzychodyTab() {
                                         })
                                     ) : (
                                         <tr>
-                                            <td colSpan={8} className="p-8 text-center text-ui-secondary italic">
+                                            <td colSpan={8} className="p-8 text-center text-ui-secondary ">
                                                 Brak faktur sprzedażowych w wybranym okresie
                                             </td>
                                         </tr>

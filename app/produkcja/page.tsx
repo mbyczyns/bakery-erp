@@ -239,6 +239,66 @@ function formatDate(dateStr: string): string {
     return dateStr;
 }
 
+const POLISH_DAYS_FULL = [
+    "Niedziela",
+    "Poniedziałek",
+    "Wtorek",
+    "Środa",
+    "Czwartek",
+    "Piątek",
+    "Sobota",
+];
+
+const POLISH_MONTHS_GENITIVE = [
+    "stycznia",
+    "lutego",
+    "marca",
+    "kwietnia",
+    "maja",
+    "czerwca",
+    "lipca",
+    "sierpnia",
+    "września",
+    "października",
+    "listopada",
+    "grudnia",
+];
+
+function formatDailyReportLabel(dateStr: string): string {
+    if (!dateStr) return "";
+    const [y, m, d] = dateStr.split("-").map(Number);
+    if (!y || !m || !d) return dateStr;
+    const dateObj = new Date(Date.UTC(y, m - 1, d));
+    const dayName = POLISH_DAYS_FULL[dateObj.getUTCDay()];
+    const dd = String(d).padStart(2, "0");
+    const mm = String(m).padStart(2, "0");
+    return `${dayName} (${dd}.${mm}.${y})`;
+}
+
+function formatWeeklyReportLabel(startDateStr: string, endDateStr: string): string {
+    if (!startDateStr || !endDateStr) return "";
+    const [sY, sM, sD] = startDateStr.split("-").map(Number);
+    const [eY, eM, eD] = endDateStr.split("-").map(Number);
+    if (!sY || !sM || !sD || !eY || !eM || !eD) return `${startDateStr} - ${endDateStr}`;
+
+    const startDay = String(sD).padStart(2, "0");
+    const startMonth = POLISH_MONTHS_GENITIVE[sM - 1];
+    const endDay = String(eD).padStart(2, "0");
+    const endMonth = POLISH_MONTHS_GENITIVE[eM - 1];
+
+    return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+}
+
+function getReportTableLabel(b: any, isDays: boolean, isWeeks: boolean): string {
+    if (isDays && b?.startDate) {
+        return formatDailyReportLabel(b.startDate);
+    }
+    if (isWeeks && b?.startDate && b?.endDate) {
+        return formatWeeklyReportLabel(b.startDate, b.endDate);
+    }
+    return b?.label || "";
+}
+
 export default function ProdukcjaPage() {
     const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
     const tomorrowStr = useMemo(() => {
@@ -1220,7 +1280,7 @@ export default function ProdukcjaPage() {
                             </div>
                             <div className="mt-2 text-2xl sm:text-3xl font-black text-ui-primary tracking-tight">
                                 {daysSummary.filter((d) => d.hasReport).length}{" "}
-                                <span className="text-sm font-semibold text-ui-secondary">dni z raportem</span>
+                                <span className="text-sm text-ui-secondary font-normal">dni z raportem</span>
                             </div>
                         </div>
                         <div className="text-[11px] font-semibold mt-2">
@@ -1880,9 +1940,9 @@ export default function ProdukcjaPage() {
                         {/* 4. KARTY STATYSTYK OKRESU (KPI) */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                             <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
-                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                    <Wheat size={14} className="text-amber-600" />
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                                     Wyprodukowano
+                                    <Wheat size={14} className="text-ui-secondary" />
                                 </div>
                                 <div className="mt-2 text-xl sm:text-2xl font-black text-ui-black">
                                     {totalStats.totalProduced.toLocaleString("pl-PL")}{" "}
@@ -1891,9 +1951,9 @@ export default function ProdukcjaPage() {
                             </div>
 
                             <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
-                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                    <CheckCircle2 size={14} className="text-emerald-600" />
-                                    Sprzedano (% skut.)
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
+                                    Sprzedano
+                                    <CheckCircle2 size={14} className="text-ui-secondary" />
                                 </div>
                                 <div className="mt-2 text-xl sm:text-2xl font-black text-emerald-700">
                                     {totalStats.totalSold.toLocaleString("pl-PL")}{" "}
@@ -1904,9 +1964,9 @@ export default function ProdukcjaPage() {
                             </div>
 
                             <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
-                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                    <AlertCircle size={14} className="text-rose-600" />
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                                     Niesprzedane
+                                    <AlertCircle size={14} className="text-ui-secondary" />
                                 </div>
                                 <div className="mt-2 text-xl sm:text-2xl font-black text-rose-700">
                                     {totalStats.totalUnsold.toLocaleString("pl-PL")}{" "}
@@ -1915,9 +1975,9 @@ export default function ProdukcjaPage() {
                             </div>
 
                             <div className="bg-white border border-ui-accent rounded-2xl p-4 shadow-xs">
-                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center gap-1.5">
-                                    <Coins size={14} className="text-ui-primary" />
+                                <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                                     Utarg ze sprzedaży
+                                    <Coins size={14} className="text-ui-secondary" />
                                 </div>
                                 <div className="mt-2 text-xl sm:text-2xl font-black text-ui-primary">
                                     {formatCurrency(totalStats.totalIncome)}
@@ -1971,7 +2031,7 @@ export default function ProdukcjaPage() {
                                                         } else {
                                                             setPeriodPreviewModal({
                                                                 isOpen: true,
-                                                                title: b.label,
+                                                                title: getReportTableLabel(b, isDays, isWeeks),
                                                                 subtitle: b.startDate === b.endDate ? formatDate(b.startDate) : `${formatDate(b.startDate)} do ${formatDate(b.endDate)}`,
                                                                 products: b.products || [],
                                                                 totalProduced: b.totalProduced,
@@ -1983,11 +2043,8 @@ export default function ProdukcjaPage() {
                                                     }}
                                                     className="hover:bg-ui-accent/10 transition-colors cursor-pointer"
                                                 >
-                                                    <td className="py-3 px-3.5 font-bold text-ui-black text-left sticky left-0 bg-ui-accent/10">
-                                                        <div className="text-sm">{b.label}</div>
-                                                        <div className="text-[11px] text-ui-secondary font-normal">
-                                                            {b.startDate === b.endDate ? formatDate(b.startDate) : `${formatDate(b.startDate)} do ${formatDate(b.endDate)}`}
-                                                        </div>
+                                                    <td className="py-3 px-3.5 font-semibold text-ui-black text-left sticky left-0 bg-ui-accent/10">
+                                                        <div className="text-[12px]">{getReportTableLabel(b, isDays, isWeeks)}</div>
                                                     </td>
 
                                                     {/* Chleby */}
@@ -2399,7 +2456,7 @@ export default function ProdukcjaPage() {
                                 type="button"
                                 disabled={isSavingForm}
                                 onClick={handleSaveReportForm}
-                                className="flex items-center gap-2 px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-ui-primary hover:bg-ui-secondary rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
                             >
                                 {isSavingForm ? (
                                     <>
@@ -2414,7 +2471,7 @@ export default function ProdukcjaPage() {
                                 ) : (
                                     <>
                                         <CheckCircle2 size={16} />
-                                        Zapisz raport dzienny
+                                        Zapisz raport
                                     </>
                                 )}
                             </button>
