@@ -3,13 +3,14 @@ import { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 import { getCustomNamesMap } from "@/lib/contractor-names";
+import { getSystemSettings } from "@/lib/settings";
 
 const prisma = new PrismaClient();
 
 // Ścieżka do lokalnego pliku metadanych (fallback dla utargu fiskalnego)
 const EXTRAS_FILE = path.join(process.cwd(), "data", "production-extras.json");
 
-function getExtras(): Record<string, { fiscalIncome?: number; soldOutTimes?: Record<string, string> }> {
+function getExtras(): Record<string, { fiscalIncome?: number; soldOutTimes?: Record<string, string>; noSales?: boolean }> {
     try {
         if (!fs.existsSync(EXTRAS_FILE)) return {};
         const raw = fs.readFileSync(EXTRAS_FILE, "utf-8");
@@ -240,6 +241,9 @@ export async function GET(request: NextRequest) {
             totalSold: number;
             sellThroughRate: number;
             hasReport: boolean;
+            isClosed?: boolean;
+            closedReason?: string;
+            noSales?: boolean;
             categoryBreakdown: {
                 BREAD: number;
                 ROLL: number;
@@ -248,6 +252,9 @@ export async function GET(request: NextRequest) {
             };
             products: DayProductDetail[];
         }
+
+        const settings = getSystemSettings();
+        const closedDaysMap = settings.closedDays || {};
 
         const dailyMap = new Map<string, DailyAggregate>();
 
@@ -258,6 +265,8 @@ export async function GET(request: NextRequest) {
                 const dayIndex = dateObj.getDay();
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
                 const fiscal = fiscalIncomeMap.get(dateStr) || 0;
+                const closedInfo = closedDaysMap[dateStr];
+                const isNoSales = Boolean(extras[dateStr]?.noSales || closedInfo?.isClosed);
                 existing = {
                     date: dateStr,
                     dayOfWeek: POLISH_WEEKDAYS[dayIndex],
@@ -273,7 +282,10 @@ export async function GET(request: NextRequest) {
                     totalProduced: 0,
                     totalSold: 0,
                     sellThroughRate: 0,
-                    hasReport: fiscal > 0,
+                    hasReport: fiscal > 0 || isNoSales,
+                    isClosed: !!closedInfo?.isClosed,
+                    closedReason: closedInfo?.reason || (isNoSales ? "Brak sprzedaży" : ""),
+                    noSales: isNoSales,
                     categoryBreakdown: {
                         BREAD: 0,
                         ROLL: 0,
@@ -290,6 +302,18 @@ export async function GET(request: NextRequest) {
         // Zarejestruj wszystkie daty z utargów fiskalnych
         fiscalIncomeMap.forEach((_, dateStr) => {
             getOrCreateDaily(new Date(dateStr));
+        });
+
+        // Zarejestruj także dni bez sprzedaży / zamknięte
+        Object.keys(closedDaysMap).forEach((dateStr) => {
+            if (closedDaysMap[dateStr]?.isClosed) {
+                getOrCreateDaily(new Date(dateStr));
+            }
+        });
+        Object.keys(extras).forEach((dateStr) => {
+            if (extras[dateStr]?.noSales) {
+                getOrCreateDaily(new Date(dateStr));
+            }
         });
 
         // Agregacja wpisów produkcji
@@ -334,15 +358,16 @@ export async function GET(request: NextRequest) {
             d.bakerySalesIncome = Math.round(d.bakerySalesIncome * 100) / 100;
             d.fiscalIncome = Math.round(d.fiscalIncome * 100) / 100;
 
-            // Utarg detaliczny / sklepik (kasa fiskalna lub wyliczenie ze sprzedanego pieczywa)
-            const retailIncome = Math.max(d.fiscalIncome, d.bakerySalesIncome);
-            const otherRetailIncome = Math.max(0, d.fiscalIncome - d.bakerySalesIncome);
+            // Ostateczny wynik finansowy danego dnia liczy się wyłącznie na podstawie utargu z kasy (d.fiscalIncome)
+            const retailIncome = d.fiscalIncome > 0 ? d.fiscalIncome : d.bakerySalesIncome;
+            const effectiveBakeryIncome = d.fiscalIncome > 0 ? Math.min(d.fiscalIncome, d.bakerySalesIncome) : d.bakerySalesIncome;
+            const otherRetailIncome = d.fiscalIncome > 0 ? Math.max(0, d.fiscalIncome - d.bakerySalesIncome) : 0;
 
-            // Całkowity utarg danego dnia = utarg detaliczny (nie mieszamy tu faktur miesięcznych)
+            // Całkowity utarg danego dnia = wyłącznie utarg z kasy
             const totalDayIncome = Math.round(retailIncome * 100) / 100;
 
             const bakeryShare = totalDayIncome > 0
-                ? Math.round((d.bakerySalesIncome / totalDayIncome) * 1000) / 10
+                ? Math.round((effectiveBakeryIncome / totalDayIncome) * 1000) / 10
                 : 0;
             const otherShare = totalDayIncome > 0
                 ? Math.round((otherRetailIncome / totalDayIncome) * 1000) / 10
@@ -361,7 +386,7 @@ export async function GET(request: NextRequest) {
                 shortDay: d.shortDay,
                 isWeekend: d.isWeekend,
                 rawDate: d.rawDate,
-                bakerySalesIncome: d.bakerySalesIncome,
+                bakerySalesIncome: Math.round(effectiveBakeryIncome * 100) / 100,
                 fiscalIncome: d.fiscalIncome,
                 otherIncome: Math.round(otherRetailIncome * 100) / 100,
                 totalIncome: totalDayIncome,
@@ -789,6 +814,7 @@ export async function GET(request: NextRequest) {
         // 11. Ogólne KPI i statystyki
         const grandTotalRetailIncome = allDailyData.reduce((acc, d) => acc + d.totalIncome, 0);
         const grandTotalOtherIncome = allDailyData.reduce((acc, d) => acc + d.otherIncome, 0);
+        const grandTotalBakeryIncomeEffective = allDailyData.reduce((acc, d) => acc + d.bakerySalesIncome, 0);
         const grandTotalSold = allDailyData.reduce((acc, d) => acc + d.totalSold, 0);
         const grandTotalProduced = allDailyData.reduce((acc, d) => acc + d.totalProduced, 0);
         const daysWithReportCount = allDailyData.filter((d) => d.hasReport).length;
@@ -820,13 +846,13 @@ export async function GET(request: NextRequest) {
         const overallStats = {
             grandTotalIncome,
             grandTotalRetailIncome: Math.round(grandTotalRetailIncome * 100) / 100,
-            grandTotalBakeryIncome: Math.round(grandTotalBakeryIncome * 100) / 100,
+            grandTotalBakeryIncome: Math.round(grandTotalBakeryIncomeEffective * 100) / 100,
             grandTotalOtherIncome: Math.round(grandTotalOtherIncome * 100) / 100,
             grandTotalSalesInvoicesGross: Math.round(grandTotalSalesInvoicesGross * 100) / 100,
             grandTotalSalesInvoicesNet: Math.round(grandTotalSalesInvoicesNet * 100) / 100,
             grandTotalSalesInvoicesCount: formattedSalesInvoices.length,
             bakerySharePercent: grandTotalIncome > 0
-                ? Math.round((grandTotalBakeryIncome / grandTotalIncome) * 1000) / 10
+                ? Math.round((grandTotalBakeryIncomeEffective / grandTotalIncome) * 1000) / 10
                 : 0,
             otherSharePercent: grandTotalIncome > 0
                 ? Math.round((grandTotalOtherIncome / grandTotalIncome) * 1000) / 10

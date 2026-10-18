@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // Ścieżka do lokalnego pliku metadanych (bezpieczny fallback dla soldOutTime i utargu fiskalnego)
 const EXTRAS_FILE = path.join(process.cwd(), "data", "production-extras.json");
 
-function getExtras(): Record<string, { fiscalIncome?: number; soldOutTimes?: Record<string, string> }> {
+function getExtras(): Record<string, { fiscalIncome?: number; soldOutTimes?: Record<string, string>; noSales?: boolean }> {
     try {
         if (!fs.existsSync(EXTRAS_FILE)) return {};
         const raw = fs.readFileSync(EXTRAS_FILE, "utf-8");
@@ -20,7 +20,7 @@ function getExtras(): Record<string, { fiscalIncome?: number; soldOutTimes?: Rec
     }
 }
 
-function saveExtras(data: Record<string, { fiscalIncome?: number; soldOutTimes?: Record<string, string> }>) {
+function saveExtras(data: Record<string, { fiscalIncome?: number; soldOutTimes?: Record<string, string>; noSales?: boolean }>) {
     try {
         const dir = path.dirname(EXTRAS_FILE);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -244,9 +244,9 @@ export async function GET(request: NextRequest) {
                 }
             });
 
-            // Jeśli dzień ma podany utarg fiskalny, oznaczamy go również jako posiadający raport
+            // Jeśli dzień ma podany utarg fiskalny lub oznaczono brak sprzedaży, oznaczamy go również jako posiadający raport
             Object.keys(daysMap).forEach((dKey) => {
-                if (daysMap[dKey].fiscalIncome > 0) {
+                if (daysMap[dKey].fiscalIncome > 0 || extras[dKey]?.noSales || daysMap[dKey].isClosed) {
                     daysMap[dKey].hasReport = true;
                 }
             });
@@ -258,6 +258,7 @@ export async function GET(request: NextRequest) {
             let monthSold = 0;
             let monthBakeryIncome = 0;
             let monthFiscalIncome = 0;
+            let monthTotalIncome = 0;
             let missingReportsCount = 0;
 
             const daysList = Object.values(daysMap).sort((a, b) => b.date.localeCompare(a.date));
@@ -269,6 +270,7 @@ export async function GET(request: NextRequest) {
                 monthSold += dayItem.totalSold;
                 monthBakeryIncome += dayItem.bakerySalesIncome;
                 monthFiscalIncome += dayItem.fiscalIncome;
+                monthTotalIncome += dayItem.fiscalIncome > 0 ? dayItem.fiscalIncome : dayItem.bakerySalesIncome;
 
                 const dObj = new Date(dayItem.date);
                 const dayOfWeek = dObj.getUTCDay();
@@ -298,8 +300,9 @@ export async function GET(request: NextRequest) {
                     monthCarriedOver,
                     monthAssortment,
                     monthSold,
-                    monthBakeryIncome,
-                    monthFiscalIncome,
+                    monthBakeryIncome: Math.round(monthBakeryIncome * 100) / 100,
+                    monthFiscalIncome: Math.round(monthFiscalIncome * 100) / 100,
+                    monthTotalIncome: Math.round(monthTotalIncome * 100) / 100,
                     missingReportsCount,
                     totalDaysInMonth: daysInMonth,
                 },
@@ -716,6 +719,8 @@ export async function GET(request: NextRequest) {
         const settings = getSystemSettings();
         const defaultClosingTime = getClosingTimeForDate(dateStr, settings);
         const closedInfo = settings.closedDays?.[dateStr];
+        const isClosed = Boolean(closedInfo?.isClosed);
+        const noSales = Boolean(extras[dateStr]?.noSales || (isClosed && closedInfo?.reason === "Brak sprzedaży"));
 
         return NextResponse.json({
             date: dateStr,
@@ -724,8 +729,9 @@ export async function GET(request: NextRequest) {
             fiscalIncome,
             soldOutTimes,
             defaultClosingTime,
-            isClosed: !!closedInfo?.isClosed,
+            isClosed,
             closedReason: closedInfo?.reason || "",
+            noSales,
             openingHours: settings.openingHours,
             favoriteRecipeIds: settings.favoriteRecipeIds || [],
         });
@@ -822,32 +828,62 @@ export async function POST(request: NextRequest) {
         // -------------------------------------------------------------
         // ZWYKŁY ZAPIS RAPORTU DZIENNEGO
         // -------------------------------------------------------------
-        const { date, items, fiscalIncome } = body;
+        const { date, items, fiscalIncome, isNoSalesDay } = body;
 
         if (!date || !Array.isArray(items)) {
             return NextResponse.json({ error: "Nieprawidłowe dane wejściowe" }, { status: 400 });
         }
 
         const targetDate = new Date(`${date}T00:00:00.000Z`);
-        const numFiscalIncome = Math.max(0, parseFloat(String(fiscalIncome || "0").replace(",", ".")) || 0);
+        const numFiscalIncome = isNoSalesDay ? 0 : Math.max(0, parseFloat(String(fiscalIncome || "0").replace(",", ".")) || 0);
 
-        // 1. Zapisujemy w lokalnym pliku extras (zapewnia natychmiastową trwałość godzin wyprzedania i utargu fiskalnego)
+        // 1. Obsługa dni zamkniętych / braku sprzedaży w ustawieniach
+        const settings = getSystemSettings();
+        const closedDays = { ...(settings.closedDays || {}) };
+
+        if (isNoSalesDay) {
+            closedDays[date] = {
+                date: date,
+                isClosed: true,
+                reason: "Brak sprzedaży",
+            };
+        } else {
+            // Jeśli zapisujemy normalny raport ze sprzedażą, a dzień był oznaczony jako "Brak sprzedaży", usuwamy go z dni zamkniętych
+            if (closedDays[date]?.reason === "Brak sprzedaży") {
+                delete closedDays[date];
+            }
+        }
+        saveSystemSettings({ closedDays });
+
+        // 2. Zapisujemy w lokalnym pliku extras (zapewnia natychmiastową trwałość godzin wyprzedania i utargu fiskalnego)
         const extras = getExtras();
+        const defaultClosingTime = getClosingTimeForDate(date, settings);
         const soldOutTimesMap: Record<string, string> = {};
 
-        items.forEach((item: any) => {
-            if (item.soldOutTime && String(item.soldOutTime).trim()) {
-                soldOutTimesMap[item.bakeryProductId] = String(item.soldOutTime).trim();
-            }
-        });
+        if (!isNoSalesDay) {
+            items.forEach((item: any) => {
+                const prod = Math.max(0, parseFloat(String(item.producedAmount || "0").replace(",", ".")) || 0);
+                const carried = Math.max(0, parseFloat(String(item.carriedOverAmount || "0").replace(",", ".")) || 0);
+                const total = prod + carried;
+                const sold = Math.max(0, parseFloat(String(item.soldAmount || "0").replace(",", ".")) || 0);
+
+                if (item.soldOutTime && String(item.soldOutTime).trim()) {
+                    soldOutTimesMap[item.bakeryProductId] = String(item.soldOutTime).trim();
+                } else if (total > 0 && sold >= total) {
+                    // Wyprzedano całość, a nie podano konkretnej wcześniejszej godziny -> domyślnie godzina zamknięcia
+                    soldOutTimesMap[item.bakeryProductId] = defaultClosingTime;
+                }
+            });
+        }
 
         extras[date] = {
             fiscalIncome: numFiscalIncome,
             soldOutTimes: soldOutTimesMap,
+            noSales: !!isNoSalesDay,
         };
         saveExtras(extras);
 
-        // 2. Próba zapisu do tabeli DailyIncome w Postgresie (jeśli dostępna)
+        // 3. Próba zapisu do tabeli DailyIncome w Postgresie (jeśli dostępna)
         try {
             if ((prisma as any).dailyIncome) {
                 const existing = await (prisma as any).dailyIncome.findFirst({
@@ -875,11 +911,17 @@ export async function POST(request: NextRequest) {
             console.warn("Zapis do DailyIncome w DB pominięty (zapisano w metadanych):", e);
         }
 
-        // 3. Zapis/Aktualizacja wpisów produkcji
+        // 4. Zapis/Aktualizacja wpisów produkcji
         const operations = items.map((item: any) => {
-            const producedAmt = Math.max(0, parseFloat(String(item.producedAmount).replace(",", ".")) || 0);
-            const carriedOverAmt = Math.max(0, parseFloat(String(item.carriedOverAmount || "0").replace(",", ".")) || 0);
-            const soldAmt = Math.max(0, parseFloat(String(item.soldAmount).replace(",", ".")) || 0);
+            const producedAmt = isNoSalesDay ? 0 : Math.max(0, parseFloat(String(item.producedAmount || "0").replace(",", ".")) || 0);
+            const carriedOverAmt = isNoSalesDay ? 0 : Math.max(0, parseFloat(String(item.carriedOverAmount || "0").replace(",", ".")) || 0);
+            const totalAssort = producedAmt + carriedOverAmt;
+            let soldAmt = isNoSalesDay ? 0 : Math.max(0, parseFloat(String(item.soldAmount).replace(",", ".")) || 0);
+
+            // Jeśli wyprodukowano X sztuk, a soldAmount nie zostało określone
+            if (!isNoSalesDay && totalAssort > 0 && (item.soldAmount === undefined || item.soldAmount === null || item.soldAmount === "")) {
+                soldAmt = totalAssort;
+            }
 
             return prisma.dailyProduction.upsert({
                 where: {

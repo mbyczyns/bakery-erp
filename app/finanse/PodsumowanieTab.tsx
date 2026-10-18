@@ -9,6 +9,8 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
+    RotateCcw,
     Loader2,
     RefreshCw,
     PieChart as PieIcon,
@@ -321,10 +323,17 @@ export default function PodsumowanieTab() {
 
         const subtotal = filteredBySource.reduce((acc, i) => acc + i.value, 0);
 
-        return filteredBySource.map((i) => ({
-            ...i,
-            sharePercent: subtotal > 0 ? Math.round((i.value / subtotal) * 1000) / 10 : 0,
-        })).sort((a, b) => b.value - a.value);
+        const sorted = filteredBySource
+            .map((i) => ({
+                ...i,
+                sharePercent: subtotal > 0 ? Math.round((i.value / subtotal) * 1000) / 10 : 0,
+            }))
+            .sort((a, b) => b.value - a.value);
+
+        return sorted.map((item, idx) => ({
+            ...item,
+            color: COST_COLORS[idx % COST_COLORS.length],
+        }));
     }, [data, filteredMonths, activeCostView, viewMode]);
 
     // Dynamicznie przeliczane KPI w zależności od wybranego widoku
@@ -432,49 +441,28 @@ export default function PodsumowanieTab() {
                             </button>
                         </div>
 
-                        {/* Tryb widoku (12M, 6M, Kwartały, Własny zakres) */}
-                        <div className="flex flex-wrap items-center bg-ui-accent/15 p-1 rounded-xl border border-ui-accent/40 text-xs font-bold gap-1">
-                            <button
-                                onClick={() => setViewMode("12M")}
-                                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === "12M"
-                                    ? "bg-white text-ui-black shadow-xs font-bold"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                                    }`}
-                            >
-                                12 Miesięcy
-                            </button>
-                            <button
-                                onClick={() => setViewMode("6M")}
-                                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === "6M"
-                                    ? "bg-white text-ui-black shadow-xs font-bold"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                                    }`}
-                            >
-                                6 Miesięcy
-                            </button>
-                            <button
-                                onClick={() => setViewMode("QUARTERS")}
-                                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === "QUARTERS"
-                                    ? "bg-white text-ui-black shadow-xs font-bold"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                                    }`}
-                            >
-                                Kwartały
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setViewMode("CUSTOM");
-                                    if (!customStartMonth) setCustomStartMonth(`${selectedYear}-01`);
-                                    if (!customEndMonth) setCustomEndMonth(`${selectedYear}-12`);
+                        {/* Selektor zakresu (rozwijana lista) */}
+                        <div className="relative">
+                            <select
+                                value={viewMode}
+                                onChange={(e) => {
+                                    const val = e.target.value as "12M" | "6M" | "QUARTERS" | "CUSTOM";
+                                    setViewMode(val);
+                                    if (val === "CUSTOM") {
+                                        if (!customStartMonth) setCustomStartMonth(`${selectedYear}-01`);
+                                        if (!customEndMonth) setCustomEndMonth(`${selectedYear}-12`);
+                                    }
                                 }}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === "CUSTOM"
-                                    ? "bg-white text-ui-black shadow-xs font-bold"
-                                    : "text-ui-secondary hover:text-ui-primary"
-                                    }`}
+                                className="bg-ui-white border border-ui-accent text-ui-primary text-xs font-semibold rounded-lg pl-2.5 pr-7 py-1.5 shadow-2xs focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none min-w-[140px]"
                             >
-                                <CalendarDays size={13} />
-                                <span>Własny zakres</span>
-                            </button>
+                                <option value="12M">12 miesięcy (cały rok)</option>
+                                <option value="6M">Ostatnie 6 miesięcy</option>
+                                <option value="QUARTERS">Kwartały (Q1 - Q4)</option>
+                                <option value="CUSTOM">Własny zakres miesięcy...</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                <ChevronDown size={13} />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -504,8 +492,17 @@ export default function PodsumowanieTab() {
                                 className="bg-ui-white border border-ui-accent rounded-lg px-2.5 py-1 font-bold text-xs text-ui-black focus:outline-none focus:border-ui-primary shadow-2xs"
                             />
                         </div>
-                        <div className="text-xs text-ui-secondary font-semibold">
-                            Wyświetlono: <b className="text-ui-black">{filteredChartData.length}</b> {filteredChartData.length === 1 ? "miesiąc" : filteredChartData.length < 5 ? "miesiące" : "miesięcy"} na wykresie
+                        <div className="flex items-center gap-4">
+                            <div className="text-xs text-ui-secondary font-semibold">
+                                Wyświetlono: <b className="text-ui-black">{filteredChartData.length}</b> {filteredChartData.length === 1 ? "miesiąc" : filteredChartData.length < 5 ? "miesiące" : "miesięcy"} na wykresie
+                            </div>
+                            <button
+                                onClick={() => setViewMode("12M")}
+                                className="flex items-center gap-1 text-ui-secondary hover:text-ui-primary font-semibold transition-colors cursor-pointer"
+                            >
+                                <RotateCcw size={12} />
+                                <span>Wróć do całego roku</span>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -529,7 +526,7 @@ export default function PodsumowanieTab() {
             {data && (
                 <>
                     {/* ---------------- 4 GŁÓWNE KARTY KPI (ZESTAWIENIE ZYSK vs KOSZT) ---------------- */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {/* KARTA 1: PRZYCHODY ŁĄCZNIE */}
                         <div className="bg-white p-5 rounded-2xl border border-ui-accent/40 shadow-xs hover:border-ui-secondary transition-all flex flex-col justify-between">
                             <div className="flex items-center justify-between gap-2 mb-2">
@@ -544,16 +541,16 @@ export default function PodsumowanieTab() {
                                 <div className="text-2xl sm:text-3xl font-extrabold text-ui-primary tracking-tight text-emerald-600">
                                     {formatPLN(kpis?.totalRevenue || 0)}
                                 </div>
-                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs font-semibold text-ui-secondary">
-                                    <div className="flex justify-between">
+                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs text-ui-secondary">
+                                    <div className="flex justify-between text-ui-black">
                                         <span>Sprzedaż detaliczna:</span>
-                                        <span className="text-ui-black font-bold">
+                                        <span className="text-ui-black">
                                             {formatPLN((kpis?.grandBakeryRevenue || 0) + (kpis?.grandOtherRevenue || 0))}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between">
+                                    <div className="flex justify-between text-ui-black">
                                         <span>Sprzedaż na faktury:</span>
-                                        <span className="text-ui-black font-bold">
+                                        <span className="text-ui-black">
                                             {formatPLN(kpis?.grandSalesInvGross || 0)}
                                         </span>
                                     </div>
@@ -575,16 +572,16 @@ export default function PodsumowanieTab() {
                                 <div className="text-2xl sm:text-3xl font-extrabold text-ui-primary tracking-tight text-rose-600">
                                     {formatPLN(kpis?.totalCost || 0)}
                                 </div>
-                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs font-semibold text-ui-secondary">
-                                    <div className="flex justify-between">
+                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs text-ui-secondary">
+                                    <div className="flex justify-between text-ui-black">
                                         <span>Faktury kosztowe:</span>
-                                        <span className="text-ui-black font-bold">
+                                        <span className="text-ui-black">
                                             {formatPLN(kpis?.grandCostInvoicesGross || 0)}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between">
+                                    <div className="flex justify-between text-ui-black">
                                         <span>Koszty pozafakturowe:</span>
-                                        <span className="text-ui-black font-bold">
+                                        <span className="text-ui-black">
                                             {formatPLN(kpis?.grandOperationalCosts || 0)}
                                         </span>
                                     </div>
@@ -610,53 +607,23 @@ export default function PodsumowanieTab() {
                                     {(kpis?.netProfit || 0) >= 0 ? "+" : ""}
                                     {formatPLN(kpis?.netProfit || 0)}
                                 </div>
-                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs font-semibold text-ui-secondary">
-                                    <div className="flex justify-between">
-                                        <span>Średnio na miesiąc:</span>
-                                        <span className="text-ui-black font-bold">
-                                            {formatPLN(kpis?.avgMonthlyProfit || 0)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Średnio dziennie:</span>
-                                        <span className="text-ui-black font-bold">
-                                            {formatPLN(kpis?.avgDailyProfit || 0)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* KARTA 4: RENTOWNOŚĆ / MARŻA ZYSKU */}
-                        <div className="bg-white p-5 rounded-2xl border border-ui-accent/40 shadow-xs hover:border-ui-secondary transition-all flex flex-col justify-between">
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                                <span className="text-xs font-bold text-ui-secondary uppercase tracking-wider">
-                                    Marża Rentowności
-                                </span>
-                                <div className="text-ui-secondary">
-                                    <Percent size={18} />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-2xl sm:text-3xl font-extrabold text-ui-primary tracking-tight flex items-baseline gap-2">
-                                    <span>{kpis?.profitMargin || 0}%</span>
-                                </div>
-                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs font-semibold text-ui-secondary">
-                                    <div className="flex justify-between items-center">
-                                        <span>Najlepszy:</span>
-                                        <span className="text-emerald-700 font-bold">
+                                <div className="mt-2.5 pt-2.5 border-t border-ui-accent/20 flex flex-col gap-1 text-xs text-ui-secondary">
+                                    <div className="flex justify-between text-ui-black items-center">
+                                        <span>Najlepszy miesiąc:</span>
+                                        <span className="text-ui-black">
                                             {kpis?.bestMonth ? `${kpis.bestMonth.monthName.split(" ")[0]} (${formatCompactPLN(kpis.bestMonth.netProfit)})` : "—"}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Najgorszy:</span>
-                                        <span className="text-rose-700 font-bold">
+                                    <div className="flex justify-between text-ui-black items-center">
+                                        <span>Najgorszy miesiąc:</span>
+                                        <span className="text-ui-black">
                                             {kpis?.worstMonth ? `${kpis.worstMonth.monthName.split(" ")[0]} (${formatCompactPLN(kpis.worstMonth.netProfit)})` : "—"}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
                     </div>
 
                     {/* ---------------- GŁÓWNY WYKRES PORÓWNAWCZY: PRZYCHODY VS KOSZTY VS ZYSK ---------------- */}
@@ -712,31 +679,27 @@ export default function PodsumowanieTab() {
                                                         </div>
                                                         <div className="space-y-1 text-xs">
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-ui-secondary flex items-center gap-1.5 font-medium">
+                                                                <span className="text-ui-black flex items-center gap-1.5 font-normal">
                                                                     <span className="w-2 h-2 rounded-xs bg-emerald-500 inline-block" />
                                                                     Przychody:
                                                                 </span>
-                                                                <span className="font-bold text-emerald-600">{formatPLN(item.totalRevenue || 0)}</span>
+                                                                <span className="text-emerald-600">{formatPLN(item.totalRevenue || 0)}</span>
                                                             </div>
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-ui-secondary flex items-center gap-1.5 font-medium">
+                                                                <span className="text-ui-black flex items-center gap-1.5 font-normal">
                                                                     <span className="w-2 h-2 rounded-xs bg-rose-500 inline-block" />
                                                                     Koszty:
                                                                 </span>
-                                                                <span className="font-bold text-rose-600">{formatPLN(item.totalCost || 0)}</span>
+                                                                <span className="text-rose-600">{formatPLN(item.totalCost || 0)}</span>
                                                             </div>
                                                         </div>
                                                         <div className="pt-1.5 border-t border-ui-accent/30 space-y-1 text-xs">
                                                             <div className="flex justify-between items-center">
                                                                 <span className="text-ui-primary font-semibold">Wynik netto:</span>
-                                                                <span className={`font-bold ${(item.netProfit || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                                                                <span className={`${(item.netProfit || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
                                                                     {(item.netProfit || 0) >= 0 ? "+" : ""}
                                                                     {formatPLN(item.netProfit || 0)}
                                                                 </span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center text-[11px]">
-                                                                <span className="text-ui-secondary font-medium">Marża:</span>
-                                                                <span className="font-bold text-amber-700">{item.profitMargin || 0}%</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -793,15 +756,40 @@ export default function PodsumowanieTab() {
                                                 ))}
                                             </Pie>
                                             <Tooltip
-                                                formatter={(value: any) => [formatPLN(Number(value)), "Przychód"]}
-                                                contentStyle={{
-                                                    backgroundColor: "#ffffff",
-                                                    borderRadius: "14px",
-                                                    border: "1px solid rgba(226, 232, 240, 0.8)",
-                                                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)",
-                                                    fontWeight: 600,
-                                                    fontSize: "12px",
-                                                    color: "#0f172a"
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const item = payload[0];
+                                                        const dataPoint = item.payload;
+                                                        const name = dataPoint?.name || item.name;
+                                                        const val = Number(item.value ?? dataPoint?.value ?? 0);
+                                                        const percent = dataPoint?.sharePercent;
+                                                        const color = dataPoint?.color || item.color;
+
+                                                        return (
+                                                            <div className="bg-white text-ui-black p-3 rounded-xl shadow-xl border border-ui-accent/60 text-xs min-w-[190px]">
+                                                                <div className="font-bold text-xs border-b border-ui-accent/40 pb-1.5 text-ui-primary flex items-center gap-2 mb-1.5">
+                                                                    {color && (
+                                                                        <span
+                                                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                            style={{ backgroundColor: color }}
+                                                                        />
+                                                                    )}
+                                                                    <span className="leading-snug">{name}</span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center text-xs text-ui-black font-medium">
+                                                                    <span>Przychód:</span>
+                                                                    <span>{formatPLN(val)}</span>
+                                                                </div>
+                                                                {percent !== undefined && percent !== null && (
+                                                                    <div className="flex justify-between items-center text-xs pt-1 border-t border-ui-accent/30 mt-1">
+                                                                        <span>Udział:</span>
+                                                                        <span>{percent}%</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
                                                 }}
                                             />
                                         </PieChart>
@@ -881,15 +869,40 @@ export default function PodsumowanieTab() {
                                                 ))}
                                             </Pie>
                                             <Tooltip
-                                                formatter={(value: any) => [formatPLN(Number(value)), "Koszt"]}
-                                                contentStyle={{
-                                                    backgroundColor: "#ffffff",
-                                                    borderRadius: "14px",
-                                                    border: "1px solid rgba(226, 232, 240, 0.8)",
-                                                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)",
-                                                    fontWeight: 600,
-                                                    fontSize: "12px",
-                                                    color: "#0f172a"
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const item = payload[0];
+                                                        const dataPoint = item.payload;
+                                                        const name = dataPoint?.name || item.name;
+                                                        const val = Number(item.value ?? dataPoint?.value ?? 0);
+                                                        const percent = dataPoint?.sharePercent;
+                                                        const color = dataPoint?.color || item.color;
+
+                                                        return (
+                                                            <div className="bg-white text-ui-black p-3 rounded-xl shadow-xl border border-ui-accent/60 text-xs min-w-[190px]">
+                                                                <div className="font-bold text-xs border-b border-ui-accent/40 pb-1.5 text-ui-primary flex items-center gap-2 mb-1.5">
+                                                                    {color && (
+                                                                        <span
+                                                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                            style={{ backgroundColor: color }}
+                                                                        />
+                                                                    )}
+                                                                    <span className="leading-snug">{name}</span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center text-xs  text-ui-black">
+                                                                    <span>Koszt:</span>
+                                                                    <span>{formatPLN(val)}</span>
+                                                                </div>
+                                                                {percent !== undefined && percent !== null && (
+                                                                    <div className="flex justify-between items-center text-xs pt-1 border-t border-ui-accent/30 mt-1">
+                                                                        <span className="font-medium">Udział:</span>
+                                                                        <span>{percent}%</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
                                                 }}
                                             />
                                         </PieChart>
@@ -937,32 +950,31 @@ export default function PodsumowanieTab() {
                                         <th className="py-3 px-4 text-center">Faktury kosztowe</th>
                                         <th className="py-3 px-4 text-center text-rose-700 bg-rose-500/10">Koszty łącznie</th>
                                         <th className="py-3 px-4 text-center font-bold">Zysk netto</th>
-                                        <th className="py-3 px-4 text-center">Marża %</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-ui-accent/20 font-medium text-ui-primary">
+                                <tbody className="divide-y divide-ui-accent/20 text-ui-black">
                                     {data.monthlyData.map((m) => (
                                         <tr
                                             key={m.monthKey}
-                                            className={`hover:bg-ui-accent/10 transition-colors ${m.isCurrentMonth ? "bg-ui-accent/10 font-semibold" : ""
+                                            className={`hover:bg-ui-accent/10 transition-colors ${m.isCurrentMonth ? "bg-ui-accent/10" : ""
                                                 }`}
                                         >
-                                            <td className="py-3.5 px-4 font-bold text-ui-black text-center">
+                                            <td className="py-3.5 px-4 text-ui-black text-center">
                                                 <span>{m.monthName}</span>
                                             </td>
-                                            <td className="py-3.5 px-4 text-center text-ui-secondary">
+                                            <td className="py-3.5 px-4 text-center text-ui-black">
                                                 {m.retailTotalRevenue > 0 ? formatPLN(m.retailTotalRevenue) : "—"}
                                             </td>
-                                            <td className="py-3.5 px-4 text-center text-ui-secondary">
+                                            <td className="py-3.5 px-4 text-center text-ui-black">
                                                 {m.salesInvoicesGross > 0 ? formatPLN(m.salesInvoicesGross) : "—"}
                                             </td>
                                             <td className="py-3.5 px-4 text-center font-bold text-emerald-700 bg-emerald-500/5">
                                                 {m.totalRevenue > 0 ? formatPLN(m.totalRevenue) : "0,00 zł"}
                                             </td>
-                                            <td className="py-3.5 px-4 text-center text-ui-secondary">
+                                            <td className="py-3.5 px-4 text-center text-ui-black">
                                                 {m.costOperational > 0 ? formatPLN(m.costOperational) : "—"}
                                             </td>
-                                            <td className="py-3.5 px-4 text-center text-ui-secondary">
+                                            <td className="py-3.5 px-4 text-center text-ui-black">
                                                 {m.costInvoicesGross > 0 ? formatPLN(m.costInvoicesGross) : "—"}
                                             </td>
                                             <td className="py-3.5 px-4 text-center font-bold text-rose-700 bg-rose-500/5">
@@ -979,37 +991,26 @@ export default function PodsumowanieTab() {
                                                     {formatPLN(m.netProfit)}
                                                 </span>
                                             </td>
-                                            <td className="py-3.5 px-4 text-center">
-                                                <span
-                                                    className={`font-bold ${m.profitMargin >= 15
-                                                        ? "text-emerald-700"
-                                                        : m.profitMargin > 0
-                                                            ? "text-amber-700"
-                                                            : "text-rose-700"
-                                                        }`}
-                                                >
-                                                    {m.totalRevenue > 0 ? `${m.profitMargin}%` : "—"}
-                                                </span>
-                                            </td>
+
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="bg-ui-accent/20 text-ui-primary font-bold text-xs sm:text-sm">
+                                    <tr className="bg-ui-accent/20 text-ui-black font-bold text-xs sm:text-sm">
                                         <td className="py-4 px-4 uppercase tracking-wider text-center">RAZEM {selectedYear}</td>
-                                        <td className="py-4 px-4 text-center text-ui-primary/80">
+                                        <td className="py-4 px-4 text-center ">
                                             {formatPLN((kpis?.grandBakeryRevenue || 0) + (kpis?.grandOtherRevenue || 0))}
                                         </td>
-                                        <td className="py-4 px-4 text-center text-ui-primary/80">
+                                        <td className="py-4 px-4 text-center ">
                                             {formatPLN(kpis?.grandSalesInvGross || 0)}
                                         </td>
                                         <td className="py-4 px-4 text-center text-emerald-700 bg-emerald-500/10 font-black">
                                             {formatPLN(kpis?.totalRevenue || 0)}
                                         </td>
-                                        <td className="py-4 px-4 text-center text-ui-primary">
+                                        <td className="py-4 px-4 text-center ">
                                             {formatPLN(kpis?.grandOperationalCosts || 0)}
                                         </td>
-                                        <td className="py-4 px-4 text-center text-ui-primary">
+                                        <td className="py-4 px-4 text-center ">
                                             {formatPLN(kpis?.grandCostInvoicesGross || 0)}
                                         </td>
                                         <td className="py-4 px-4 text-center text-rose-700 bg-rose-500/10 font-black">
@@ -1020,9 +1021,6 @@ export default function PodsumowanieTab() {
                                                 {(kpis?.netProfit || 0) >= 0 ? "+" : ""}
                                                 {formatPLN(kpis?.netProfit || 0)}
                                             </span>
-                                        </td>
-                                        <td className="py-4 px-4 text-center text-amber-800 font-black">
-                                            {kpis?.profitMargin || 0}%
                                         </td>
                                     </tr>
                                 </tfoot>

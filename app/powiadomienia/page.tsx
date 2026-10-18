@@ -311,16 +311,14 @@ export default function PowiadomieniaPage() {
                     onClick={() => setActiveTab("ALL")}
                     className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "ALL" ? "border-ui-primary ring-2 ring-ui-primary/20 bg-ui-primary/5" : "border-ui-accent hover:border-ui-secondary"}`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ui-secondary truncate">Wszystkie alerty</span>
-                        <div className="p-2 sm:p-2.5 rounded-xl bg-ui-primary/10 text-ui-primary shrink-0">
-                            <Bell size={18} />
-                        </div>
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Wszystkie alerty</span>
+                        <Bell size={18} className="text-ui-secondary" />
                     </div>
                     <div className="text-2xl sm:text-3xl font-black text-ui-black mt-1 sm:mt-2">
                         {summary.totalCount}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                    <div className="text-[10px] sm:text-xs text-ui-black mt-0.5 sm:mt-1 truncate">
                         {summary.totalCount === 0 ? "Brak aktywnych" : "Wymagających reakcji"}
                     </div>
                 </div>
@@ -330,16 +328,14 @@ export default function PowiadomieniaPage() {
                     onClick={() => setActiveTab("INVOICES")}
                     className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "INVOICES" ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30" : "border-ui-accent hover:border-ui-primary"}`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ui-secondary truncate">Do zmapowania</span>
-                        <div className="p-2 sm:p-2.5 rounded-xl bg-ui-primary/10 text-ui-primary shrink-0">
-                            <FileText size={18} />
-                        </div>
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Do zmapowania</span>
+                        <FileText size={18} className="text-ui-secondary" />
                     </div>
                     <div className="text-2xl sm:text-3xl font-black text-ui-black mt-1 sm:mt-2">
                         {summary.unmappedInvoicesCount}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                    <div className="text-[10px] sm:text-xs text-ui-black mt-0.5 sm:mt-1 truncate">
                         Faktur do weryfikacji
                     </div>
                 </div>
@@ -349,16 +345,14 @@ export default function PowiadomieniaPage() {
                     onClick={() => setActiveTab("PRICE_INCREASES")}
                     className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "PRICE_INCREASES" ? "border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/30" : "border-ui-accent hover:border-ui-primary"}`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ui-secondary truncate">Wzrosty cen</span>
-                        <div className="p-2 sm:p-2.5 rounded-xl bg-ui-primary/10 text-ui-primary shrink-0">
-                            <TrendingUp size={18} />
-                        </div>
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Wzrosty cen</span>
+                        <TrendingUp size={18} className="text-ui-secondary" />
                     </div>
                     <div className="text-2xl sm:text-3xl font-black text-ui-black mt-1 sm:mt-2">
                         {summary.priceAlertsCount}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
+                    <div className="text-[10px] sm:text-xs text-ui-black mt-0.5 sm:mt-1 truncate">
                         Składników z podwyżką
                     </div>
                 </div>
@@ -368,17 +362,15 @@ export default function PowiadomieniaPage() {
                     onClick={() => setActiveTab("ORDER_REMINDERS")}
                     className={`bg-white border rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all cursor-pointer ${activeTab === "ORDER_REMINDERS" ? "border-amber-600 ring-2 ring-amber-600/20 bg-amber-50/40" : "border-ui-accent hover:border-ui-primary"}`}
                 >
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ui-secondary truncate">Zamówienia</span>
-                        <div className="p-2 sm:p-2.5 rounded-xl bg-ui-primary/10 text-ui-primary shrink-0">
-                            <ShoppingCart size={18} />
-                        </div>
+                    <div className="flex items-center justify-between text-ui-secondary mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Cena sprzedaży</span>
+                        <ShoppingCart size={18} className="text-ui-secondary" />
                     </div>
                     <div className="text-2xl sm:text-3xl font-black text-ui-black mt-1 sm:mt-2">
                         {summary.orderRemindersCount}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-ui-secondary mt-0.5 sm:mt-1 truncate">
-                        Surowców &gt;80% zużycia
+                    <div className="text-[10px] sm:text-xs text-ui-black mt-0.5 sm:mt-1 truncate">
+                        Surowców &gt; 80% zużycia
                     </div>
                 </div>
             </div>
@@ -608,17 +600,15 @@ export default function PowiadomieniaPage() {
                                                             (wzrost o +{pa.priceDifference.toFixed(2)} zł / {pa.ingredientUnit})
                                                         </span>
                                                     </div>
-                                                    <div className="text-xs text-ui-secondary flex items-center gap-3 mt-1 flex-wrap">
-                                                        <span>Dostawca: <b className="text-ui-primary">{pa.lastSupplierName}</b></span>
-                                                        <span>• Faktura: <b>{pa.lastInvoiceNumber}</b></span>
-                                                        <span>• Data: <b>{formatDate(pa.lastPurchaseDate)}</b></span>
+                                                    <div className="text-xs text-ui-black flex items-center gap-3 mt-1 flex-wrap">
+                                                        {pa.lastSupplierName}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center gap-4 self-end sm:self-center">
                                                 <div className="text-right">
-                                                    <div className="text-[11px] text-ui-secondary font-semibold">Cena zakupu netto:</div>
+                                                    <div className="text-[11px] text-ui-secondary font-semibold">Cena zakupu:</div>
                                                     <div className="flex items-center gap-2 mt-0.5">
                                                         <div className="text-right">
                                                             <div className="text-xs text-ui-secondary line-through font-medium">
@@ -630,7 +620,7 @@ export default function PowiadomieniaPage() {
                                                         </div>
                                                         <ArrowRight size={13} className="text-rose-600 shrink-0" />
                                                         <div className="text-right">
-                                                            <div className="text-sm font-black text-rose-950">
+                                                            <div className="text-sm font-black text-ui-black">
                                                                 {pa.newPrice.toFixed(2)} zł <span className="text-[10px] font-normal">netto</span>
                                                             </div>
                                                             <div className="text-[10px] text-rose-800 font-semibold">
@@ -651,213 +641,204 @@ export default function PowiadomieniaPage() {
                                         </div>
 
                                         {/* Lista wyrobów piekarniczych wykorzystujących ten składnik */}
-                                        <div className="mt-4">
+                                        < div className="mt-4" >
                                             <div className="text-xs font-bold text-ui-secondary uppercase tracking-wider mb-3 flex items-center justify-between">
                                                 <span>
                                                     Wyroby wykorzystujące ten składnik ({pa.affectedProducts.length}) – sugerowana modyfikacja cen:
                                                 </span>
                                             </div>
 
-                                            {pa.affectedProducts.length === 0 ? (
-                                                <div className="text-xs text-ui-secondary py-2">
-                                                    Ten surowiec nie jest obecnie przypisany do żadnego aktywnego przepisu.
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                    {pa.affectedProducts.map((prod) => (
-                                                        <div
-                                                            key={prod.productId}
-                                                            className="bg-ui-accent/10 border border-ui-accent rounded-xl p-3.5 flex flex-col justify-between hover:bg-ui-accent/15 transition-all"
-                                                        >
-                                                            <div>
-                                                                <div className="flex items-start justify-between gap-2">
-                                                                    <div className="font-bold text-sm text-ui-black truncate">
-                                                                        {prod.productName}
+                                            {
+                                                pa.affectedProducts.length === 0 ? (
+                                                    <div className="text-xs text-ui-secondary py-2">
+                                                        Ten surowiec nie jest obecnie przypisany do żadnego aktywnego przepisu.
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                        {pa.affectedProducts.map((prod) => (
+                                                            <div
+                                                                key={prod.productId}
+                                                                className="bg-ui-accent/10 border border-ui-accent rounded-xl p-3.5 flex flex-col justify-between hover:bg-ui-accent/15 transition-all"
+                                                            >
+                                                                <div>
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="font-bold text-sm text-ui-black truncate">
+                                                                            {prod.productName}
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-ui-secondary bg-white px-2 py-0.5 rounded-md border border-ui-accent/60 shrink-0">
+                                                                            {CATEGORY_NAMES[prod.productType] || prod.productType}
+                                                                        </span>
                                                                     </div>
-                                                                    <span className="text-[10px] font-bold text-ui-secondary bg-white px-2 py-0.5 rounded-md border border-ui-accent/60 shrink-0">
-                                                                        {CATEGORY_NAMES[prod.productType] || prod.productType}
-                                                                    </span>
+
+                                                                    <div className="mt-2 space-y-1 text-xs">
+                                                                        <div className="flex items-center justify-between text-ui-secondary">
+                                                                            <span>Zużycie surowca:</span>
+                                                                            <span className="font-semibold text-ui-black">
+                                                                                {prod.amountUsed} {prod.unit} / szt.
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between text-rose-800">
+                                                                            <span>Wzrost kosztu sztuki:</span>
+                                                                            <span className="font-bold">
+                                                                                +{prod.foodCostIncrease.toFixed(2)} zł
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between pt-1 border-t border-ui-accent/40">
+                                                                            <span className="text-ui-secondary">Obecna cena:</span>
+                                                                            <span className="font-bold text-ui-black text-right">
+                                                                                {prod.currentSellingPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">brutto</span>
+                                                                                <div className="text-[10px] font-normal text-ui-secondary">
+                                                                                    ({(prod.currentSellingPrice / 1.05).toFixed(2)} zł netto)
+                                                                                </div>
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between text-emerald-900 bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-200/60">
+                                                                            <span className="font-medium text-[11px]">Sugerowana cena:</span>
+                                                                            <span className="font-black text-xs text-right">
+                                                                                {prod.suggestedSellingPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-emerald-800">brutto</span>
+                                                                                <div className="text-[10px] font-normal text-emerald-700">
+                                                                                    ({(prod.suggestedSellingPrice / 1.05).toFixed(2)} zł netto)
+                                                                                </div>
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
 
-                                                                <div className="mt-2 space-y-1 text-xs">
-                                                                    <div className="flex items-center justify-between text-ui-secondary">
-                                                                        <span>Zużycie surowca:</span>
-                                                                        <span className="font-semibold text-ui-black">
-                                                                            {prod.amountUsed} {prod.unit} / szt.
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between text-rose-800">
-                                                                        <span>Wzrost kosztu sztuki:</span>
-                                                                        <span className="font-bold">
-                                                                            +{prod.foodCostIncrease.toFixed(2)} zł
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between pt-1 border-t border-ui-accent/40">
-                                                                        <span className="text-ui-secondary">Obecna cena:</span>
-                                                                        <span className="font-bold text-ui-black text-right">
-                                                                            {prod.currentSellingPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-ui-secondary">brutto</span>
-                                                                            <div className="text-[10px] font-normal text-ui-secondary">
-                                                                                ({(prod.currentSellingPrice / 1.05).toFixed(2)} zł netto)
-                                                                            </div>
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between text-emerald-900 bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-200/60">
-                                                                        <span className="font-medium text-[11px]">Sugerowana cena:</span>
-                                                                        <span className="font-black text-xs text-right">
-                                                                            {prod.suggestedSellingPrice.toFixed(2)} zł <span className="text-[10px] font-normal text-emerald-800">brutto</span>
-                                                                            <div className="text-[10px] font-normal text-emerald-700">
-                                                                                ({(prod.suggestedSellingPrice / 1.05).toFixed(2)} zł netto)
-                                                                            </div>
-                                                                        </span>
-                                                                    </div>
+                                                                <div className="mt-3 pt-2.5 border-t border-ui-accent/30">
+                                                                    <button
+                                                                        onClick={() => router.push(`/przepisy/${prod.productId}`)}
+                                                                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                                                                    >
+                                                                        <span>Przejdź do foodcost'u</span>
+                                                                        <ArrowRight size={13} />
+                                                                    </button>
                                                                 </div>
                                                             </div>
-
-                                                            <div className="mt-3 pt-2.5 border-t border-ui-accent/30">
-                                                                <button
-                                                                    onClick={() => router.push(`/przepisy/${prod.productId}`)}
-                                                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                                                                >
-                                                                    <span>Otwórz przepis i kalkulację foodcost</span>
-                                                                    <ArrowRight size={13} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                                        ))}
+                                                    </div>
+                                                )
+                                            }
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                    )}
+                    )
+                    }
 
                     {/* ===================================================== */}
                     {/* SEKCJA 3: PRZYPOMNIENIA O ZAMÓWIENIU SUROWCÓW (>80%) */}
                     {/* ===================================================== */}
-                    {(activeTab === "ALL" || activeTab === "ORDER_REMINDERS") && activeOrderReminders.length >= 0 && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-amber-100 text-amber-800">
-                                        <ShoppingCart size={18} />
-                                    </div>
-                                    Przypomnienia o złożeniu zamówienia surowców ({activeOrderReminders.length})
-                                </h2>
-                                <span className="text-xs text-ui-secondary font-medium hidden sm:inline">
-                                    Zużyto ponad 80% surowca z ostatniej dostawy
-                                </span>
-                            </div>
+                    {
+                        (activeTab === "ALL" || activeTab === "ORDER_REMINDERS") && activeOrderReminders.length >= 0 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-bold text-ui-black flex items-center gap-2">
+                                        <div className="p-1.5 rounded-lg bg-amber-100 text-amber-800">
+                                            <ShoppingCart size={18} />
+                                        </div>
+                                        Przypomnienia o złożeniu zamówienia surowców ({activeOrderReminders.length})
+                                    </h2>
+                                    <span className="text-xs text-ui-secondary font-medium hidden sm:inline">
+                                        Zużyto ponad 80% surowca z ostatniej dostawy
+                                    </span>
+                                </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {activeOrderReminders.map((ord) => (
-                                    <div
-                                        key={ord.id}
-                                        className="bg-white border border-amber-300/80 rounded-2xl p-5 sm:p-6 shadow-xs relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all"
-                                    >
-                                        <div>
-                                            {/* Nagłówek karty */}
-                                            <div className="flex items-start justify-between gap-3 mb-3">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0 font-bold">
-                                                        <ShoppingCart size={20} />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {activeOrderReminders.map((ord) => (
+                                        <div
+                                            key={ord.id}
+                                            className="bg-white border border-amber-300/80 rounded-2xl p-5 sm:p-6 shadow-xs relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all"
+                                        >
+                                            <div>
+                                                {/* Nagłówek karty */}
+                                                <div className="flex items-start justify-between gap-3 mb-3">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0 font-bold">
+                                                            <ShoppingCart size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <h3 className="text-base sm:text-lg font-black text-ui-black">
+                                                                    {ord.ingredientName}
+                                                                </h3>
+                                                                <span
+                                                                    className={`text-xs font-black px-2.5 py-0.5 rounded-md ${ord.percentUsed >= 100
+                                                                        ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                                                        : "bg-amber-100 text-amber-900 border border-amber-200"
+                                                                        }`}
+                                                                >
+                                                                    Zużyto: {ord.percentUsed}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-xs text-ui-black flex items-center gap-3 mt-1 flex-wrap">
+                                                                {ord.lastSupplierName}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={(e) => handleDismiss(ord.id, e)}
+                                                        className="p-1.5 text-ui-secondary/40 hover:text-ui-primary hover:bg-ui-accent/20 rounded-lg transition-colors cursor-pointer"
+                                                        title="Usuń powiadomienie"
+                                                    >
+                                                        <X size={18} />
+                                                    </button>
+                                                </div>
+
+                                                {/* Siatka wskaźników */}
+                                                <div className="grid grid-cols-3 gap-2 py-3 my-3 border-y border-ui-accent/40 text-xs">
+                                                    <div>
+                                                        <span className="text-ui-secondary block text-[11px]">Ostatni zakup:</span>
+                                                        <span className="font-bold text-ui-black text-xs sm:text-sm">
+                                                            {ord.lastPurchaseQuantity} {ord.ingredientUnit}
+                                                        </span>
+                                                        <span className="text-[10px] text-ui-black block truncate mt-0.5">
+                                                            {formatDate(ord.lastPurchaseDate)}
+                                                        </span>
                                                     </div>
                                                     <div>
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <h3 className="text-base sm:text-lg font-black text-ui-black">
-                                                                {ord.ingredientName}
-                                                            </h3>
-                                                            <span
-                                                                className={`text-xs font-black px-2.5 py-0.5 rounded-md ${ord.percentUsed >= 100
-                                                                    ? "bg-rose-100 text-rose-800 border border-rose-200"
-                                                                    : "bg-amber-100 text-amber-900 border border-amber-200"
-                                                                    }`}
-                                                            >
-                                                                Zużyto: {ord.percentUsed}%
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-ui-secondary font-medium mt-0.5">
-                                                            Dostawca: <strong className="text-ui-primary">{ord.lastSupplierName}</strong>
-                                                        </div>
+                                                        <span className="text-ui-secondary block text-[11px]">Zużyto:</span>
+                                                        <span
+                                                            className={`font-bold text-xs sm:text-sm ${ord.percentUsed >= 100 ? "text-rose-700" : "text-amber-900"
+                                                                }`}
+                                                        >
+                                                            {ord.consumedQuantity} {ord.ingredientUnit}
+                                                        </span>
+                                                        <span className="text-[10px] text-ui-black block truncate mt-0.5">
+                                                            {ord.percentUsed}% dostawy
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-ui-secondary block text-[11px]">Pozostało:</span>
+                                                        <span className="font-bold text-ui-black text-xs sm:text-sm">
+                                                            ~{ord.remainingQuantity} {ord.ingredientUnit}
+                                                        </span>
+                                                        <span className="text-[10px] text-ui-black block truncate mt-0.5">
+                                                            {ord.remainingQuantity <= 0 ? "Brak w zapasie" : "Szacunkowo"}
+                                                        </span>
                                                     </div>
                                                 </div>
+                                            </div>
 
+                                            {/* Dolny pasek z przyciskiem usunięcia */}
+                                            <div className="pt-1 flex items-center justify-between gap-2 text-xs">
                                                 <button
                                                     onClick={(e) => handleDismiss(ord.id, e)}
-                                                    className="p-1.5 text-ui-secondary/40 hover:text-ui-primary hover:bg-ui-accent/20 rounded-lg transition-colors cursor-pointer"
-                                                    title="Usuń powiadomienie"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-ui-accent/20 hover:bg-rose-50 text-ui-secondary hover:text-rose-700 rounded-xl text-xs font-semibold border border-ui-accent transition-colors cursor-pointer"
                                                 >
-                                                    <X size={18} />
+                                                    <Trash2 size={13} />
+                                                    <span>Usuń powiadomienie</span>
                                                 </button>
                                             </div>
-
-                                            {/* Pasek postępu zużycia */}
-                                            <div className="mt-3">
-                                                <div className="w-full bg-ui-accent/20 h-2.5 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all duration-500 ${ord.percentUsed >= 100 ? "bg-rose-600" : "bg-amber-500"
-                                                            }`}
-                                                        style={{ width: `${Math.min(ord.percentUsed, 100)}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Siatka wskaźników */}
-                                            <div className="grid grid-cols-3 gap-2 py-3 my-3 border-y border-ui-accent/40 text-xs">
-                                                <div>
-                                                    <span className="text-ui-secondary block text-[11px]">Ostatni zakup:</span>
-                                                    <span className="font-bold text-ui-black text-xs sm:text-sm">
-                                                        {ord.lastPurchaseQuantity} {ord.ingredientUnit}
-                                                    </span>
-                                                    <span className="text-[10px] text-ui-secondary block truncate mt-0.5">
-                                                        {formatDate(ord.lastPurchaseDate)}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-ui-secondary block text-[11px]">Zużyto na prod.:</span>
-                                                    <span
-                                                        className={`font-bold text-xs sm:text-sm ${ord.percentUsed >= 100 ? "text-rose-700" : "text-amber-900"
-                                                            }`}
-                                                    >
-                                                        {ord.consumedQuantity} {ord.ingredientUnit}
-                                                    </span>
-                                                    <span className="text-[10px] text-ui-secondary block truncate mt-0.5">
-                                                        {ord.percentUsed}% dostawy
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-ui-secondary block text-[11px]">Pozostało:</span>
-                                                    <span className="font-black text-ui-black text-xs sm:text-sm">
-                                                        ~{ord.remainingQuantity} {ord.ingredientUnit}
-                                                    </span>
-                                                    <span className="text-[10px] text-ui-secondary block truncate mt-0.5">
-                                                        {ord.remainingQuantity <= 0 ? "Brak w zapasie" : "Szacunkowo"}
-                                                    </span>
-                                                </div>
-                                            </div>
                                         </div>
-
-                                        {/* Dolny pasek z przyciskiem usunięcia */}
-                                        <div className="pt-1 flex items-center justify-between gap-2 text-xs">
-                                            <span className="text-[11px] text-ui-secondary leading-snug">
-                                                Faktura: <strong>{ord.lastInvoiceNumber || "-"}</strong>
-                                            </span>
-                                            <button
-                                                onClick={(e) => handleDismiss(ord.id, e)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-ui-accent/20 hover:bg-rose-50 text-ui-secondary hover:text-rose-700 rounded-xl text-xs font-semibold border border-ui-accent transition-colors cursor-pointer"
-                                            >
-                                                <Trash2 size={13} />
-                                                <span>Usuń powiadomienie</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )
+                    }
+                </div >
             )}
-        </div>
+        </div >
     );
 }

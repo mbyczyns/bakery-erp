@@ -268,9 +268,9 @@ export default function KosztyTab() {
         setIsSaving(true);
         setSaveSuccess(false);
         try {
-            const costsToSave = Object.entries(formValues).map(([costTypeId, valStr]) => ({
-                costTypeId,
-                value: parseFloat(valStr) || 0,
+            const costsToSave = (costData?.costTypes || []).map((type: CostType) => ({
+                costTypeId: type.id,
+                value: parseFloat(formValues[type.id] || "0") || 0,
             }));
 
             const res = await fetch("/api/koszty", {
@@ -286,9 +286,13 @@ export default function KosztyTab() {
                 setSaveSuccess(true);
                 setTimeout(() => setSaveSuccess(false), 3000);
                 await fetchCosts(selectedMonth);
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                alert(errData.error || errData.details || "Wystąpił błąd podczas zapisywania kosztów.");
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Błąd zapisu kosztów:", err);
+            alert("Błąd połączenia podczas zapisu kosztów: " + (err.message || err));
         } finally {
             setIsSaving(false);
         }
@@ -584,12 +588,12 @@ export default function KosztyTab() {
                             </span>
                             <DollarSign size={15} className="text-ui-secondary" />
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-extrabold text-ui-primary tracking-tight">
                             {formatCurrency(liveGrandEnterpriseTotal)}
                         </div>
                     </div>
-                    <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
-                        <span>Netto: {formatCurrency(liveGrandEnterpriseNetTotal)}</span>
+                    <div className="text-xs text-ui-black  mt-2 flex items-center justify-between">
+                        <span>{formatCurrency(liveGrandEnterpriseNetTotal)} netto</span>
                     </div>
                 </div>
 
@@ -602,12 +606,12 @@ export default function KosztyTab() {
                             </span>
                             <Briefcase size={15} className="text-ui-secondary" />
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-extrabold text-ui-primary tracking-tight">
                             {formatCurrency(liveOpTotal)}
                         </div>
                     </div>
-                    <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
-                        <span>Netto: {formatCurrency(liveOpTotal)}</span>
+                    <div className="text-xs text-ui-black  mt-2 flex items-center justify-between">
+                        <span>{formatCurrency(liveOpTotal)} netto</span>
                     </div>
                 </div>
 
@@ -621,12 +625,12 @@ export default function KosztyTab() {
                             <Receipt size={15} className="text-ui-secondary" />
 
                         </div>
-                        <div className="mt-2 text-2xl sm:text-3xl font-bold text-ui-primary tracking-tight">
+                        <div className="mt-2 text-2xl sm:text-3xl font-extrabold text-ui-primary tracking-tight">
                             {formatCurrency(invoicesGross)}
                         </div>
                     </div>
-                    <div className="text-[11px] text-ui-secondary font-semibold mt-2 flex items-center justify-between">
-                        <span>Netto: {formatCurrency(invoicesNet)}</span>
+                    <div className="text-xs text-ui-black  mt-2 flex items-center justify-between">
+                        <span>{formatCurrency(invoicesNet)} netto</span>
                     </div>
                 </div>
             </div>
@@ -708,7 +712,7 @@ export default function KosztyTab() {
                                             <div className="flex items-center gap-2.5 min-w-0">
 
                                                 <div className="truncate">
-                                                    <div className="font-bold text-xs text-ui-black truncate">{type.name}</div>
+                                                    <div className="text-xs text-ui-black truncate">{type.name}</div>
 
                                                 </div>
                                             </div>
@@ -736,7 +740,7 @@ export default function KosztyTab() {
 
                             {/* Dolny pasek podsumowania formularza */}
                             <div className="p-3 border-t border-ui-accent flex items-center justify-between">
-                                <div className="text-xs font-bold text-ui-secondary">
+                                <div className="text-xs font-bold text-ui-black">
                                     Suma pozafakturowa:
                                 </div>
                                 <span className="text-base font-bold text-ui-black">{formatCurrency(liveOpTotal)}</span>
@@ -822,6 +826,7 @@ export default function KosztyTab() {
                                                         outerRadius={95}
                                                         paddingAngle={2}
                                                         dataKey="value"
+                                                        nameKey="name"
                                                         onClick={(entry) => {
                                                             if (entry.hasSubcategories || entry.name.toLowerCase().includes("spożywcz")) {
                                                                 setDrillDownCategory("Produkty spożywcze");
@@ -841,8 +846,47 @@ export default function KosztyTab() {
                                                         ))}
                                                     </Pie>
                                                     <Tooltip
-                                                        formatter={(val: number) => [formatCurrency(val), "Wartość brutto"]}
-                                                        contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}
+                                                        content={({ active, payload }) => {
+                                                            if (active && payload && payload.length) {
+                                                                const item = payload[0];
+                                                                const dataPoint = item.payload;
+                                                                const name = dataPoint?.name || item.name;
+                                                                const val = Number(item.value ?? dataPoint?.value ?? 0);
+                                                                const percent = dataPoint?.sharePercent;
+                                                                const color = dataPoint?.color || item.color;
+
+                                                                return (
+                                                                    <div className="bg-white text-ui-black p-3 rounded-xl shadow-xl border border-ui-accent/60 text-xs min-w-[190px]">
+                                                                        <div className="font-bold text-xs border-b border-ui-accent/40 pb-1.5 text-ui-primary flex items-center gap-2 mb-1.5">
+                                                                            {color && (
+                                                                                <span
+                                                                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                                    style={{ backgroundColor: color }}
+                                                                                />
+                                                                            )}
+                                                                            <span className="leading-snug">{name}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between items-center text-xs">
+                                                                            <span className="text-ui-secondary font-medium">Koszt brutto:</span>
+                                                                            <span className="font-bold text-ui-black">{formatCurrency(val)}</span>
+                                                                        </div>
+                                                                        {dataPoint?.netValue !== undefined && dataPoint?.netValue !== null && (
+                                                                            <div className="flex justify-between items-center text-xs pt-1">
+                                                                                <span className="text-ui-secondary font-medium">Koszt netto:</span>
+                                                                                <span className="font-medium text-ui-secondary">{formatCurrency(dataPoint.netValue)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {percent !== undefined && percent !== null && (
+                                                                            <div className="flex justify-between items-center text-xs pt-1 border-t border-ui-accent/30 mt-1">
+                                                                                <span className="text-ui-secondary font-medium">Udział:</span>
+                                                                                <span className="font-bold text-ui-primary">{percent}%</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        }}
                                                     />
                                                 </PieChart>
                                             </ResponsiveContainer>
@@ -945,23 +989,18 @@ export default function KosztyTab() {
                                 </h3>
 
                             </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl">
-                                    Suma brutto: {formatCurrency(invoicesGross)}
-                                </span>
-                            </div>
                         </div>
 
                         {invoiceCategoriesList.length > 0 ? (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs border-collapse">
+                                <table className="w-full min-w-[680px] text-left text-xs border-collapse">
                                     <thead>
                                         <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider border-b border-ui-accent/30">
-                                            <th className="p-3.5 min-w-[200px]">Kategoria produktu na fakturze</th>
-                                            <th className="p-3.5 text-right min-w-[120px]">Kwota Netto</th>
-                                            <th className="p-3.5 text-right min-w-[120px]">Kwota Brutto</th>
-                                            <th className="p-3.5 text-right min-w-[110px] bg-ui-accent/15 font-bold text-ui-black">
-                                                Udział w kosztach firmy
+                                            <th className="p-3.5 w-[34%] min-w-[200px]">Kategoria produktu na fakturze</th>
+                                            <th className="p-3.5 text-right w-[22%] min-w-[130px]">Kwota Netto</th>
+                                            <th className="p-3.5 text-right w-[22%] min-w-[130px]">Kwota Brutto</th>
+                                            <th className="p-3.5 text-right w-[22%] min-w-[120px]">
+                                                Udział w kosztach
                                             </th>
                                         </tr>
                                     </thead>
@@ -975,7 +1014,7 @@ export default function KosztyTab() {
                                             return (
                                                 <React.Fragment key={idx}>
                                                     <tr className="hover:bg-ui-accent/5 transition-colors">
-                                                        <td className="p-3.5 font-bold text-ui-black">
+                                                        <td className="p-3.5 text-ui-black">
                                                             <div className="flex items-center gap-2">
                                                                 <span>{cat.name}</span>
                                                                 {isFood && (
@@ -991,57 +1030,57 @@ export default function KosztyTab() {
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="p-3.5 text-right font-semibold text-ui-black">
+                                                        <td className="p-3.5 text-right text-ui-black">
                                                             {formatCurrency(cat.net)}
                                                         </td>
-                                                        <td className="p-3.5 text-right font-bold text-ui-black">
+                                                        <td className="p-3.5 text-right text-ui-black">
                                                             {formatCurrency(cat.gross)}
                                                         </td>
-                                                        <td className="p-3.5 text-right font-bold text-ui-primary bg-ui-accent/5">
+                                                        <td className="p-3.5 text-right  text-ui-black">
                                                             {shareOfAll}%
                                                         </td>
                                                     </tr>
 
-                                                    {/* Rozwinięcie podkategorii spożywczych w tabeli */}
+                                                    {/* Rozwinięcie podkategorii spożywczych bezpośrednio w kolumnach tabeli */}
                                                     {isFood && isTableFoodExpanded && foodBreakdown?.subcategories && (
-                                                        <tr>
-                                                            <td colSpan={4} className="bg-ui-accent/10 p-4 border-y border-ui-accent/40">
-                                                                <div className="rounded-xl border border-ui-accent/60 bg-white overflow-hidden shadow-xs">
-                                                                    <table className="w-full text-xs">
-                                                                        <thead>
-                                                                            <tr className="bg-ui-accent/10 text-ui-secondary font-bold border-b border-ui-accent/30">
-                                                                                <th className="p-2.5 pl-4 text-left">Podkategoria surowca</th>
-                                                                                <th className="p-2.5 text-right">Kwota Netto</th>
-                                                                                <th className="p-2.5 text-right">Kwota Brutto</th>
-                                                                                <th className="p-2.5 pr-4 text-right">Udział w surowcach</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-ui-accent/20">
-                                                                            {foodBreakdown.subcategories.map((subcat: FoodSubcategoryItem) => (
-                                                                                <tr key={subcat.key} className="hover:bg-ui-accent/5 font-medium transition-colors">
-                                                                                    <td className="p-2.5 pl-4 font-bold text-ui-black flex items-center gap-2">
-                                                                                        <span
-                                                                                            className="w-2 h-2 rounded-full"
-                                                                                            style={{ backgroundColor: FOOD_COLORS[subcat.key] || "#0c8ac9" }}
-                                                                                        />
-                                                                                        {subcat.name}
-                                                                                    </td>
-                                                                                    <td className="p-2.5 text-right text-ui-secondary font-semibold">
-                                                                                        {formatCurrency(subcat.net)}
-                                                                                    </td>
-                                                                                    <td className="p-2.5 text-right font-bold text-ui-black">
-                                                                                        {formatCurrency(subcat.gross)}
-                                                                                    </td>
-                                                                                    <td className="p-2.5 pr-4 text-right font-bold text-ui-primary">
-                                                                                        {subcat.sharePercent}%
-                                                                                    </td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
+                                                        <>
+                                                            <tr className="bg-ui-accent/15 text-[10px] font-bold text-ui-secondary uppercase tracking-wider border-y border-ui-accent/30">
+                                                                <th className="py-2.5 px-3.5 pl-8 text-left font-bold text-ui-secondary">
+                                                                    PODKATEGORIA SUROWCA
+                                                                </th>
+                                                                <th className="py-2.5 px-3.5 text-right font-bold text-ui-secondary">
+                                                                    KWOTA NETTO
+                                                                </th>
+                                                                <th className="py-2.5 px-3.5 text-right font-bold text-ui-secondary">
+                                                                    KWOTA BRUTTO
+                                                                </th>
+                                                                <th className="py-2.5 px-3.5 text-right font-bold text-ui-secondary">
+                                                                    UDZIAŁ W SUROWCACH
+                                                                </th>
+                                                            </tr>
+                                                            {foodBreakdown.subcategories.map((subcat: FoodSubcategoryItem) => (
+                                                                <tr key={subcat.key} className="bg-ui-accent/5 hover:bg-ui-accent/10 transition-colors border-b border-ui-accent/20">
+                                                                    <td className="py-2.5 px-3.5 pl-8 text-ui-black">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span
+                                                                                className="w-2 h-2 rounded-full shrink-0"
+                                                                                style={{ backgroundColor: FOOD_COLORS[subcat.key] || "#0c8ac9" }}
+                                                                            />
+                                                                            <span>{subcat.name}</span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2.5 px-3.5 text-right text-ui-black">
+                                                                        {formatCurrency(subcat.net)}
+                                                                    </td>
+                                                                    <td className="py-2.5 px-3.5 text-right text-ui-black">
+                                                                        {formatCurrency(subcat.gross)}
+                                                                    </td>
+                                                                    <td className="py-2.5 px-3.5 text-right text-ui-primary">
+                                                                        {subcat.sharePercent}%
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </>
                                                     )}
                                                 </React.Fragment>
                                             );
@@ -1052,7 +1091,7 @@ export default function KosztyTab() {
                                             <td className="p-3.5">RAZEM FAKTURY</td>
                                             <td className="p-3.5 text-right">{formatCurrency(invoicesNet)}</td>
                                             <td className="p-3.5 text-right">{formatCurrency(invoicesGross)}</td>
-                                            <td className="p-3.5 text-right bg-ui-accent/20">
+                                            <td className="p-3.5 text-right">
                                                 {liveGrandEnterpriseTotal > 0 ? Math.round((invoicesGross / liveGrandEnterpriseTotal) * 100) : 0}%
                                             </td>
                                         </tr>
@@ -1225,12 +1264,9 @@ export default function KosztyTab() {
                         <div className="flex items-center justify-between pb-4 border-b border-ui-accent/50 mb-6">
                             <div>
                                 <h3 className="text-sm font-bold text-ui-black flex items-center gap-2">
-                                    <Settings size={16} />
+                                    <Settings className="text-ui-secondary" size={16} />
                                     Kategorie kosztów pozafakturowych
                                 </h3>
-                                <p className="text-xs text-ui-secondary mt-1">
-                                    Dodawaj nowe kategorie (np. premie, inne) i edytuj istniejące
-                                </p>
                             </div>
                         </div>
 
@@ -1245,7 +1281,7 @@ export default function KosztyTab() {
                             />
                             <button
                                 type="submit"
-                                className="px-4 py-2 bg-ui-primary text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                                className="flex items-center gap-1 text-xs font-semibold border border-ui-accent hover:bg-ui-accent/30 text-ui-primary px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                             >
                                 <Plus size={14} />
                                 Dodaj
@@ -1256,7 +1292,7 @@ export default function KosztyTab() {
                         <div className="divide-y divide-ui-accent/30 space-y-2">
                             {costData?.costTypes?.map((type: CostType) => {
                                 const isEditing = editingCategoryId === type.id;
-                                const isDefault = ["Wypłaty pracowników", "Składki ZUS", "Podatek PIT"].includes(type.name);
+                                const isDefault = ["Wynagrodzenia", "Składki ZUS", "Podatek PIT"].includes(type.name);
 
                                 return (
                                     <div key={type.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3">

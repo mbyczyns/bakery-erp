@@ -708,10 +708,10 @@ export default function PrzepisSzczegolyPage({
                         <div className="text-2xl font-black text-ui-primary leading-tight">
                             {currentSellingPrice > 0 ? (
                                 <>
-                                    {currentSellingPrice.toFixed(2)} <span className="text-sm font-medium">zł brutto</span>
+                                    {currentSellingPrice.toFixed(2)} zł <span className="text-sm font-medium">brutto</span>
                                 </>
                             ) : (
-                                <span className="text-xl font-bold text-ui-secondary">Nieustalona</span>
+                                <span className="text-xl font-bold text-ui-primary">Nieustalona</span>
                             )}
                         </div>
                         <div className="text-xs text-ui-primary mt-1">
@@ -734,7 +734,7 @@ export default function PrzepisSzczegolyPage({
                     </div>
                     <div>
                         <div className="text-2xl font-black text-ui-primary leading-tight">
-                            {totalFoodCost.toFixed(2)} <span className="text-sm font-medium">zł netto</span>
+                            {totalFoodCost.toFixed(2)} zł<span className="text-sm font-medium"> netto</span>
                         </div>
                         <div className="text-xs text-ui-primary mt-1">
                             {totalFoodCostGross.toFixed(2)} <span className="font-normal text-xs">zł brutto</span>
@@ -752,7 +752,7 @@ export default function PrzepisSzczegolyPage({
                         <div className="text-2xl font-black text-ui-primary leading-tight">
                             {currentSellingPrice > 0 ? (
                                 <>
-                                    {currentProfit.toFixed(2)} <span className="text-sm font-medium">zł netto</span>
+                                    {currentProfit.toFixed(2)} zł<span className="text-sm font-medium"> netto</span>
                                 </>
                             ) : (
                                 <span className="text-xl font-bold text-ui-secondary">—</span>
@@ -780,7 +780,7 @@ export default function PrzepisSzczegolyPage({
                         <div className="text-2xl font-black text-ui-primary leading-tight">
                             {currentSellingPrice > 0 ? (
                                 <>
-                                    {currentMargin.toFixed(1)} <span className="text-sm font-medium">%</span>
+                                    {currentMargin.toFixed(1)} %
                                 </>
                             ) : (
                                 <span className="text-xl font-bold text-ui-secondary">—</span>

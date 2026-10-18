@@ -452,7 +452,13 @@ export async function POST(request: NextRequest) {
 
         for (const item of costs) {
             const { costTypeId, value } = item;
+            if (!costTypeId) continue;
             const numericValue = Math.max(0, parseFloat(value) || 0);
+
+            const existingCostType = await prisma.costType.findUnique({
+                where: { id: costTypeId },
+            });
+            if (!existingCostType) continue;
 
             await prisma.monthlyCost.upsert({
                 where: {

@@ -24,6 +24,7 @@ import {
     Building2,
     CheckCircle2,
     Info,
+    Hamburger,
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -40,8 +41,13 @@ import {
 } from "recharts";
 
 type Granularity = "DAILY" | "WEEKLY" | "MONTHLY" | "PRODUCTS" | "INVOICES";
-type PeriodPreset = "CURRENT_MONTH" | "PREV_MONTH" | "30D" | "90D" | "YEAR" | "ALL";
+type PeriodPreset = "CURRENT_MONTH" | "PREV_MONTH" | "7D" | "14D" | "30D" | "90D" | "YEAR" | "ALL";
 type BakeryCategory = "ALL" | "BREAD" | "ROLL" | "SWEET" | "SAVORY";
+
+const MONTH_NAMES = [
+    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+];
 
 interface DayProductDetail {
     productId: string;
@@ -104,6 +110,9 @@ interface DailyRecord {
     totalSold: number;
     sellThroughRate: number;
     hasReport: boolean;
+    isClosed?: boolean;
+    closedReason?: string;
+    noSales?: boolean;
     categoryBreakdown: {
         BREAD: number;
         ROLL: number;
@@ -198,10 +207,10 @@ const CATEGORY_MAP: Record<string, {
     },
     ROLL: {
         label: "Bułki",
-        color: "#9333ea",
-        badge: "bg-purple-100 text-purple-800 border-purple-300",
-        headerBg: "text-purple-800 bg-purple-50 border-purple-200",
-        icon: Layers,
+        color: "#059669",
+        badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        headerBg: "text-emerald-800 bg-emerald-50 border-emerald-200",
+        icon: Hamburger,
     },
     SWEET: {
         label: "Wypieki słodkie",
@@ -212,9 +221,9 @@ const CATEGORY_MAP: Record<string, {
     },
     SAVORY: {
         label: "Wypieki słone",
-        color: "#059669",
-        badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
-        headerBg: "text-emerald-800 bg-emerald-50 border-emerald-200",
+        color: "#9333ea",
+        badge: "bg-purple-100 text-purple-800 border-purple-300",
+        headerBg: "text-purple-800 bg-purple-50 border-purple-200",
         icon: Pizza,
     },
 };
@@ -230,6 +239,19 @@ function formatDate(dateStr: string): string {
         return `${parts[2]}.${parts[1]}.${parts[0]}`;
     }
     return dateStr;
+}
+
+function formatWeekDateRange(startDate: string, endDate: string): string {
+    if (!startDate || !endDate) return "";
+    const sParts = startDate.split("-");
+    const eParts = endDate.split("-");
+    if (sParts.length === 3 && eParts.length === 3) {
+        if (sParts[0] === eParts[0]) {
+            return `${sParts[2]}.${sParts[1]} - ${eParts[2]}.${eParts[1]}.${eParts[0]}`;
+        }
+        return `${sParts[2]}.${sParts[1]}.${sParts[0]} - ${eParts[2]}.${eParts[1]}.${eParts[0]}`;
+    }
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
 }
 
 export default function PrzychodyTab() {
@@ -255,6 +277,16 @@ export default function PrzychodyTab() {
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const [expandedInvoices, setExpandedInvoices] = useState<Record<string, boolean>>({});
     const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
+
+    const formattedSelectedMonth = useMemo(() => {
+        if (!selectedMonth) return "";
+        const [yStr, mStr] = selectedMonth.split("-");
+        const mIdx = parseInt(mStr, 10) - 1;
+        if (mIdx >= 0 && mIdx < 12) {
+            return `${MONTH_NAMES[mIdx]} ${yStr}`;
+        }
+        return selectedMonth;
+    }, [selectedMonth]);
 
     const fetchRevenueData = async () => {
         setIsLoading(true);
@@ -339,6 +371,14 @@ export default function PrzychodyTab() {
             }
             const prevKey = `${y}-${String(m).padStart(2, "0")}`;
             list = list.filter((d) => d.date.startsWith(prevKey));
+        } else if (periodPreset === "7D") {
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 7);
+            list = list.filter((d) => new Date(d.date) >= dateLimit);
+        } else if (periodPreset === "14D") {
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 14);
+            list = list.filter((d) => new Date(d.date) >= dateLimit);
         } else if (periodPreset === "30D") {
             const dateLimit = new Date();
             dateLimit.setDate(dateLimit.getDate() - 30);
@@ -362,6 +402,9 @@ export default function PrzychodyTab() {
             );
         }
 
+        // Sortowanie chronologiczne: od pierwszego do ostatniego dnia miesiąca / okresu
+        list.sort((a, b) => a.date.localeCompare(b.date));
+
         return list;
     }, [data?.dailyData, periodPreset, selectedMonth, currentMonthKey, searchQuery]);
 
@@ -370,7 +413,9 @@ export default function PrzychodyTab() {
         if (!data?.weeklyData) return [];
         let list = [...data.weeklyData];
 
-        if (periodPreset === "CURRENT_MONTH" || periodPreset === "PREV_MONTH" || periodPreset === "30D") {
+        if (periodPreset === "7D" || periodPreset === "14D") {
+            list = list.slice(0, 4);
+        } else if (periodPreset === "CURRENT_MONTH" || periodPreset === "PREV_MONTH" || periodPreset === "30D") {
             list = list.slice(0, 8);
         } else if (periodPreset === "90D") {
             list = list.slice(0, 14);
@@ -383,6 +428,9 @@ export default function PrzychodyTab() {
             const q = searchQuery.toLowerCase();
             list = list.filter((w) => w.label.toLowerCase().includes(q));
         }
+
+        // Sortowanie chronologiczne tygodni od najwcześniejszego do najpóźniejszego
+        list.sort((a, b) => a.startDate.localeCompare(b.startDate));
 
         return list;
     }, [data?.weeklyData, periodPreset, searchQuery]);
@@ -401,6 +449,9 @@ export default function PrzychodyTab() {
             const q = searchQuery.toLowerCase();
             list = list.filter((m) => m.label.toLowerCase().includes(q));
         }
+
+        // Sortowanie chronologiczne miesięcy od pierwszego do ostatniego
+        list.sort((a, b) => a.key.localeCompare(b.key));
 
         return list;
     }, [data?.monthlyData, periodPreset, searchQuery]);
@@ -439,6 +490,14 @@ export default function PrzychodyTab() {
             }
             const prevKey = `${y}-${String(m).padStart(2, "0")}`;
             list = list.filter((inv) => inv.issuedDate.startsWith(prevKey));
+        } else if (periodPreset === "7D") {
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 7);
+            list = list.filter((inv) => new Date(inv.issuedDate) >= dateLimit);
+        } else if (periodPreset === "14D") {
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 14);
+            list = list.filter((inv) => new Date(inv.issuedDate) >= dateLimit);
         } else if (periodPreset === "30D") {
             const dateLimit = new Date();
             dateLimit.setDate(dateLimit.getDate() - 30);
@@ -463,6 +522,9 @@ export default function PrzychodyTab() {
             );
         }
 
+        // Sortowanie chronologiczne faktur od najwcześniejszej do najpóźniejszej
+        list.sort((a, b) => a.issuedDate.localeCompare(b.issuedDate));
+
         return list;
     }, [data?.salesInvoices, periodPreset, selectedMonth, currentMonthKey, searchQuery]);
 
@@ -479,7 +541,7 @@ export default function PrzychodyTab() {
         let peakLabel = "-";
 
         if (view === "DAILY") {
-            daysCount = filteredDailyData.filter((d) => d.hasReport).length;
+            daysCount = filteredDailyData.filter((d) => d.hasReport && !d.noSales && !d.isClosed).length;
             filteredDailyData.forEach((d) => {
                 totalIncome += d.totalIncome;
                 bakerySalesIncome += d.bakerySalesIncome;
@@ -563,7 +625,7 @@ export default function PrzychodyTab() {
     const chartData = useMemo(() => {
         if (view === "DAILY") {
             // W widoku dziennym wykres pokazuje czysty utarg detaliczny ze sklepu (Pieczywo + Inne)
-            return [...filteredDailyData].reverse().map((d) => ({
+            return filteredDailyData.map((d) => ({
                 label: `${d.shortDay} ${d.date.slice(8, 10)}.${d.date.slice(5, 7)}`,
                 fullDate: d.date,
                 dayOfWeek: d.dayOfWeek,
@@ -576,7 +638,7 @@ export default function PrzychodyTab() {
         }
         if (view === "WEEKLY") {
             // W widoku tygodniowym wykres pokazuje utarg tygodniowy ze sklepu
-            return [...filteredWeeklyData].reverse().map((w) => ({
+            return filteredWeeklyData.map((w) => ({
                 label: w.shortLabel,
                 fullLabel: w.label,
                 bakery: w.bakerySalesIncome,
@@ -588,7 +650,7 @@ export default function PrzychodyTab() {
         }
         if (view === "MONTHLY") {
             // W widoku MIESIĘCZNYM wykres uwzględnia faktury sprzedażowe na cały miesiąc
-            return [...filteredMonthlyData].reverse().map((m) => ({
+            return filteredMonthlyData.map((m) => ({
                 label: m.shortLabel,
                 fullLabel: m.label,
                 bakery: m.bakerySalesIncome,
@@ -614,7 +676,7 @@ export default function PrzychodyTab() {
             res.push({ name: "Inne przychody (detal)", value: activeStats.otherIncome, color: "#38bdf8" });
         }
         if (view === "MONTHLY" && activeStats.salesInvoicesGross > 0) {
-            res.push({ name: "Faktury sprzedażowe (B2B)", value: activeStats.salesInvoicesGross, color: "#10b981" });
+            res.push({ name: "Faktury sprzedażowe", value: activeStats.salesInvoicesGross, color: "#10b981" });
         }
         return res;
     }, [activeStats, view]);
@@ -651,8 +713,8 @@ export default function PrzychodyTab() {
                         >
                             <ChevronLeft size={16} />
                         </button>
-                        <span className="px-3 text-xs font-bold text-ui-primary min-w-[90px] text-center">
-                            {selectedMonth}
+                        <span className="px-3 text-xs font-bold text-ui-primary min-w-[130px] text-center">
+                            {formattedSelectedMonth}
                         </span>
                         <button
                             onClick={handleNextMonth}
@@ -674,11 +736,11 @@ export default function PrzychodyTab() {
             </div>
 
             {/* ---------------- PRZEŁĄCZNIK WIDOKÓW (TABS) & FILTRY ---------------- */}
-            <div className="bg-white border border-ui-accent rounded-2xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 p-1 bg-ui-accent/10 rounded-xl border border-ui-accent/30 overflow-x-auto max-w-full">
+            <div className="bg-white border border-ui-accent rounded-2xl p-2.5 sm:p-3 shadow-xs flex items-center justify-between gap-3 overflow-x-auto">
+                <div className="flex items-center gap-1 p-1 bg-ui-accent/10 rounded-xl border border-ui-accent/30 shrink-0">
                     <button
                         onClick={() => setView("DAILY")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "DAILY"
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "DAILY"
                             ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
                             : "text-ui-secondary hover:text-ui-primary"
                             }`}
@@ -688,7 +750,7 @@ export default function PrzychodyTab() {
                     </button>
                     <button
                         onClick={() => setView("WEEKLY")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "WEEKLY"
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "WEEKLY"
                             ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
                             : "text-ui-secondary hover:text-ui-primary"
                             }`}
@@ -698,7 +760,7 @@ export default function PrzychodyTab() {
                     </button>
                     <button
                         onClick={() => setView("MONTHLY")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "MONTHLY"
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "MONTHLY"
                             ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
                             : "text-ui-secondary hover:text-ui-primary"
                             }`}
@@ -708,7 +770,7 @@ export default function PrzychodyTab() {
                     </button>
                     <button
                         onClick={() => setView("PRODUCTS")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "PRODUCTS"
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "PRODUCTS"
                             ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
                             : "text-ui-secondary hover:text-ui-primary"
                             }`}
@@ -718,7 +780,7 @@ export default function PrzychodyTab() {
                     </button>
                     <button
                         onClick={() => setView("INVOICES")}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "INVOICES"
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${view === "INVOICES"
                             ? "bg-white text-ui-primary shadow-xs border border-ui-accent/50"
                             : "text-ui-secondary hover:text-ui-primary"
                             }`}
@@ -728,63 +790,58 @@ export default function PrzychodyTab() {
                     </button>
                 </div>
 
-                {/* Filtry zakresów */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {(view === "DAILY" || view === "INVOICES") && (
-                        <div className="flex items-center gap-1 text-xs">
-                            {[
-                                { id: "CURRENT_MONTH", label: "Wybrany miesiąc" },
-                                { id: "30D", label: "Ost. 30 dni" },
-                                { id: "90D", label: "Ost. 90 dni" },
-                                { id: "YEAR", label: "Bieżący rok" },
-                                { id: "ALL", label: "Wszystko" },
-                            ].map((p) => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => setPeriodPreset(p.id as PeriodPreset)}
-                                    className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${periodPreset === p.id
-                                        ? "bg-ui-primary text-white shadow-xs"
-                                        : "text-ui-secondary hover:bg-ui-accent/10"
-                                        }`}
-                                >
-                                    {p.label}
-                                </button>
-                            ))}
+                {/* Filtry zakresów (rozwijany pasek) i wyszukiwarka przesunięte na prawo w jednej linii */}
+                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    {view !== "PRODUCTS" && (
+                        <div className="relative">
+                            <select
+                                value={periodPreset}
+                                onChange={(e) => setPeriodPreset(e.target.value as PeriodPreset)}
+                                className="bg-ui-white border border-ui-accent text-ui-primary text-xs font-semibold rounded-lg pl-2.5 pr-7 py-1.5 shadow-2xs focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none min-w-[155px]"
+                            >
+                                <option value="CURRENT_MONTH">Wybrany miesiąc ({formattedSelectedMonth})</option>
+                                <option value="PREV_MONTH">Poprzedni miesiąc</option>
+                                <option value="7D">Ostatnie 7 dni</option>
+                                <option value="14D">Ostatnie 14 dni</option>
+                                <option value="30D">Ostatnie 30 dni</option>
+                                <option value="90D">Ostatnie 90 dni</option>
+                                <option value="YEAR">Bieżący rok</option>
+                                <option value="ALL">Wszystko (pełna historia)</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                <ChevronDown size={13} />
+                            </div>
                         </div>
                     )}
 
                     {view === "PRODUCTS" && (
-                        <div className="flex items-center gap-1 text-xs">
-                            {[
-                                { id: "ALL", label: "Wszystkie" },
-                                { id: "BREAD", label: "Chleby" },
-                                { id: "ROLL", label: "Bułki" },
-                                { id: "SWEET", label: "Słodkie" },
-                                { id: "SAVORY", label: "Słone" },
-                            ].map((c) => (
-                                <button
-                                    key={c.id}
-                                    onClick={() => setSelectedCategory(c.id as BakeryCategory)}
-                                    className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${selectedCategory === c.id
-                                        ? "bg-ui-primary text-white shadow-xs"
-                                        : "text-ui-secondary hover:bg-ui-accent/10"
-                                        }`}
-                                >
-                                    {c.label}
-                                </button>
-                            ))}
+                        <div className="relative">
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value as BakeryCategory)}
+                                className="bg-ui-white border border-ui-accent text-ui-primary text-xs font-semibold rounded-lg pl-2.5 pr-7 py-1.5 shadow-2xs focus:outline-none focus:border-ui-secondary transition-all cursor-pointer appearance-none min-w-[150px]"
+                            >
+                                <option value="ALL">Wszystkie kategorie</option>
+                                <option value="BREAD">Chleby</option>
+                                <option value="ROLL">Bułki</option>
+                                <option value="SWEET">Słodkie</option>
+                                <option value="SAVORY">Słone</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-ui-secondary">
+                                <ChevronDown size={13} />
+                            </div>
                         </div>
                     )}
 
                     {/* Wyszukiwarka */}
                     <div className="relative">
-                        <Search size={14} className="absolute left-3 top-2.5 text-ui-secondary" />
+                        <Search size={13} className="absolute left-2.5 top-2 text-ui-secondary" />
                         <input
                             type="text"
-                            placeholder={view === "INVOICES" ? "Szukaj kontrahenta, nr faktury..." : "Szukaj daty, wyrobu..."}
+                            placeholder={view === "INVOICES" ? "Szukaj faktury..." : "Szukaj..."}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="text-xs pl-8 pr-3 py-1.5 rounded-xl border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-secondary w-44 sm:w-56"
+                            className="text-xs pl-7 pr-2.5 py-1.5 rounded-lg border border-ui-accent bg-white text-ui-primary focus:outline-none focus:ring-2 focus:ring-ui-secondary w-32 sm:w-40 lg:w-48"
                         />
                     </div>
                 </div>
@@ -797,7 +854,6 @@ export default function PrzychodyTab() {
                     <div className="text-[11px] uppercase font-bold text-ui-secondary tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
                             {view === "MONTHLY" ? "Łączny przychód (z fakturami) " : "Utarg z kasy "}
-                            ({view === "INVOICES" ? `${filteredSalesInvoices.length} faktur` : `${activeStats.daysCount} dni`})
                         </span>
 
                         <DollarSign size={15} className="text-ui-secondary" />
@@ -867,7 +923,7 @@ export default function PrzychodyTab() {
                                 <BarChart3 size={30} className="p-1.5 bg-ui-secondary/20 rounded-lg text-ui-secondary shadow-sm" />
                                 {view === "DAILY" && "Dzienny utarg ze sklepu (Pieczywo + Inne z kasy)"}
                                 {view === "WEEKLY" && "Tygodniowy utarg ze sklepu (Pieczywo + Inne)"}
-                                {view === "MONTHLY" && "Miesięczny przychód (Sklep + Faktury sprzedażowe B2B)"}
+                                {view === "MONTHLY" && "Miesięczny przychód (Sklep + Faktury sprzedażowe"}
                             </h3>
                         </div>
 
@@ -895,22 +951,22 @@ export default function PrzychodyTab() {
                                                 const pt = payload[0].payload;
                                                 return (
                                                     <div className="bg-white border border-ui-accent/80 rounded-2xl p-4 shadow-xl text-xs min-w-[240px]">
-                                                        <div className="font-bold text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2.5">
+                                                        <div className="font-extrabold text-sm text-ui-black border-b border-ui-accent/40 pb-1.5 mb-2.5">
                                                             {pt.fullLabel || (pt.dayOfWeek ? `${pt.dayOfWeek}, ${formatDate(pt.fullDate || "")}` : label)}
                                                         </div>
                                                         <div className="space-y-1.5">
-                                                            <div className="flex items-center justify-between text-ui-black font-bold text-sm border-b border-ui-accent/20 pb-1">
+                                                            <div className="flex items-center justify-between text-ui-black border-b border-ui-accent/20 pb-1">
                                                                 <span>Przychód łączny:</span>
                                                                 <span>{formatCurrency(pt.total)}</span>
                                                             </div>
-                                                            <div className="flex items-center justify-between text-ui-primary font-bold">
+                                                            <div className="flex items-center justify-between text-ui-black ">
                                                                 <span className="flex items-center gap-1">
                                                                     <span className="w-2.5 h-2.5 rounded-full bg-[#042043]" />
                                                                     Sprzedaż pieczywa:
                                                                 </span>
                                                                 <span>{formatCurrency(pt.bakery)}</span>
                                                             </div>
-                                                            <div className="flex items-center justify-between text-ui-primary font-bold">
+                                                            <div className="flex items-center justify-between text-ui-black">
                                                                 <span className="flex items-center gap-1">
                                                                     <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8]" />
                                                                     Inne z kasy:
@@ -918,7 +974,7 @@ export default function PrzychodyTab() {
                                                                 <span>{formatCurrency(pt.other)}</span>
                                                             </div>
                                                             {view === "MONTHLY" && pt.invoices > 0 && (
-                                                                <div className="flex items-center justify-between text-emerald-700 font-bold">
+                                                                <div className="flex items-center justify-between text-ui-black">
                                                                     <span className="flex items-center gap-1">
                                                                         <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
                                                                         Faktury sprzedażowe:
@@ -927,7 +983,7 @@ export default function PrzychodyTab() {
                                                                 </div>
                                                             )}
                                                             {pt.soldUnits > 0 && (
-                                                                <div className="flex items-center justify-between text-ui-secondary pt-1 border-t border-ui-accent/20 font-semibold">
+                                                                <div className="flex items-center justify-between text-ui-black pt-1 border-t border-ui-accent/20">
                                                                     <span>Sprzedane sztuki:</span>
                                                                     <span>{pt.soldUnits} szt.</span>
                                                                 </div>
@@ -945,7 +1001,7 @@ export default function PrzychodyTab() {
                                         formatter={(val) => {
                                             if (val === "bakery") return "Sprzedaż pieczywa";
                                             if (val === "other") return "Inne z kasy";
-                                            if (val === "invoices") return "Faktury sprzedażowe (B2B)";
+                                            if (val === "invoices") return "Faktury sprzedażowe";
                                             return val;
                                         }}
                                     />
@@ -985,14 +1041,47 @@ export default function PrzychodyTab() {
                                         outerRadius={80}
                                         paddingAngle={4}
                                         dataKey="value"
+                                        nameKey="name"
                                     >
                                         {pieSourceData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(val: number) => formatCurrency(val)}
-                                        contentStyle={{ borderRadius: "12px", border: "1px solid #E5E7EB", fontWeight: "bold", fontSize: "12px" }}
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                const item = payload[0];
+                                                const dataPoint = item.payload;
+                                                const name = dataPoint?.name || item.name;
+                                                const val = Number(item.value ?? dataPoint?.value ?? 0);
+                                                const total = activeStats.totalIncome || 1;
+                                                const percent = Math.round((val / total) * 1000) / 10;
+                                                const color = dataPoint?.color || item.color;
+
+                                                return (
+                                                    <div className="bg-white text-ui-black p-3 rounded-xl shadow-xl border border-ui-accent/60 text-xs min-w-[190px]">
+                                                        <div className="font-bold text-xs border-b border-ui-accent/40 pb-1.5 text-ui-primary flex items-center gap-2 mb-1.5">
+                                                            {color && (
+                                                                <span
+                                                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                    style={{ backgroundColor: color }}
+                                                                />
+                                                            )}
+                                                            <span className="leading-snug">{name}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-xs">
+                                                            <span className="text-ui-secondary font-medium">Przychód:</span>
+                                                            <span className="font-bold text-ui-black">{formatCurrency(val)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-xs pt-1 border-t border-ui-accent/30 mt-1">
+                                                            <span className="text-ui-secondary font-medium">Udział:</span>
+                                                            <span className="font-bold text-ui-primary">{percent}%</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -1001,19 +1090,20 @@ export default function PrzychodyTab() {
                         <div className={`grid ${view === "MONTHLY" ? "grid-cols-3" : "grid-cols-2"} gap-1.5 pt-2 border-t border-ui-accent/30 text-xs`}>
                             <div className="p-2 rounded-xl bg-ui-accent/10">
                                 <div className="text-[10px] text-ui-secondary font-bold">Pieczywo:</div>
-                                <div className="font-bold text-ui-secondary text-xs sm:text-sm">{activeStats.bakerySharePercent}%</div>
-                                <div className="text-[9px] sm:text-[10px] text-ui-secondary truncate">{formatCurrency(activeStats.bakerySalesIncome)}</div>
+                                <div className="font-bold text-ui-secondary text-xs sm:text-sm">{formatCurrency(activeStats.bakerySalesIncome)}</div>
+                                <div className="text-[9px] sm:text-[10px] text-ui-secondary truncate">{activeStats.bakerySharePercent}%</div>
                             </div>
                             <div className="p-2 rounded-xl bg-ui-accent/10">
                                 <div className="text-[10px] text-ui-primary font-bold">Inne z kasy:</div>
-                                <div className="font-bold text-ui-primary text-xs sm:text-sm">{activeStats.otherSharePercent}%</div>
-                                <div className="text-[9px] sm:text-[10px] text-ui-primary truncate">{formatCurrency(activeStats.otherIncome)}</div>
+                                <div className="font-bold text-ui-primary text-xs sm:text-sm">{formatCurrency(activeStats.otherIncome)}</div>
+                                <div className="text-[9px] sm:text-[10px] text-ui-primary truncate">
+                                    {activeStats.otherSharePercent}%</div>
                             </div>
                             {view === "MONTHLY" && (
                                 <div className="p-2 rounded-xl bg-emerald-50">
-                                    <div className="text-[10px] text-emerald-900 font-bold">Faktury B2B:</div>
-                                    <div className="font-bold text-emerald-950 text-xs sm:text-sm">{activeStats.salesInvoicesSharePercent}%</div>
-                                    <div className="text-[9px] sm:text-[10px] text-emerald-800 truncate">{formatCurrency(activeStats.salesInvoicesGross)}</div>
+                                    <div className="text-[10px] text-emerald-900 font-bold">Faktury sprzedażowe:</div>
+                                    <div className="font-bold text-emerald-950 text-xs sm:text-sm">{formatCurrency(activeStats.salesInvoicesGross)}</div>
+                                    <div className="text-[9px] sm:text-[10px] text-emerald-800 truncate">{activeStats.salesInvoicesSharePercent}%</div>
                                 </div>
                             )}
                         </div>
@@ -1033,9 +1123,6 @@ export default function PrzychodyTab() {
                             </h3>
 
                         </div>
-                        <span className="text-[11px] font-semibold text-ui-secondary">
-                            {filteredDailyData.length} dni
-                        </span>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -1063,10 +1150,17 @@ export default function PrzychodyTab() {
                                                     className={`hover:bg-ui-accent/10 transition-colors cursor-pointer ${isExpanded ? "bg-ui-accent/10" : ""
                                                         }`}
                                                 >
-                                                    <td className="p-3.5 font-bold text-ui-black">
-                                                        {formatDate(d.date)}
+                                                    <td className="p-3.5 text-ui-black">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span>{formatDate(d.date)}</span>
+                                                            {(d.noSales || d.isClosed) && (
+                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                                                    {d.closedReason || "Brak sprzedaży"}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
-                                                    <td className="p-3.5 text-ui-secondary font-semibold">
+                                                    <td className="p-3.5 text-ui-black">
                                                         {d.dayOfWeek}
                                                     </td>
                                                     <td className="p-3.5 text-right font-bold text-ui-primary">
@@ -1075,7 +1169,7 @@ export default function PrzychodyTab() {
                                                     <td className="p-3.5 text-right font-bold text-[#38bdf8]">
                                                         {formatCurrency(d.otherIncome)}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-ui-black text-sm">
+                                                    <td className="p-3.5 text-right font-bold text-ui-black">
                                                         {formatCurrency(d.totalIncome)}
                                                     </td>
                                                     <td className="p-3.5 text-center">
@@ -1128,15 +1222,24 @@ export default function PrzychodyTab() {
                                                                                         </span>
                                                                                     </div>
                                                                                     <div className="flex items-center gap-3 sm:gap-4 text-xs font-semibold">
-                                                                                        <span>Wypiek: <strong className="font-bold">{catProducedTotal} szt.</strong></span>
-                                                                                        <span>Sprzedaż: <strong className="font-bold">{catSoldTotal} szt.</strong></span>
-                                                                                        <span>Przychód: <strong className="font-black text-ui-black">{formatCurrency(catRevenueTotal)}</strong></span>
+                                                                                        <span>Wypiek: <span className="text-ui-black">{catProducedTotal} szt.</span></span>
+                                                                                        <span>Sprzedaż: <span className="text-ui-black">{catSoldTotal} szt.</span></span>
+                                                                                        <span>Przychód: <span className="text-ui-black">{formatCurrency(catRevenueTotal)}</span></span>
                                                                                     </div>
                                                                                 </div>
 
                                                                                 {/* Tabela produktów w kategorii */}
                                                                                 <div className="overflow-x-auto">
-                                                                                    <table className="w-full text-left text-xs border-collapse">
+                                                                                    <table className="w-full text-left text-xs border-collapse table-fixed min-w-[700px]">
+                                                                                        <colgroup>
+                                                                                            <col className="w-[32%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[13%]" />
+                                                                                        </colgroup>
                                                                                         <thead>
                                                                                             <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent/30">
                                                                                                 <th className="py-2.5 px-3">Nazwa wyrobu</th>
@@ -1157,19 +1260,19 @@ export default function PrzychodyTab() {
 
                                                                                                 return (
                                                                                                     <tr key={prod.productId} className="hover:bg-ui-accent/5 transition-colors">
-                                                                                                        <td className="py-2.5 px-3 font-semibold text-ui-black">
+                                                                                                        <td className="py-2.5 px-3 text-ui-black break-words leading-snug">
                                                                                                             {prod.productName}
                                                                                                         </td>
-                                                                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                                                                        <td className="py-2.5 px-3 text-right text-ui-black tabular-nums">
                                                                                                             {prod.sellingPrice.toFixed(2)} zł
                                                                                                         </td>
-                                                                                                        <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
+                                                                                                        <td className="py-2.5 px-3 text-right text-ui-black tabular-nums">
                                                                                                             {prod.producedAmount} szt.
                                                                                                         </td>
-                                                                                                        <td className="py-2.5 px-3 text-right font-bold text-ui-black tabular-nums">
+                                                                                                        <td className="py-2.5 px-3 text-right text-emerald-600  tabular-nums">
                                                                                                             {prod.soldAmount} szt.
                                                                                                         </td>
-                                                                                                        <td className="py-2.5 px-3 text-right text-rose-600 font-semibold tabular-nums">
+                                                                                                        <td className="py-2.5 px-3 text-right text-rose-600  tabular-nums">
                                                                                                             {unsold > 0 ? `-${unsold} szt.` : "0 szt."}
                                                                                                         </td>
                                                                                                         <td className="py-2.5 px-3 text-right tabular-nums">
@@ -1182,7 +1285,7 @@ export default function PrzychodyTab() {
                                                                                                                 {efficiency}%
                                                                                                             </span>
                                                                                                         </td>
-                                                                                                        <td className="py-2.5 px-3 text-right font-black text-ui-primary tabular-nums">
+                                                                                                        <td className="py-2.5 px-3 text-right font-semibold text-ui-primary tabular-nums">
                                                                                                             {formatCurrency(prod.salesIncome)}
                                                                                                         </td>
                                                                                                     </tr>
@@ -1222,7 +1325,16 @@ export default function PrzychodyTab() {
                                                                                 </div>
 
                                                                                 <div className="overflow-x-auto">
-                                                                                    <table className="w-full text-left text-xs border-collapse">
+                                                                                    <table className="w-full text-left text-xs border-collapse table-fixed min-w-[700px]">
+                                                                                        <colgroup>
+                                                                                            <col className="w-[32%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[11%]" />
+                                                                                            <col className="w-[13%]" />
+                                                                                        </colgroup>
                                                                                         <thead>
                                                                                             <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase text-[10px] border-b border-ui-accent/30">
                                                                                                 <th className="py-2.5 px-3">Nazwa wyrobu</th>
@@ -1243,7 +1355,7 @@ export default function PrzychodyTab() {
 
                                                                                                 return (
                                                                                                     <tr key={prod.productId} className="hover:bg-ui-accent/5 transition-colors">
-                                                                                                        <td className="py-2.5 px-3 font-semibold text-ui-black">
+                                                                                                        <td className="py-2.5 px-3 font-semibold text-ui-black break-words leading-snug">
                                                                                                             {prod.productName}
                                                                                                         </td>
                                                                                                         <td className="py-2.5 px-3 text-right text-ui-secondary tabular-nums">
@@ -1268,7 +1380,7 @@ export default function PrzychodyTab() {
                                                                                                                 {efficiency}%
                                                                                                             </span>
                                                                                                         </td>
-                                                                                                        <td className="py-2.5 px-3 text-right font-black text-ui-primary tabular-nums">
+                                                                                                        <td className="py-2.5 px-3 text-right font-semibold text-ui-primary tabular-nums">
                                                                                                             {formatCurrency(prod.salesIncome)}
                                                                                                         </td>
                                                                                                     </tr>
@@ -1283,7 +1395,13 @@ export default function PrzychodyTab() {
                                                                 </div>
                                                             ) : (
                                                                 <div className="text-center py-6 text-xs text-ui-secondary  bg-white rounded-xl border border-ui-accent/30">
-                                                                    Brak wpisów jednostkowych sprzedaży w tym dniu
+                                                                    {d.noSales || d.isClosed ? (
+                                                                        <span className="font-semibold text-slate-600">
+                                                                            W tym dniu nie prowadzono sprzedaży ({d.closedReason || "brak sprzedaży"})
+                                                                        </span>
+                                                                    ) : (
+                                                                        "Brak wpisów jednostkowych sprzedaży w tym dniu"
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </td>
@@ -1312,16 +1430,13 @@ export default function PrzychodyTab() {
                         <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
                             <BarChart3 size={14} /> Tygodniowy rejestr utargu ze sklepu
                         </h3>
-                        <span className="text-[11px] font-semibold text-ui-secondary">
-                            {filteredWeeklyData.length} tygodni
-                        </span>
                     </div>
 
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider border-b border-ui-accent/30">
-                                    <th className="p-3.5">Okres</th>
+                                    <th className="p-3.5 whitespace-nowrap">Okres</th>
                                     <th className="p-3.5 text-center">Dni z danymi</th>
                                     <th className="p-3.5 text-right">Sprzedaż pieczywa</th>
                                     <th className="p-3.5 text-right">Inne z kasy</th>
@@ -1336,40 +1451,40 @@ export default function PrzychodyTab() {
                                 {filteredWeeklyData.length > 0 ? (
                                     filteredWeeklyData.map((w) => (
                                         <tr key={w.key} className="hover:bg-ui-accent/5 transition-colors">
-                                            <td className="p-3.5">
-                                                <div className="font-bold text-ui-black">{w.label}</div>
-                                                <div className="text-[10px] text-ui-secondary mt-0.5">
-                                                    {formatDate(w.startDate)} — {formatDate(w.endDate)}
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <div className="text-ui-black">Tydzień {w.weekNumber}</div>
+                                                <div className="text-[11px] text-ui-black mt-0.5">
+                                                    {formatWeekDateRange(w.startDate, w.endDate)}
                                                 </div>
                                             </td>
                                             <td className="p-3.5 text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-ui-accent/15 text-ui-primary font-bold text-[11px]">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-ui-accent/15 text-ui-black text-[11px]">
                                                     {w.daysWithReport} / 7 dni
                                                 </span>
                                             </td>
-                                            <td className="p-3.5 text-right font-bold text-ui-primary">
+                                            <td className="p-3.5 text-right text-ui-black">
                                                 {formatCurrency(w.bakerySalesIncome)}
                                             </td>
-                                            <td className="p-3.5 text-right font-bold text-blue-600">
+                                            <td className="p-3.5 text-right text-ui-black">
                                                 {formatCurrency(w.otherIncome)}
                                             </td>
-                                            <td className="p-3.5 text-right font-bold text-ui-black text-sm">
+                                            <td className="p-3.5 text-right text-ui-black ">
                                                 {formatCurrency(w.totalIncome)}
                                             </td>
-                                            <td className="p-3.5 text-right font-bold text-ui-secondary">
+                                            <td className="p-3.5 text-right text-ui-black">
                                                 {formatCurrency(w.avgDailyIncome)}
                                             </td>
                                             <td className="p-3.5 text-center">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ui-accent/20 text-ui-primary font-bold text-[11px]">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ui-accent/20 text-ui-primary text-[11px]">
                                                     {w.bakerySharePercent}%
                                                 </span>
                                             </td>
-                                            <td className="p-3.5 text-center font-bold text-ui-black">
+                                            <td className="p-3.5 text-center text-ui-black">
                                                 {w.totalSold > 0 ? w.totalSold.toLocaleString("pl-PL") : "—"}
                                             </td>
                                             <td className="p-3.5 text-center">
                                                 {w.totalProduced > 0 ? (
-                                                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                    <span className="px-2 py-0.5 rounded-md text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200">
                                                         {w.sellThroughRate}%
                                                     </span>
                                                 ) : (
@@ -1400,9 +1515,6 @@ export default function PrzychodyTab() {
                                 <CalendarDays size={14} /> Miesięczne zestawienie przychodów (Sklep + Faktury)
                             </h3>
                         </div>
-                        <span className="text-[11px] font-semibold text-ui-secondary">
-                            {filteredMonthlyData.length} miesięcy
-                        </span>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -1431,25 +1543,25 @@ export default function PrzychodyTab() {
                                                     className={`hover:bg-ui-accent/5 transition-colors ${m.salesInvoicesCount > 0 ? "cursor-pointer" : ""
                                                         } ${isExpanded ? "bg-ui-accent/10" : ""}`}
                                                 >
-                                                    <td className="p-3.5 font-bold text-ui-black text-sm">
+                                                    <td className="p-3.5  text-ui-black">
                                                         {m.label}
                                                     </td>
                                                     <td className="p-3.5 text-center">
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ui-accent/15 text-ui-primary font-bold text-[11px]">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ui-accent/15 text-ui-black text-[11px]">
                                                             {m.daysWithReport} / {m.daysInMonth} dni
                                                         </span>
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-ui-primary">
+                                                    <td className="p-3.5 text-right text-ui-black">
                                                         {formatCurrency(m.bakerySalesIncome)}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-blue-600">
+                                                    <td className="p-3.5 text-right text-ui-black">
                                                         {formatCurrency(m.otherIncome)}
                                                     </td>
                                                     <td className="p-3.5 text-right">
                                                         {m.salesInvoicesGross > 0 ? (
-                                                            <div className="flex items-center justify-end gap-1.5 font-bold text-emerald-800">
+                                                            <div className="flex items-center justify-end gap-1.5 text-ui-black">
                                                                 <span>{formatCurrency(m.salesInvoicesGross)}</span>
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-950 font-bold">
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-ui-black ">
                                                                     {m.salesInvoicesCount}
                                                                 </span>
                                                             </div>
@@ -1457,13 +1569,13 @@ export default function PrzychodyTab() {
                                                             <span className="text-ui-secondary/40 font-normal">—</span>
                                                         )}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-ui-black text-sm">
+                                                    <td className="p-3.5 text-right text-ui-black">
                                                         {formatCurrency(m.totalIncome)}
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-ui-secondary">
+                                                    <td className="p-3.5 text-right text-ui-black">
                                                         {formatCurrency(m.avgDailyIncome)}
                                                     </td>
-                                                    <td className="p-3.5 text-center font-bold text-ui-black">
+                                                    <td className="p-3.5 text-center text-ui-black">
                                                         {m.totalSold > 0 ? m.totalSold.toLocaleString("pl-PL") : "—"} szt.
                                                     </td>
                                                     <td className="p-3.5 text-center text-ui-secondary">
@@ -1567,11 +1679,8 @@ export default function PrzychodyTab() {
                     <div className="bg-white border border-ui-accent rounded-2xl overflow-hidden shadow-xs">
                         <div className="p-4 border-b border-ui-accent bg-ui-accent/5 flex items-center justify-between">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
-                                <Wheat size={14} /> Ranking wyrobów wg generowanego przychodu
+                                <Wheat size={14} /> Ranking wyrobów według generowanego przychodu
                             </h3>
-                            <span className="text-[11px] font-semibold text-ui-secondary">
-                                {filteredProductRanking.length} pozycji
-                            </span>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -1597,7 +1706,7 @@ export default function PrzychodyTab() {
                                                     <td className="p-3.5 text-center font-bold text-ui-secondary">
                                                         {idx + 1}
                                                     </td>
-                                                    <td className="p-3.5 font-bold text-ui-black">
+                                                    <td className="p-3.5 text-ui-black">
                                                         {p.productName}
                                                     </td>
                                                     <td className="p-3.5">
@@ -1605,13 +1714,13 @@ export default function PrzychodyTab() {
                                                             {catInfo?.label || p.productType}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3.5 text-right font-semibold text-ui-black">
+                                                    <td className="p-3.5 text-right text-ui-black">
                                                         {p.sellingPrice.toFixed(2)} zł
                                                     </td>
-                                                    <td className="p-3.5 text-center font-semibold text-ui-black">
+                                                    <td className="p-3.5 text-center text-ui-black">
                                                         {p.totalSold.toLocaleString("pl-PL")}
                                                     </td>
-                                                    <td className="p-3.5 text-center font-semibold text-ui-black">
+                                                    <td className="p-3.5 text-center text-ui-black">
                                                         {p.totalProduced.toLocaleString("pl-PL")}
                                                     </td>
                                                     <td className="p-3.5 text-center">
@@ -1619,7 +1728,7 @@ export default function PrzychodyTab() {
                                                             {p.sellThroughRate}%
                                                         </span>
                                                     </td>
-                                                    <td className="p-3.5 text-right font-bold text-ui-black text-sm">
+                                                    <td className="p-3.5 text-right text-ui-black">
                                                         {formatCurrency(p.totalRevenue)}
                                                     </td>
                                                 </tr>
@@ -1648,9 +1757,6 @@ export default function PrzychodyTab() {
                             <h3 className="text-xs font-bold uppercase tracking-wider text-ui-secondary flex items-center gap-2">
                                 <Receipt size={14} className="text-ui-secondary" /> Rejestr faktur sprzedażowych
                             </h3>
-                            <span className="text-[11px] font-semibold text-ui-secondary">
-                                {filteredSalesInvoices.length} faktur
-                            </span>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -1659,8 +1765,7 @@ export default function PrzychodyTab() {
                                     <tr className="bg-ui-accent/10 text-ui-secondary font-bold uppercase tracking-wider border-b border-ui-accent/30">
                                         <th className="p-3.5">Data wystawienia</th>
                                         <th className="p-3.5">Nr dokumentu</th>
-                                        <th className="p-3.5">Kontrahent (Odbiorca)</th>
-                                        <th className="p-3.5 text-center">Pozycje</th>
+                                        <th className="p-3.5">Kontrahent</th>
                                         <th className="p-3.5 text-right">Wartość netto</th>
                                         <th className="p-3.5 text-right">VAT</th>
                                         <th className="p-3.5 text-right">Wartość brutto</th>
@@ -1688,18 +1793,13 @@ export default function PrzychodyTab() {
                                                                 <span>{inv.contractorName}</span>
                                                             </div>
                                                         </td>
-                                                        <td className="p-3.5 text-center">
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ui-accent/15 text-ui-secondary font-bold text-[11px]">
-                                                                {inv.positionsCount} poz.
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-3.5 text-right text-ui-secondary">
+                                                        <td className="p-3.5 text-right text-ui-black">
                                                             {formatCurrency(inv.netAmount)}
                                                         </td>
-                                                        <td className="p-3.5 text-right text-ui-secondary">
+                                                        <td className="p-3.5 text-right text-ui-black">
                                                             {formatCurrency(inv.vatAmount)}
                                                         </td>
-                                                        <td className="p-3.5 text-right text-ui-primary text-sm">
+                                                        <td className="p-3.5 text-right text-ui-black">
                                                             {formatCurrency(inv.grossAmount)}
                                                         </td>
                                                     </tr>

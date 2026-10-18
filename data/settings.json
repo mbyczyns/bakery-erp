@@ -38,6 +38,12 @@
       "closeTime": "13:00"
     }
   },
-  "closedDays": {},
+  "closedDays": {
+    "2026-06-04": {
+      "date": "2026-06-04",
+      "isClosed": true,
+      "reason": "Brak sprzedaży"
+    }
+  },
   "favoriteRecipeIds": []
 }

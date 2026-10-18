@@ -5,7 +5,7 @@ import { getUserFromRequest } from "@/lib/auth";
 const prisma = new PrismaClient();
 
 const CANONICAL_DEFAULTS = [
-    "Wypłaty pracowników",
+    "Wynagrodzenia",
     "Składki ZUS",
     "Podatek PIT",
 ];
@@ -16,6 +16,7 @@ const OLD_REDUNDANT_NAMES = [
     "Księgowość i doradztwo podatkowe",
     "Paliwo i eksploatacja pojazdów",
     "Inne koszty operacyjne",
+    "Wypłaty pracowników",
     "Wypłaty pracowników (Wynagrodzenia)",
     "Składki ZUS (Społeczne, Zdrowotne, FP/FGŚP)",
     "Podatek dochodowy (Zaliczka PIT / CIT)",
@@ -29,11 +30,20 @@ export async function ensureCleanCostTypes() {
 
     // 1. Usunięcie starych nadmiarowych kategorii
     for (const item of all) {
+        // Kategorie kanoniczne (Wynagrodzenia, Składki ZUS, Podatek PIT) NIGDY nie mogą być usuwane
+        if (CANONICAL_DEFAULTS.some((c) => c.trim().toLowerCase() === item.name.trim().toLowerCase())) {
+            continue;
+        }
+
         if (OLD_REDUNDANT_NAMES.includes(item.name)) {
             let targetCanonicalName: string | null = null;
-            if (item.name.toLowerCase().includes("wypłat")) targetCanonicalName = "Wypłaty pracowników";
-            else if (item.name.toLowerCase().includes("zus")) targetCanonicalName = "Składki ZUS";
-            else if (item.name.toLowerCase().includes("podatek") || item.name.toLowerCase().includes("pit")) targetCanonicalName = "Podatek PIT";
+            if (item.name.toLowerCase().includes("wypłat") || item.name.toLowerCase().includes("wynagrodz")) {
+                targetCanonicalName = "Wynagrodzenia";
+            } else if (item.name.toLowerCase().includes("zus")) {
+                targetCanonicalName = "Składki ZUS";
+            } else if (item.name.toLowerCase().includes("podatek") || item.name.toLowerCase().includes("pit")) {
+                targetCanonicalName = "Podatek PIT";
+            }
 
             if (targetCanonicalName) {
                 let canonical = all.find((c) => c.name.trim().toLowerCase() === targetCanonicalName!.toLowerCase() && c.id !== item.id);
@@ -57,7 +67,7 @@ export async function ensureCleanCostTypes() {
             }
 
             await prisma.monthlyCost.deleteMany({ where: { costTypeId: item.id } });
-            await prisma.costType.delete({ where: { id: item.id } }).catch(() => {});
+            await prisma.costType.delete({ where: { id: item.id } }).catch(() => { });
         }
     }
 
@@ -86,7 +96,7 @@ export async function ensureCleanCostTypes() {
                 }
             }
             await prisma.monthlyCost.deleteMany({ where: { costTypeId: item.id } });
-            await prisma.costType.delete({ where: { id: item.id } }).catch(() => {});
+            await prisma.costType.delete({ where: { id: item.id } }).catch(() => { });
         } else {
             seenNames.set(norm, item);
         }

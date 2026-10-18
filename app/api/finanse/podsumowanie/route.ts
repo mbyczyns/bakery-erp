@@ -150,9 +150,10 @@ export async function GET(request: NextRequest) {
             const dData = dailyBakeryMap.get(dateStr) || { bakerySales: 0, categoryBreakdown: { BREAD: 0, ROLL: 0, SWEET: 0, SAVORY: 0 } };
             const fiscal = fiscalIncomeMap.get(dateStr) || 0;
 
-            const bakeryIncome = dData.bakerySales;
-            const retailTotal = Math.max(fiscal, bakeryIncome);
-            const otherIncome = Math.max(0, fiscal - bakeryIncome);
+            // Ostateczny wynik finansowy danego dnia liczy się wyłącznie na podstawie utargu z kasy (fiscal)
+            const retailTotal = fiscal > 0 ? fiscal : dData.bakerySales;
+            const bakeryIncome = fiscal > 0 ? Math.min(fiscal, dData.bakerySales) : dData.bakerySales;
+            const otherIncome = fiscal > 0 ? Math.max(0, fiscal - dData.bakerySales) : 0;
 
             monthlyRetailBakery[mIdx] += bakeryIncome;
             monthlyRetailOther[mIdx] += otherIncome;
@@ -411,9 +412,9 @@ export async function GET(request: NextRequest) {
 
         const bakeryCategoriesBreakdown = [
             { id: "BREAD", name: "Chleby", value: grandCategoryBread, color: "#d97706" },
-            { id: "ROLL", name: "Bułki", value: grandCategoryRoll, color: "#9333ea" },
+            { id: "ROLL", name: "Bułki", value: grandCategoryRoll, color: "#059669" },
             { id: "SWEET", name: "Słodkie wypieki", value: grandCategorySweet, color: "#ec4899" },
-            { id: "SAVORY", name: "Słone wypieki", value: grandCategorySavory, color: "#6366f1" },
+            { id: "SAVORY", name: "Słone wypieki", value: grandCategorySavory, color: "#9333ea" },
         ].filter((c) => c.value > 0);
 
         // 11. Struktura kosztów (Pozafakturowe + Faktury)
