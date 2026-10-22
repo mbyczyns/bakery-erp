@@ -43,7 +43,41 @@
       "date": "2026-06-04",
       "isClosed": true,
       "reason": "Brak sprzedaży"
+    },
+    "2026-08-15": {
+      "date": "2026-08-15",
+      "isClosed": true,
+      "reason": "Brak sprzedaży"
     }
   },
-  "favoriteRecipeIds": []
+  "favoriteRecipeIds": [
+    "294cdf12-ed59-41b1-951d-bb2eefb5660a",
+    "3bdd8c9a-023d-477b-97c6-3d5d52350ef6",
+    "c1188069-77aa-4109-9741-dff0dccc6893",
+    "b13cf45a-ec09-4f0d-a6f5-844008c6c7fc",
+    "d42e113d-1695-4aeb-8d6a-34ec9c3578f2",
+    "dc9ec071-72d1-49d4-8c68-3686a48b2380",
+    "fb8abbc8-b66a-44d6-ad8e-45aa3e9a4b7b",
+    "aee9d660-0b66-4625-92fe-963a0489b038",
+    "d0aae292-a835-4491-92b9-fe57bdd0f67d",
+    "79c6637d-167d-4582-8977-d7d5d7e97eeb",
+    "713a9a62-e554-40d4-a4bc-cd669affae73",
+    "b01f89a1-d539-4637-82be-758c20601955",
+    "ab654b48-804f-4d20-81ac-3369b097189b",
+    "e8e3344d-6880-42f4-a9ce-8bf48e2a78f8",
+    "0762e2d4-0f96-4a2b-8dfa-6f4ccb808520",
+    "28faafc5-b123-48d6-a514-c7624e286c88",
+    "5260bf82-79fe-40ad-be6d-0b7a01812876",
+    "78c02a3f-3763-41ad-b015-407d0b8605b9",
+    "1b4af46f-954f-466d-b7b0-44f8b078953a",
+    "aec63bca-abd4-4840-a798-824ea8a842c3",
+    "9b5a205d-189c-477b-97f2-51eecebdbf1c",
+    "bc321389-4300-4821-929c-ad6ceb03e0de",
+    "49b65b9f-fc07-47e2-ab1a-a503ff69366f",
+    "a5328083-c63c-4aa7-964e-4cf1ddf46766",
+    "64997f7a-55e5-4ffa-952f-2f21f2c289b0",
+    "4cd7ea92-fedd-4db1-b9f3-dce37799db75",
+    "b9227f69-33d2-4bf3-a8a4-594433a4a6ab",
+    "25ec7a9d-03cf-4b78-81ac-a1ed06683e79"
+  ]
 }

@@ -211,7 +211,9 @@ export async function GET(request: NextRequest) {
                 const soldOutTime = extras[dStr]?.soldOutTimes?.[prod.bakeryProductId] || prod.soldOutTime || "";
 
                 if (produced > 0 || carriedOver > 0 || sold > 0) {
-                    daysMap[dStr].hasReport = true;
+                    if (produced > 0 || sold > 0) {
+                        daysMap[dStr].hasReport = true;
+                    }
                     daysMap[dStr].totalProduced += produced;
                     daysMap[dStr].totalCarriedOver += carriedOver;
                     daysMap[dStr].totalAssortment += totalAssortment;
@@ -722,6 +724,14 @@ export async function GET(request: NextRequest) {
         const isClosed = Boolean(closedInfo?.isClosed);
         const noSales = Boolean(extras[dateStr]?.noSales || (isClosed && closedInfo?.reason === "Brak sprzedaży"));
 
+        const hasReport = Boolean(
+            extras[dateStr] ||
+            fiscalIncome > 0 ||
+            noSales ||
+            isClosed ||
+            productions.some((p: any) => Number(p.producedAmount) > 0 || Number(p.soldAmount) > 0 || (p.soldOutTime && String(p.soldOutTime).trim()))
+        );
+
         return NextResponse.json({
             date: dateStr,
             products,
@@ -732,6 +742,7 @@ export async function GET(request: NextRequest) {
             isClosed,
             closedReason: closedInfo?.reason || "",
             noSales,
+            hasReport,
             openingHours: settings.openingHours,
             favoriteRecipeIds: settings.favoriteRecipeIds || [],
         });

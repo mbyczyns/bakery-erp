@@ -659,6 +659,16 @@ export default function ProdukcjaPage() {
 
                 setFormFiscalIncome(data.fiscalIncome > 0 ? String(data.fiscalIncome) : "");
 
+                const isManualReportSaved = Boolean(
+                    data.hasReport ||
+                    data.fiscalIncome > 0 ||
+                    data.noSales ||
+                    data.isClosed ||
+                    (data.productions || []).some(
+                        (p: any) => Number(p.producedAmount) > 0 || Number(p.soldAmount) > 0 || (p.soldOutTime && String(p.soldOutTime).trim())
+                    )
+                );
+
                 const itemsMap: Record<string, ProductionDetailItem> = {};
                 (data.products || []).forEach((prod: BakeryProduct) => {
                     const existingProd = (data.productions || []).find(
@@ -680,25 +690,37 @@ export default function ProdukcjaPage() {
 
                     let initSold = "";
                     let initLeftover = "";
-                    if (existingProd) {
+                    let initStatus = "";
+                    const existingSoldOut = data.soldOutTimes?.[prod.id] || existingProd?.soldOutTime || "";
+
+                    if (existingProd && isManualReportSaved) {
                         const pVal = Number(existingProd.producedAmount) || 0;
                         const cVal = Number(existingProd.carriedOverAmount) || 0;
                         const totalAssort = pVal + cVal;
                         const sVal = Number(existingProd.soldAmount) || 0;
-                        if (sVal > 0 || totalAssort > 0) {
-                            initSold = String(sVal);
-                            initLeftover = String(Math.max(0, Math.round((totalAssort - sVal) * 100) / 100));
-                        }
-                    }
 
-                    const existingSoldOut = data.soldOutTimes?.[prod.id] || existingProd?.soldOutTime || "";
-                    let initStatus = "";
-                    if (existingSoldOut && existingSoldOut.trim() !== "") {
-                        initStatus = existingSoldOut.trim();
-                    } else if (initLeftover !== "" && Number(initLeftover) > 0) {
-                        initStatus = initLeftover;
-                    } else if (initLeftover === "0") {
-                        initStatus = existingSoldOut || "";
+                        if (existingSoldOut && existingSoldOut.trim() !== "") {
+                            initSold = String(sVal > 0 ? sVal : totalAssort);
+                            initLeftover = "0";
+                            initStatus = existingSoldOut.trim();
+                        } else if (totalAssort > 0 && sVal < totalAssort) {
+                            const left = Math.max(0, Math.round((totalAssort - sVal) * 100) / 100);
+                            const actualUnsold = cVal > 0 ? Math.max(0, Math.round((left - cVal) * 100) / 100) : left;
+
+                            if (sVal <= 0 || actualUnsold <= 0) {
+                                initSold = "";
+                                initLeftover = "";
+                                initStatus = "";
+                            } else {
+                                initSold = String(sVal);
+                                initLeftover = String(actualUnsold);
+                                initStatus = String(actualUnsold);
+                            }
+                        } else if (sVal > 0) {
+                            initSold = String(sVal);
+                            initLeftover = "0";
+                            initStatus = "";
+                        }
                     }
 
                     itemsMap[prod.id] = {
@@ -1729,12 +1751,11 @@ export default function ProdukcjaPage() {
 
                             const isClosed = Boolean(cell.dayData && cell.dayData.isClosed);
                             const totalProduced = Number(cell.dayData?.totalProduced || 0);
+                            const totalSold = Number(cell.dayData?.totalSold || 0);
                             const hasProduction = Boolean(
                                 cell.dayData && (
                                     (cell.dayData.totalProduced || 0) > 0 ||
-                                    (cell.dayData.totalCarriedOver || 0) > 0 ||
-                                    (cell.dayData.totalSold || 0) > 0 ||
-                                    (cell.dayData.productsCount || 0) > 0
+                                    (cell.dayData.totalSold || 0) > 0
                                 )
                             );
                             const income = Number(cell.dayData?.fiscalIncome || cell.dayData?.bakerySalesIncome || 0);
@@ -1792,16 +1813,6 @@ export default function ProdukcjaPage() {
                                     </div>
 
                                     <div className="flex items-end justify-between">
-                                        <div>
-                                            {hasFullProduction && totalProduced > 0 && (
-                                                <span
-                                                    className="hidden sm:inline-block text-[11px] font-bold text-emerald-800/80"
-                                                    title={`Wyprodukowano: ${totalProduced} szt.`}
-                                                >
-                                                    {totalProduced} szt.
-                                                </span>
-                                            )}
-                                        </div>
                                         <div className="text-right">
                                             {income > 0 ? (
                                                 <div className="text-xs sm:text-sm font-black text-ui-primary">
@@ -2641,6 +2652,27 @@ export default function ProdukcjaPage() {
                                                 </div>
                                             )}
 
+                                            {/* Pole Utargu z Kasy Fiskalnej */}
+                                            <div className="bg-ui-accent/15 border border-ui-accent rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+                                                <div>
+                                                    <div className="text-xs font-bold text-ui-black flex items-center gap-1.5">
+                                                        <Receipt size={16} className="text-ui-primary" />
+                                                        Utarg z kasy fiskalnej:
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={formFiscalIncome}
+                                                        onChange={(e) => setFormFiscalIncome(e.target.value)}
+                                                        placeholder="0.00"
+                                                        className="w-32 px-3 py-1.5 bg-white border border-ui-accent rounded-xl text-sm font-black text-ui-primary text-right focus:outline-none focus:border-ui-primary shadow-2xs"
+                                                    />
+                                                    <span className="text-xs font-bold text-ui-secondary">zł</span>
+                                                </div>
+                                            </div>
+
                                             {/* Podział na kategorie w formularzu */}
                                             {Object.entries(CATEGORY_MAP).map(([catKey, catMeta]) => {
                                                 const catProducts = formOrderedProducts.filter((p) => p.type === catKey);
@@ -2836,27 +2868,6 @@ export default function ProdukcjaPage() {
                                                     </div>
                                                 );
                                             })}
-
-                                            {/* Pole Utargu z Kasy Fiskalnej */}
-                                            <div className="bg-ui-accent/15 border border-ui-accent rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-                                                <div>
-                                                    <div className="text-xs font-bold text-ui-black flex items-center gap-1.5">
-                                                        <Receipt size={16} className="text-ui-primary" />
-                                                        Utarg z kasy fiskalnej:
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        inputMode="decimal"
-                                                        value={formFiscalIncome}
-                                                        onChange={(e) => setFormFiscalIncome(e.target.value)}
-                                                        placeholder="0.00"
-                                                        className="w-32 px-3 py-1.5 bg-white border border-ui-accent rounded-xl text-sm font-black text-ui-primary text-right focus:outline-none focus:border-ui-primary shadow-2xs"
-                                                    />
-                                                    <span className="text-xs font-bold text-ui-secondary">zł</span>
-                                                </div>
-                                            </div>
                                         </>
                                     )}
                                 </div>

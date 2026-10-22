@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User, Sliders, Save, ShieldCheck, Droplet, Loader2, CheckCircle2, Coins, Clock, Sparkles } from "lucide-react";
+import { User, Sliders, Save, ShieldCheck, Droplet, Loader2, CheckCircle2, Coins, Clock, Sparkles, AlertCircle, KeyRound } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ZespolSection from "@/components/ZespolSection";
 import { PRICE_ROUNDING_OPTIONS, PriceRoundingOption } from "@/lib/price-rounding";
@@ -16,6 +16,14 @@ import {
 export default function KonfiguracjaPage() {
     const { user } = useAuth();
     const isManagerOrAdmin = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+    // Stan formularza zmiany hasła
+    const [currentPassword, setCurrentPassword] = useState<string>("");
+    const [newPassword, setNewPassword] = useState<string>("");
+    const [confirmPassword, setConfirmPassword] = useState<string>("");
+    const [isSavingPassword, setIsSavingPassword] = useState<boolean>(false);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
     // Stan konfiguracji stawki wody
     const [waterPrice, setWaterPrice] = useState<string>("");
@@ -36,6 +44,13 @@ export default function KonfiguracjaPage() {
     const [openingHoursSaveSuccess, setOpeningHoursSaveSuccess] = useState<boolean>(false);
 
     useEffect(() => {
+        if (!isManagerOrAdmin) {
+            setIsLoadingWater(false);
+            setIsLoadingRounding(false);
+            setIsLoadingOpeningHours(false);
+            return;
+        }
+
         const fetchConfig = async () => {
             try {
                 const res = await fetch("/api/konfiguracja");
@@ -61,7 +76,53 @@ export default function KonfiguracjaPage() {
         };
 
         fetchConfig();
-    }, []);
+    }, [isManagerOrAdmin]);
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError(null);
+        setPasswordSuccess(null);
+
+        if (!currentPassword || !newPassword) {
+            setPasswordError("Wprowadź aktualne oraz nowe hasło.");
+            return;
+        }
+
+        if (newPassword.length < 4) {
+            setPasswordError("Nowe hasło musi zawierać co najmniej 4 znaki.");
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            setPasswordError("Nowe hasło i potwierdzenie hasła nie są identyczne.");
+            return;
+        }
+
+        setIsSavingPassword(true);
+        try {
+            const res = await fetch("/api/auth/change-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword, newPassword }),
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setPasswordSuccess(data.message || "Hasło zostało pomyślnie zmienione!");
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+                setTimeout(() => setPasswordSuccess(null), 4500);
+            } else {
+                setPasswordError(data.error || "Wystąpił błąd podczas zmiany hasła.");
+            }
+        } catch (err: any) {
+            console.error("Błąd podczas zmiany hasła:", err);
+            setPasswordError("Błąd połączenia z serwerem.");
+        } finally {
+            setIsSavingPassword(false);
+        }
+    };
 
     const handleSaveWaterPrice = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -212,43 +273,95 @@ export default function KonfiguracjaPage() {
                         {/* Status roli użytkownika */}
                         <div className="flex items-center gap-1.5 bg-ui-white border border-ui-secondary/35 text-ui-secondary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs w-fit">
                             <ShieldCheck size={14} />
-                            Rola: {user?.role || "USER"}
+                            Rola: {user?.role === "BAKER" ? "PRACOWNIK" : user?.role || "USER"}
                         </div>
                     </div>
 
-                    {/* Pola formularza zmiany hasła */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Aktualne hasło</label>
-                            <input
-                                type="password"
-                                placeholder="••••••••"
-                                className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
-                            />
+                    {/* Formularz zmiany hasła */}
+                    <form onSubmit={handleChangePassword}>
+                        <div className="flex items-center gap-2 mb-3">
+                            <KeyRound size={16} className="text-ui-secondary" />
+                            <h3 className="text-sm font-bold text-ui-black">Zmiana hasła</h3>
                         </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Nowe hasło</label>
-                            <input
-                                type="password"
-                                placeholder="Min. 8 znaków"
-                                className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
-                            />
-                        </div>
-                    </div>
 
-                    {/* Przycisk akcji */}
-                    <div className="flex justify-end mt-5 sm:mt-6">
-                        <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs transition-colors duration-200 cursor-pointer">
-                            <Save size={14} />
-                            Zmień hasło
-                        </button>
-                    </div>
+                        {passwordError && (
+                            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2 animate-fade-in">
+                                <AlertCircle size={16} className="shrink-0 text-rose-600" />
+                                <span>{passwordError}</span>
+                            </div>
+                        )}
+
+                        {passwordSuccess && (
+                            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2 animate-fade-in">
+                                <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+                                <span>{passwordSuccess}</span>
+                            </div>
+                        )}
+
+                        {/* Pola formularza zmiany hasła */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Aktualne hasło</label>
+                                <input
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                    className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Nowe hasło</label>
+                                <input
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Min. 4 znaki"
+                                    required
+                                    className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider text-ui-secondary">Powtórz nowe hasło</label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    placeholder="Powtórz hasło"
+                                    required
+                                    className="bg-ui-white border border-ui-accent rounded-xl px-4 py-2.5 text-sm text-ui-primary focus:outline-none focus:border-ui-secondary focus:ring-1 focus:ring-ui-secondary transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Przycisk akcji */}
+                        <div className="flex justify-end mt-5 sm:mt-6">
+                            <button
+                                type="submit"
+                                disabled={isSavingPassword}
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ui-primary hover:bg-ui-primary/90 text-ui-white px-5 py-2.5 rounded-xl text-xs font-semibold shadow-xs transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                            >
+                                {isSavingPassword ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        Zmienianie hasła...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={14} />
+                                        Zmień hasło
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
-                {/* SEKCJA 3: Zespół i pracownicy (Dostępna TYLKO dla Managerów i Administratorów) */}
+                {/* Sekcje konfiguracyjne dostępne TYLKO dla Managerów i Administratorów */}
                 {isManagerOrAdmin && (
-                    <ZespolSection />
-                )}
+                    <>
+                        <ZespolSection />
 
                 {/* SEKCJA 1: Zaokrąglanie cen sprzedaży */}
                 <div className="bg-ui-white rounded-2xl p-4 sm:p-6 shadow-xs border border-ui-accent hover:border-ui-secondary transition-all duration-300">
@@ -492,9 +605,8 @@ export default function KonfiguracjaPage() {
                         </div>
                     </form>
                 </div>
-
-                {/* SEKCJA 2: Konto zalogowanego użytkownika */}
-
+                </>
+                )}
 
             </div>
         </div>

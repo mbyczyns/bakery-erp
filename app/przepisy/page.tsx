@@ -206,27 +206,6 @@ export default function PrzepisyPage() {
         fetchData();
     }, []);
 
-    // Obliczanie łącznej wagi składników dla półproduktu
-    const calculateTotalWeight = (items: Array<{ batchAmount: string; unit: string }>, targetUnit: string) => {
-        let totalKg = 0;
-        for (const item of items) {
-            const amt = parseFloat(String(item.batchAmount || "0").replace(",", ".").trim()) || 0;
-            const u = (item.unit || "").toLowerCase().trim();
-            if (u === "kg") {
-                totalKg += amt;
-            } else if (u === "g" || u === "ml") {
-                totalKg += amt / 1000;
-            } else if (u === "l") {
-                totalKg += amt; // 1 l wody/mleka ≈ 1 kg
-            } else {
-                totalKg += amt;
-            }
-        }
-        if (targetUnit === "g") {
-            return Math.round(totalKg * 1000);
-        }
-        return Math.round(totalKg * 1000) / 1000;
-    };
 
     // Dodanie surowca lub półproduktu do formularza (dopuszczalne wielokrotne dodanie tego samego składnika z osobną adnotacją)
     const handleSelectItem = (
@@ -242,22 +221,11 @@ export default function PrzepisyPage() {
         ];
         setFormItems(updated);
         setSearchInput("");
-
-        if (creationKind === "SEMI_FINISHED" && (newSemiUnit === "kg" || newSemiUnit === "g")) {
-            const weight = calculateTotalWeight(updated, newSemiUnit);
-            if (weight > 0) {
-                setBatchSize(String(weight));
-            }
-        }
     };
 
     const handleRemoveItem = (rowId: string) => {
         const updated = formItems.filter((i) => i.rowId !== rowId);
         setFormItems(updated);
-        if (creationKind === "SEMI_FINISHED" && (newSemiUnit === "kg" || newSemiUnit === "g")) {
-            const weight = calculateTotalWeight(updated, newSemiUnit);
-            setBatchSize(weight > 0 ? String(weight) : "1");
-        }
     };
 
     const handleAmountChange = (rowId: string, amount: string) => {
@@ -265,12 +233,6 @@ export default function PrzepisyPage() {
             i.rowId === rowId ? { ...i, batchAmount: amount } : i
         );
         setFormItems(updated);
-        if (creationKind === "SEMI_FINISHED" && (newSemiUnit === "kg" || newSemiUnit === "g")) {
-            const weight = calculateTotalWeight(updated, newSemiUnit);
-            if (weight > 0) {
-                setBatchSize(String(weight));
-            }
-        }
     };
 
     const handleNotesChange = (rowId: string, notes: string) => {
@@ -312,12 +274,7 @@ export default function PrzepisyPage() {
             };
         });
         setFormItems(items);
-        if (unit === "kg" || unit === "g") {
-            const weight = calculateTotalWeight(items, unit);
-            setBatchSize(weight > 0 ? String(weight) : String(semi.amount || "1"));
-        } else {
-            setBatchSize(String(semi.amount || "1"));
-        }
+        setBatchSize(String(semi.amount || "1"));
         setIsAddModalOpen(true);
     };
 
@@ -1171,12 +1128,7 @@ export default function PrzepisyPage() {
                                             <select
                                                 value={newSemiUnit}
                                                 onChange={(e) => {
-                                                    const u = e.target.value;
-                                                    setNewSemiUnit(u);
-                                                    if (u === "kg" || u === "g") {
-                                                        const weight = calculateTotalWeight(formItems, u);
-                                                        if (weight > 0) setBatchSize(String(weight));
-                                                    }
+                                                    setNewSemiUnit(e.target.value);
                                                 }}
                                                 className="w-full h-11 bg-ui-white border border-ui-accent rounded-xl pl-3.5 pr-9 py-2 text-sm text-ui-black focus:outline-none focus:border-amber-600 cursor-pointer transition-all appearance-none shadow-sm"
                                             >

@@ -60,17 +60,17 @@ function calculateUnmetDemandMultiplier(dayOfWeek: number, soldOutTimeStr?: stri
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
         if (minutes !== null) {
             if (minutes < 12 * 60) {
-                // Wyprzedane przed 12:00 -> +30%
-                return { multiplier: 1.30, reason: `Wyprzedane przed 12:00 (${soldOutTimeStr}) -> +30% popytu` };
+                // Wyprzedane przed 12:00 -> +25%
+                return { multiplier: 1.25, reason: `Wyprzedane przed 12:00 (${soldOutTimeStr}) -> +25% popytu` };
             } else if (minutes >= 12 * 60 && minutes < 15 * 60) {
-                // Wyprzedane między 12:00 a 15:00 -> +15%
-                return { multiplier: 1.15, reason: `Wyprzedane między 12:00 a 15:00 (${soldOutTimeStr}) -> +15% popytu` };
-            } else if (minutes >= 15 * 60 && minutes < 17 * 60 + 30) {
-                // Wyprzedane między 15:00 a 17:30 -> +5%
-                return { multiplier: 1.05, reason: `Wyprzedane między 15:00 a 17:30 (${soldOutTimeStr}) -> +5% popytu` };
+                // Wyprzedane między 12:00 a 15:00 -> +10%
+                return { multiplier: 1.15, reason: `Wyprzedane między 12:00 a 15:00 (${soldOutTimeStr}) -> +10% popytu` };
+            } else if (minutes >= 15 * 60 && minutes < 17 * 60) {
+                // Wyprzedane między 15:00 a 17:00 -> +5%
+                return { multiplier: 1.05, reason: `Wyprzedane między 15:00 a 17:00 (${soldOutTimeStr}) -> +5% popytu` };
             } else {
-                // Wyprzedane po 17:30 -> 1.00
-                return { multiplier: 1.00, reason: `Wyprzedane po 17:30 (${soldOutTimeStr}) -> popyt w 100% zaspokojony` };
+                // Wyprzedane po 17:00 -> 1.00
+                return { multiplier: 1.00, reason: `Wyprzedane po 17:00 (${soldOutTimeStr}) -> popyt w 100% zaspokojony` };
             }
         }
         return { multiplier: 1.00, reason: "Brak wcześniejszego wyprzedania -> popyt zaspokojony" };
@@ -79,17 +79,17 @@ function calculateUnmetDemandMultiplier(dayOfWeek: number, soldOutTimeStr?: stri
     // SOBOTA (07:00 – 16:00)
     if (dayOfWeek === 6) {
         if (minutes !== null) {
-            if (minutes < 11 * 60) {
-                // Wyprzedane przed 11:00 -> +30%
-                return { multiplier: 1.30, reason: `Wyprzedane w sobotę przed 11:00 (${soldOutTimeStr}) -> +30% popytu` };
-            } else if (minutes >= 11 * 60 && minutes < 13 * 60 + 30) {
-                // Wyprzedane między 11:00 a 13:30 -> +15%
-                return { multiplier: 1.15, reason: `Wyprzedane w sobotę między 11:00 a 13:30 (${soldOutTimeStr}) -> +15% popytu` };
-            } else if (minutes >= 13 * 60 + 30 && minutes < 15 * 60 + 30) {
-                // Wyprzedane między 13:30 a 15:30 -> +5%
+            if (minutes < 10 * 60) {
+                // Wyprzedane przed 10:00 -> +25%
+                return { multiplier: 1.25, reason: `Wyprzedane w sobotę przed 11:00 (${soldOutTimeStr}) -> +30% popytu` };
+            } else if (minutes >= 10 * 60 && minutes < 13 * 60) {
+                // Wyprzedane między 10:00 a 13:00 -> +15%
+                return { multiplier: 1.10, reason: `Wyprzedane w sobotę między 11:00 a 13:30 (${soldOutTimeStr}) -> +15% popytu` };
+            } else if (minutes >= 13 * 60 && minutes < 15 * 60) {
+                // Wyprzedane między 13:00 a 15:00 -> +5%
                 return { multiplier: 1.05, reason: `Wyprzedane w sobotę między 13:30 a 15:30 (${soldOutTimeStr}) -> +5% popytu` };
             } else {
-                // Wyprzedane po 15:30 -> 1.00
+                // Wyprzedane po 15:00 -> 1.00
                 return { multiplier: 1.00, reason: `Wyprzedane w sobotę po 15:30 (${soldOutTimeStr}) -> popyt zaspokojony` };
             }
         }

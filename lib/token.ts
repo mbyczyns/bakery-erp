@@ -117,16 +117,38 @@ export async function verifySessionToken(token: string): Promise<AuthUser | null
     }
 }
 
-// Sprawdzenie czy użytkownik ma uprawnienia do podstrony
+// Sprawdzenie czy użytkownik ma uprawnienia do podstrony lub endpointu API
 export function isPathAllowedForRole(path: string, role: UserRole): boolean {
     if (role === "ADMIN" || role === "MANAGER") {
         return true;
     }
 
-    // BAKER ma dostęp TYLKO do: produkcja, składniki, przepisy
+    // BAKER (Pracownik) ma dostęp do modułów: Produkcja, Składniki, Przepisy oraz Powiadomienia
     if (role === "BAKER") {
-        const allowedPrefixes = ["/produkcja", "/skladniki", "/przepisy"];
-        return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+        // Żądania do API
+        if (path.startsWith("/api/")) {
+            const allowedApiPrefixes = [
+                "/api/produkcja",
+                "/api/skladniki",
+                "/api/przepisy",
+                "/api/polprodukty",
+                "/api/dictionaries",
+                "/api/powiadomienia",
+                "/api/konfiguracja",
+                "/api/auth",
+            ];
+            return allowedApiPrefixes.some((prefix) => path.startsWith(prefix));
+        }
+
+        // Żądania do podstron UI
+        const allowedPagePrefixes = [
+            "/produkcja",
+            "/skladniki",
+            "/przepisy",
+            "/powiadomienia",
+            "/konfiguracja",
+        ];
+        return allowedPagePrefixes.some((prefix) => path.startsWith(prefix));
     }
 
     return false;

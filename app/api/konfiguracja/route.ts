@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getSystemSettings, saveSystemSettings } from "@/lib/settings";
 import { PriceRoundingOption } from "@/lib/price-rounding";
+import { getUserFromRequest } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -43,6 +44,14 @@ export async function GET() {
 // POST / PATCH: Zapisanie ceny wody lub reguły zaokrąglania cen
 export async function POST(request: NextRequest) {
     try {
+        const currentUser = await getUserFromRequest(request);
+        if (!currentUser || (currentUser.role !== "ADMIN" && currentUser.role !== "MANAGER")) {
+            return NextResponse.json(
+                { error: "Brak uprawnień. Zmiana konfiguracji dostępna jest tylko dla Administratorów i Managerów." },
+                { status: 403 }
+            );
+        }
+
         const body = await request.json();
 
         // 1. Zapis konfiguracji zaokrąglania cen jeśli przesłano

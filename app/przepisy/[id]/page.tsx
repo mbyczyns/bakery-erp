@@ -1834,7 +1834,7 @@ export default function PrzepisSzczegolyPage({
                                                                     {(openEditNotesRowIds[item.rowId] || (item.notes && item.notes.trim())) && (
                                                                         <div className="flex items-center gap-1.5 pt-0.5">
                                                                             <span className="text-[10px] font-semibold text-amber-900 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
-                                                                                Adnotacja:
+                                                                                Notatka:
                                                                             </span>
                                                                             <input
                                                                                 type="text"
@@ -1853,7 +1853,7 @@ export default function PrzepisSzczegolyPage({
                                                                                     setOpenEditNotesRowIds((prev) => ({ ...prev, [item.rowId]: false }));
                                                                                 }}
                                                                                 className="p-1 text-ui-secondary hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0"
-                                                                                title="Usuń adnotację"
+                                                                                title="Usuń notatkę"
                                                                             >
                                                                                 <X size={12} />
                                                                             </button>

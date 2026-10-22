@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user.role === "ADMIN" || user.role === "MANAGER") return true;
 
         if (user.role === "BAKER") {
-            const allowed = ["/produkcja", "/skladniki", "/przepisy", "/powiadomienia"];
+            const allowed = ["/produkcja", "/skladniki", "/przepisy", "/powiadomienia", "/konfiguracja"];
             return allowed.some((p) => path.startsWith(p));
         }
 
