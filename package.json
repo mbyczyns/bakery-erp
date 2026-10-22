@@ -12,15 +12,15 @@
   "dependencies": {
     "fast-xml-parser": "^5.10.1",
     "lucide-react": "^1.24.0",
-    "next": "^16.3.6",
+    "next": "^16.4.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.5"
   },
   "overrides": {
-    "sharp": "^0.35.4",
-    "next": "^16.3.6"
+    "sharp": "^0.35.5",
+    "next": "^16.4.1"
   },
   "devDependencies": {
     "@prisma/client": "^6.19.3",
